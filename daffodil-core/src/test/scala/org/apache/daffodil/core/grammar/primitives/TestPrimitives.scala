@@ -53,7 +53,9 @@ class TestPrimitives {
     val optMatch = re.findFirstMatchIn("'P'###012V34'P';N0V0N")
     println(optMatch)
     optMatch match {
-      case Some(re("'P'", "###012", "34", "'P'", "N", "0V0", "N")) => // ok
+      case Some(m)
+          if m.subgroups == List("'P'", "###012", "34", "'P'", "N", "0V0", "N") => // ok
+      case _ => fail()
     }
   }
 
@@ -62,31 +64,36 @@ class TestPrimitives {
     val optMatch = re.findFirstMatchIn("'P'###012V34'P';N#N")
     println(optMatch)
     optMatch match {
-      case Some(re("'P'", "###012", "34", "'P'", "N", "#", "N")) => // ok
+      case Some(m) if m.subgroups == List("'P'", "###012", "34", "'P'", "N", "#", "N") => // ok
+      case _ => fail()
     }
   }
 
   @Test def testVRegexOnlyPositivePattern(): Unit = {
     val re = TextNumberPatternUtils.vRegexStandard
     val Some(myMatch) = re.findFirstMatchIn("A###012V34B")
-    myMatch match {
-      case re("A", "###012", "34", "B", null, null, null) =>
+    myMatch.subgroups match {
+      case List("A", "###012", "34", "B", null, null, null) => // ok
+      case _ => fail()
     }
   }
 
   @Test def testVRegexOnlyPositivePatternNoPrefixNorSuffix(): Unit = {
     val re = TextNumberPatternUtils.vRegexStandard
-    val Some(myMatch) = re.findFirstMatchIn("###012V34")
-    myMatch match {
-      case re("", "###012", "34", "", null, null, null) =>
+    val optMyMatch = re.findFirstMatchIn("###012V34")
+
+    optMyMatch match {
+      case Some(m) if m.subgroups == List("", "###012", "34", "", null, null, null) => // ok
+      case _ => fail()
     }
   }
 
   @Test def testVRegexTrailingSign(): Unit = {
     val re = TextNumberPatternUtils.vRegexStandard
     val Some(myMatch) = re.findFirstMatchIn("012V34+") // for zoned, overpunched trailing sign.
-    myMatch match {
-      case re("", "012", "34", "+", null, null, null) =>
+    myMatch.subgroups match {
+      case List("", "012", "34", "+", null, null, null) => // ok
+      case _ => fail()
     }
   }
 
@@ -107,8 +114,9 @@ class TestPrimitives {
     val optMyMatch =
       re.findFirstMatchIn("012V34+garbage") // for zoned, overpunched trailing sign.
     optMyMatch match {
-      case Some(re("", "012", "34", "+")) => fail("accepted trash at end of pattern")
-      case None => // ok
+      case Some(m) if m.subgroups == List("", "012", "34", "+") =>
+        fail("accepted trash at end of pattern")
+      case _ => // ok
     }
   }
 
@@ -116,7 +124,7 @@ class TestPrimitives {
     val re = TextNumberPatternUtils.vRegexZoned
     val optMyMatch = re.findFirstMatchIn("A012V34")
     optMyMatch match {
-      case Some(x @ re(_*)) => fail(s"accepted A as leading sign: $x")
+      case Some(x) => fail(s"accepted A as leading sign: ${x.matched}")
       case None => // ok
     }
   }

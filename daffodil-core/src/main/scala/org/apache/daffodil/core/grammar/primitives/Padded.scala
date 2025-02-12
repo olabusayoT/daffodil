@@ -49,6 +49,7 @@ trait PaddingInfoMixin {
     eBase.textTrimKind match {
       case TextTrimKind.None => (MaybeChar.Nope, TextJustificationType.None)
       case TextTrimKind.PadChar if eBase.isSimpleType => padCharAndJustificationForType
+      case _ => eBase.SDE("padChar textTrimKind not supported for complexType")
     }
 
   lazy val (unparsingPadChar: MaybeChar, justificationPad) = {

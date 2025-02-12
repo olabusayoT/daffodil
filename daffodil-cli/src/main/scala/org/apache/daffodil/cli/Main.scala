@@ -440,13 +440,13 @@ class CLIConf(arguments: Array[String], stdout: PrintStream, stderr: PrintStream
     validateOpt(debug, infile) {
       case (Some(_), Some("-")) | (Some(_), None) =>
         Left("Input must not be stdin during interactive debugging")
-      case _ => Right(Unit)
+      case _ => Right(())
     }
 
     validateOpt(parser, validate) {
       case (Some(_), Some(ValidationMode.Full)) =>
         Left("The validation mode must be 'limited' or 'off' when using a saved parser.")
-      case _ => Right(Unit)
+      case _ => Right(())
     }
 
     validateOpt(infosetType, stream, schema) {
@@ -456,7 +456,7 @@ class CLIConf(arguments: Array[String], stdout: PrintStream, stderr: PrintStream
         Left("Streaming mode is not currently supported with EXI infosets.")
       case (Some(InfosetType.EXISA), _, None) =>
         Left("A schema must be specified to use schema-aware compression with EXI")
-      case _ => Right(Unit)
+      case _ => Right(())
     }
   }
 
@@ -566,7 +566,7 @@ class CLIConf(arguments: Array[String], stdout: PrintStream, stderr: PrintStream
     validateOpt(debug, infile) {
       case (Some(_), Some("-")) | (Some(_), None) =>
         Left("Input must not be stdin during interactive debugging")
-      case _ => Right(Unit)
+      case _ => Right(())
     }
 
     validateOpt(infosetType, stream, schema) {
@@ -576,7 +576,7 @@ class CLIConf(arguments: Array[String], stdout: PrintStream, stderr: PrintStream
         Left("Streaming mode is not currently supported with EXI infosets.")
       case (Some(InfosetType.EXISA), _, None) =>
         Left("A schema must be specified to use schema-aware compression with EXI")
-      case _ => Right(Unit)
+      case _ => Right(())
     }
   }
 
@@ -787,7 +787,7 @@ class CLIConf(arguments: Array[String], stdout: PrintStream, stderr: PrintStream
     validateOpt(infosetType, schema) {
       case (Some(InfosetType.EXISA), None) =>
         Left("A schema must be specified to use schema-aware compression with EXI")
-      case _ => Right(Unit)
+      case _ => Right(())
     }
   }
 
@@ -991,8 +991,8 @@ class Main(
     val bindingsWithCorrectValues =
       bindings.filter(b => inBoth.exists(p => b.hashCode == p.hashCode))
 
-    val bindingsMinusUpdates = bindingsMinusBoth.union(bindingsToOverrideMinusBoth)
-    val bindingsWithUpdates = bindingsMinusUpdates.union(bindingsWithCorrectValues)
+    val bindingsMinusUpdates = bindingsMinusBoth ++: bindingsToOverrideMinusBoth
+    val bindingsWithUpdates = bindingsMinusUpdates ++: bindingsWithCorrectValues
 
     bindingsWithUpdates
   }
@@ -1428,7 +1428,7 @@ class Main(
               forPerformance = true
             )
 
-            val dataSeq: Seq[Either[AnyRef, Array[Byte]]] = files.map { filePath =>
+            val dataSeq: collection.Seq[Either[AnyRef, Array[Byte]]] = files.map { filePath =>
               // For performance testing, we want everything in memory so as to
               // remove I/O from consideration. Additionally, for both parse
               // and unparse we need immutable inputs since we could parse the

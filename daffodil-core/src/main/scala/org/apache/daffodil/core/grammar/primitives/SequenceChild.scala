@@ -424,6 +424,7 @@ class ScalarOrderedSequenceChild(sq: SequenceTermBase, term: Term, groupIndex: I
           trd,
           unseparatedHelper
         )
+      case _ => Assert.impossibleCase("default case should not be reached")
     }
     res
   }

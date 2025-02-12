@@ -464,6 +464,7 @@ case class ConvertTextStandardNumberPrim(e: ElementBase)
             ),
             pattern
           )
+        case _ => Assert.impossibleCase("default case should not be reached")
       }
     } else if (hasP) {
       val rr = TextNumberPatternUtils.pOnRightRegexStandard
