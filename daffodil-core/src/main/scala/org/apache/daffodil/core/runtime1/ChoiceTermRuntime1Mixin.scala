@@ -125,8 +125,8 @@ trait ChoiceTermRuntime1Mixin { self: ChoiceTermBase =>
       .groupBy {
         _._1
       }
-      .mapValues {
-        _.map(_._2)
+      .map { case (k, v) =>
+        k -> v.map(_._2)
       }
 
     // Now we examine the event map looking for cases where a given input event corresponds to

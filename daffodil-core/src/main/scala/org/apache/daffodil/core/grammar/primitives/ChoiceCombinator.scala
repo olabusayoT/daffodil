@@ -236,7 +236,7 @@ case class ChoiceCombinator(ch: ChoiceTermBase, alternatives: Seq[Gram])
         }
       })
 
-      val dispatchBranchKeyMap = dispatchBranchKeyValueTuples.toMap.mapValues { gram =>
+      val dispatchBranchKeyMap = dispatchBranchKeyValueTuples.toMap.map { case (k, gram) =>
         val isRepresented =
           true // choice branches are, currently, always represented (cannot have inputValueCalc).
         val gramParser = gram.parser
@@ -246,7 +246,7 @@ case class ChoiceCombinator(ch: ChoiceTermBase, alternatives: Seq[Gram])
           } else {
             gramParser
           }
-        (parser, isRepresented)
+        k -> (parser, isRepresented)
       }
 
       val serializableMap: ProperlySerializableMap[String, (Parser, Boolean)] =

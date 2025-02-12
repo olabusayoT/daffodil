@@ -135,7 +135,7 @@ trait RepTypeMixin { self: ElementBase =>
         repType
       )
 
-      val repValues: Seq[DataValueNumber] =
+      val repValues: collection.Seq[DataValueNumber] =
         enum.repValuesRaw
           .map(repTypeElementDecl.primType.fromXMLString(_).asInstanceOf[DataValueNumber])
       val repValueRanges: Seq[(DataValueNumber, DataValueNumber)] =

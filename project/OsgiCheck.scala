@@ -83,7 +83,7 @@ object OsgiCheckPlugin extends AutoPlugin {
         // should be a list of one.
         val packageOwnersMap = packageOwnerTuples
           .groupBy { case (packageName, _) => packageName }
-          .mapValues { list => list.map { case (_, packageOwner) => packageOwner } }
+          .map { case (k, list) => k -> list.map { case (_, packageOwner) => packageOwner } }
 
         // find any packages with multiple project owners and error
         val multipleOwners = packageOwnersMap.filter { case (_, owners) => owners.length > 1 }

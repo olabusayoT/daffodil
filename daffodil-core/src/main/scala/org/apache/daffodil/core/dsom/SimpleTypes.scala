@@ -276,17 +276,17 @@ final class EnumerationDef(xml: Node, parentType: SimpleTypeDefBase)
         SDE("Invalid data for enumeration: %s", e.getMessage)
     }
 
-  lazy val repValuesRaw: Seq[String] = {
+  lazy val repValuesRaw: collection.Seq[String] = {
     val optNodes = xml.attribute(XMLUtils.DFDLX_NAMESPACE, "repValues")
-    val res = optNodes.getOrElse(Seq.empty).flatMap { node =>
+    val res = optNodes.getOrElse(collection.Seq.empty).flatMap { node =>
       RepValueCooker.convertConstant(node.text, this, false)
     }
     res
   }
 
-  lazy val repValueRangesRaw: Seq[String] = {
+  lazy val repValueRangesRaw: collection.Seq[String] = {
     val optNodes = xml.attribute(XMLUtils.DFDLX_NAMESPACE, "repValueRanges")
-    val res = optNodes.getOrElse(Seq.empty).flatMap { node =>
+    val res = optNodes.getOrElse(collection.Seq.empty).flatMap { node =>
       val ranges = RepValueCooker.convertConstant(node.text, this, false)
       if (ranges.length % 2 != 0) {
         SDE("dfdlx:repValueRanges must specify an even number of values")

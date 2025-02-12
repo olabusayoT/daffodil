@@ -256,7 +256,8 @@ trait ElementBase
 
       // Creates a Map[prefix, Set[NS]]. Duplicate NS's will be removed from the
       // Set, since it's a Set
-      val bindingsGroupedByPrefix = allBindings.groupBy { _._1 }.mapValues { _.map { _._2 } }
+      val bindingsGroupedByPrefix =
+        allBindings.groupBy { _._1 }.map { case (k, v) => k -> v.map { _._2 } }
 
       // Any Set with size > 1 has different namespaces for the same prefix, filter them out
       val bindingsNoConflictsMap = bindingsGroupedByPrefix.filter { case (prefix, bindings) =>
@@ -264,7 +265,7 @@ trait ElementBase
       }
 
       // Create a Map[prefix, NS] now that conflicts are removed
-      val bindingsSingleNSMap = bindingsNoConflictsMap.mapValues { _.head }
+      val bindingsSingleNSMap = bindingsNoConflictsMap.map { case (k, v) => k -> v.head }
 
       // Convert back to a set
       val bindings = bindingsSingleNSMap.toSet
