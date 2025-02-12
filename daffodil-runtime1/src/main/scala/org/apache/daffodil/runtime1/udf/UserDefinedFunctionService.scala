@@ -25,8 +25,8 @@ import java.io.Serializable
 import java.lang.reflect.Method
 import java.util.ServiceConfigurationError
 import java.util.ServiceLoader
-import scala.collection.mutable._
 import scala.collection.compat.immutable.ArraySeq
+import scala.collection.mutable._
 
 import org.apache.daffodil.lib.util.Logger
 import org.apache.daffodil.lib.util.Misc
