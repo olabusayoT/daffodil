@@ -68,7 +68,7 @@ object Util {
     Paths.get(string)
   }
 
-  def devNull(): String = if (isWindows) "NUL" else "/dev/null"
+  def devNull: String = if (isWindows) "NUL" else "/dev/null"
 
   def md5sum(path: Path): String = {
     val md = MessageDigest.getInstance("MD5")
