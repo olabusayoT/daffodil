@@ -18,7 +18,6 @@
 package org.apache.daffodil.runtime1.processors.dfa
 
 import scala.collection.compat.immutable.ArraySeq
-import scala.collection.mutable.ArrayBuffer
 
 import org.apache.daffodil.runtime1.dsom.DPathCompileInfo
 import org.apache.daffodil.runtime1.processors.CharDelim
@@ -45,14 +44,14 @@ object CreateDelimiterDFA {
     outputNewLine: String
   ): DFADelimiter = {
 
-    val allStates: ArrayBuffer[State] = ArrayBuffer.empty
+    val allStates: Array[State] = new Array[State](delimiter.length)
 
     buildTransitions(delimiter, allStates, false)
 
     val unparseValue = delimiter.map { _.unparseValue(outputNewLine) }.mkString
     new DFADelimiterImplUnparse(
       delimType,
-      allStates.reverse.toArray,
+      allStates.reverse,
       delimiterStr,
       unparseValue,
       ci.schemaFileLocation
@@ -71,13 +70,13 @@ object CreateDelimiterDFA {
     ignoreCase: Boolean
   ): DFADelimiter = {
 
-    val allStates: ArrayBuffer[State] = ArrayBuffer.empty
+    val allStates: Array[State] = new Array[State](delimiter.length)
 
     buildTransitions(delimiter, allStates, ignoreCase)
 
     new DFADelimiterImpl(
       delimType,
-      allStates.reverse.toArray,
+      allStates.reverse,
       delimiterStr,
       ci.schemaFileLocation
     )
@@ -148,7 +147,7 @@ object CreateDelimiterDFA {
     d: DelimBase,
     nextState: Int,
     stateNum: Int,
-    allStates: ArrayBuffer[State],
+    allStates: Array[State],
     ignoreCase: Boolean
   ): DelimStateBase = {
 
@@ -177,7 +176,7 @@ object CreateDelimiterDFA {
 
   private def buildTransitions(
     delim: Seq[DelimBase],
-    allStates: ArrayBuffer[State],
+    allStates: Array[State],
     ignoreCase: Boolean
   ): State = {
     assert(!delim.isEmpty)
@@ -187,26 +186,33 @@ object CreateDelimiterDFA {
   private def buildTransitions(
     nextState: DelimStateBase,
     delim: Seq[DelimBase],
-    allStates: ArrayBuffer[State],
+    allStates: Array[State],
     ignoreCase: Boolean
   ): State = {
 
-    if (delim.isEmpty && nextState != null) {
-      // We are initial state
-      nextState.stateName = "StartState" // "PTERM0"
-      return nextState
+    var i = 0
+    var remainingDelim = delim
+    var currentNextState = nextState
+
+    while (remainingDelim.nonEmpty) {
+      val currentState = getState(
+        remainingDelim.head,
+        if (currentNextState == null) DFA.FinalState else currentNextState.stateNum,
+        remainingDelim.length - 1,
+        allStates,
+        ignoreCase
+      )
+      remainingDelim = remainingDelim.tail
+      allStates(i) = currentState
+      currentNextState = currentState
+      i += 1
     }
 
-    val currentState = getState(
-      delim(0),
-      if (nextState == null) DFA.FinalState else nextState.stateNum,
-      delim.length - 1,
-      allStates,
-      ignoreCase
-    )
-    val rest = delim.tail
+    if (currentNextState != null) {
+      // We are initial state
+      currentNextState.stateName = "StartState" // "PTERM0"
+    }
 
-    allStates += currentState
-    return buildTransitions(currentState, rest, allStates, ignoreCase)
+    currentNextState
   }
 }
