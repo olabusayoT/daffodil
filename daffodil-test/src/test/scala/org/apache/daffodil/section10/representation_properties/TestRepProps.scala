@@ -29,13 +29,13 @@ object TestRepProps extends TdmlSuite {
 class TestRepProps extends TdmlTests {
   val tdmlSuite = TestRepProps
 
-  @Test def repPropMissing = test
-  @Test def repPropMissing2 = test
-  @Test def repPropMissing3 = test
+  @Test def repPropMissing() = test()
+  @Test def repPropMissing2() = test()
+  @Test def repPropMissing3() = test()
 
-  @Test def hexBinary_01 = test
+  @Test def hexBinary_01() = test()
 
   // These tests are temporary - see DFDL-994
-  @Test def temporaryDefaultProps_01 = test
-  @Test def temporaryDefaultProps_02 = test
+  @Test def temporaryDefaultProps_01() = test()
+  @Test def temporaryDefaultProps_02() = test()
 }

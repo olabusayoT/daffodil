@@ -29,35 +29,35 @@ object TestUnparserFileBuffering extends TdmlSuite {
 class TestUnparserFileBuffering extends TdmlTests {
   val tdmlSuite = TestUnparserFileBuffering
 
-  @Test def puaInfosetChars_01_ffb = test
-  @Test def puaInfosetChars_02_ffb = test
+  @Test def puaInfosetChars_01_ffb() = test()
+  @Test def puaInfosetChars_02_ffb() = test()
 
-  @Test def unparseFixedLengthString01_ffb = test
-  @Test def unparseFixedLengthString02_ffb = test
-  @Test def unparseFixedLengthString03_ffb = test
+  @Test def unparseFixedLengthString01_ffb() = test()
+  @Test def unparseFixedLengthString02_ffb() = test()
+  @Test def unparseFixedLengthString03_ffb() = test()
 
-  @Test def parseFixedLengthString01_ffb = test
-  @Test def parseFixedLengthStringLength0_ffb = test
+  @Test def parseFixedLengthString01_ffb() = test()
+  @Test def parseFixedLengthStringLength0_ffb() = test()
 
-  @Test def negativeUnparseTest01_ffb = test
-  @Test def negativeUnparseTest02_ffb = test
-  @Test def negativeUnparseTest03_ffb = test
-  @Test def negativeUnparseTest04_ffb = test
-  @Test def negativeUnparseTest05_ffb = test
+  @Test def negativeUnparseTest01_ffb() = test()
+  @Test def negativeUnparseTest02_ffb() = test()
+  @Test def negativeUnparseTest03_ffb() = test()
+  @Test def negativeUnparseTest04_ffb() = test()
+  @Test def negativeUnparseTest05_ffb() = test()
 
-  @Test def unparseDelimitedString01_ffb = test
-  @Test def unparseDelimitedString02_ffb = test
-  @Test def unparseDelimitedString03_ffb = test
-  @Test def unparseDelimitedString04_ffb = test
-  @Test def unparseDelimitedString05_ffb = test
-  @Test def unparseDelimitedString06_ffb = test
-  @Test def unparseDelimitedString07_ffb = test
+  @Test def unparseDelimitedString01_ffb() = test()
+  @Test def unparseDelimitedString02_ffb() = test()
+  @Test def unparseDelimitedString03_ffb() = test()
+  @Test def unparseDelimitedString04_ffb() = test()
+  @Test def unparseDelimitedString05_ffb() = test()
+  @Test def unparseDelimitedString06_ffb() = test()
+  @Test def unparseDelimitedString07_ffb() = test()
 
-  @Test def parseDelimitedString01_ffb = test
+  @Test def parseDelimitedString01_ffb() = test()
 
   // DFDL-1650
-  @Test def alignmentPaddingOVC1_ffb = test
-  @Test def alignmentPaddingOVC2_ffb = test
-  @Test def alignmentPaddingOVC3_ffb = test
-  @Test def alignmentPaddingOVC4_ffb = test
+  @Test def alignmentPaddingOVC1_ffb() = test()
+  @Test def alignmentPaddingOVC2_ffb() = test()
+  @Test def alignmentPaddingOVC3_ffb() = test()
+  @Test def alignmentPaddingOVC4_ffb() = test()
 }

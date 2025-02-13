@@ -36,16 +36,16 @@ object TestEnumsInvalid extends TdmlSuite {
 class TestEnums extends TdmlTests {
   val tdmlSuite = TestEnums
 
-  @Test def enumValid1 = test
-  @Test def enumInvalid1 = test
-  @Test def enumMiss1 = test
-  @Test def repTypeAlignment = test
+  @Test def enumValid1() = test()
+  @Test def enumInvalid1() = test()
+  @Test def enumMiss1() = test()
+  @Test def repTypeAlignment() = test()
 }
 
 class TestEnumsInvalid extends TdmlTests {
   val tdmlSuite = TestEnumsInvalid
 
-  @Test def emptyRepValues = test
-  @Test def noRepValues = test
-  @Test def enumRepTypeNonInt = test
+  @Test def emptyRepValues() = test()
+  @Test def noRepValues() = test()
+  @Test def enumRepTypeNonInt() = test()
 }

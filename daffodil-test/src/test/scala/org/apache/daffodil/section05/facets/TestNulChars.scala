@@ -29,8 +29,8 @@ class TestNulChars extends TdmlTests {
   val tdmlSuite = TestNulChars
 
   // DAFFODIL-2363 &#xE000; (NUL replacement into XML) can't be used in pattern facet. With full validation.
-  @Test def nulPattern1 = test
+  @Test def nulPattern1() = test()
 
-  @Test def nulPad1 = test
-  @Test def nulPad2 = test
+  @Test def nulPad1() = test()
+  @Test def nulPad2() = test()
 }

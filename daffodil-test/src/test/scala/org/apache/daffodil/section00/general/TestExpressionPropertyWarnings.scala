@@ -33,5 +33,5 @@ object TestExpressionPropertyWarnings extends TdmlSuite {
 class TestExpressionPropertyWarnings extends TdmlTests {
   val tdmlSuite = TestExpressionPropertyWarnings
 
-  @Test def expressionPropertyWarning1 = test
+  @Test def expressionPropertyWarning1() = test()
 }

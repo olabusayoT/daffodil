@@ -30,5 +30,5 @@ class TestUnparserGeneral2 extends TdmlTests {
   val tdmlSuite = TestUnparserGeneral2
 
   // test for DAFFODIL-1843
-  @Test def bitOrderOVC1 = test
+  @Test def bitOrderOVC1() = test()
 }

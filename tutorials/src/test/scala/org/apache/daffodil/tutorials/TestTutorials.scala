@@ -39,25 +39,25 @@ class TestTutorialBitOrder extends TdmlTests {
   val tdmlSuite = TestTutorialBitOrder
 
   // removed for now. This will probably go back into this tutorial
-  @Ignore @Test def TestMIL2045_47001D_1 = test
-  @Test def leastSignificantBitFirst = test
-  @Test def leastSignificantBitFirstRTL = test
-  @Test def mostSignificantBitFirst = test
-  @Test def littleEndianLeastFirstLTR = test
-  @Test def littleEndianLeastFirstRTL = test
+  @Ignore @Test def TestMIL2045_47001D_1() = test()
+  @Test def leastSignificantBitFirst() = test()
+  @Test def leastSignificantBitFirstRTL() = test()
+  @Test def mostSignificantBitFirst() = test()
+  @Test def littleEndianLeastFirstLTR() = test()
+  @Test def littleEndianLeastFirstRTL() = test()
 
 }
 
 class TestTutorialTdml extends TdmlTests {
   val tdmlSuite = TestTutorialTdml
 
-  @Test def dateTimeTest = test
-  @Test def unparseDateTimeTest = test
+  @Test def dateTimeTest() = test()
+  @Test def unparseDateTimeTest() = test()
 }
 
 class TestTutorialBugReport extends TdmlTests {
   val tdmlSuite = TestTutorialBugReport
 
-  @Test def dateTimeTest = test
-  @Test def unparseDateTimeTest = test
+  @Test def dateTimeTest() = test()
+  @Test def unparseDateTimeTest() = test()
 }

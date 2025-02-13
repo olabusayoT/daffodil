@@ -32,27 +32,27 @@ class TestDFDLExpressions3 extends TdmlTests {
 
   // Fix to DAFFODIL-2192 removed the sharing of expression compilation across
   // multiple points of use. So these polymorphic situations no longer cause errors.
-  @Ignore @Test def test_polymorphic_expr_1 = test
-  @Ignore @Test def test_polymorphic_expr_2a = test
-  @Ignore @Test def test_polymorphic_expr_2b = test
-  @Ignore @Test def test_polymorphic_expr_3 = test
-  @Ignore @Test def test_polymorphic_expr_4 = test
-  @Ignore @Test def test_polymorphic_expr_5 = test
-  @Ignore @Test def test_polymorphic_expr_6 = test
+  @Ignore @Test def test_polymorphic_expr_1() = test()
+  @Ignore @Test def test_polymorphic_expr_2a() = test()
+  @Ignore @Test def test_polymorphic_expr_2b() = test()
+  @Ignore @Test def test_polymorphic_expr_3() = test()
+  @Ignore @Test def test_polymorphic_expr_4() = test()
+  @Ignore @Test def test_polymorphic_expr_5() = test()
+  @Ignore @Test def test_polymorphic_expr_6() = test()
 
-  @Test def test_array_self_expr1 = test
-  @Test def test_array_self_expr2 = test
-  @Test def test_array_path_expr1 = test
-  @Test def test_array_path_expr2 = test
-  @Test def test_array_path_expr3 = test
+  @Test def test_array_self_expr1() = test()
+  @Test def test_array_self_expr2() = test()
+  @Test def test_array_path_expr1() = test()
+  @Test def test_array_path_expr2() = test()
+  @Test def test_array_path_expr3() = test()
 
-  @Test def setVariable_neg_01 = test
-
-  // DAFFODIL-2594
-  @Ignore @Test def setVariable_neg_line_info_01 = test
-
-  @Test def newVariableInstance_neg_01 = test
+  @Test def setVariable_neg_01() = test()
 
   // DAFFODIL-2594
-  @Ignore @Test def newVariableInstance_neg_line_info_01 = test
+  @Ignore @Test def setVariable_neg_line_info_01() = test()
+
+  @Test def newVariableInstance_neg_01() = test()
+
+  // DAFFODIL-2594
+  @Ignore @Test def newVariableInstance_neg_line_info_01() = test()
 }

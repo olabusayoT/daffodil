@@ -45,82 +45,82 @@ object TestBitFunctionsNot extends TdmlSuite {
 class TestBitFunctions extends TdmlTests {
   val tdmlSuite = TestBitFunctions
 
-  @Test def longShiftTest = test
-  @Test def intShiftTest = test
-  @Test def byteShiftTest = test
-  @Test def shortShiftTest = test
-  @Test def testUnsignedLongShifting1 = test
-  @Test def testUnsignedIntShifting = test
-  @Test def testUnsignedByteShifting = test
-  @Test def testUnsignedShortShifting = test
-  @Test def leftShiftIntError = test
-  @Test def rightShiftIntError = test
-  @Test def rightShiftLongError = test
-  @Test def leftShiftLongError = test
-  @Test def leftShiftShortError = test
-  @Test def rightShiftShortError = test
-  @Test def leftShiftByteError = test
-  @Test def rightShiftByteError = test
-  @Test def leftShiftFloatError01 = test
-  @Test def rightShiftFloatError01 = test
-  @Test def leftShiftDoubleError01 = test
-  @Test def rightShiftDoubleError01 = test
-  @Test def leftShiftIntegerError01 = test
-  @Test def rightShiftIntegerError01 = test
-  @Test def leftShiftDecimalError01 = test
-  @Test def rightShiftDecimalError01 = test
-  @Test def leftShiftNonNegativeIntegerError01 = test
-  @Test def rightShiftNonNegativeIntegerError01 = test
+  @Test def longShiftTest() = test()
+  @Test def intShiftTest() = test()
+  @Test def byteShiftTest() = test()
+  @Test def shortShiftTest() = test()
+  @Test def testUnsignedLongShifting1() = test()
+  @Test def testUnsignedIntShifting() = test()
+  @Test def testUnsignedByteShifting() = test()
+  @Test def testUnsignedShortShifting() = test()
+  @Test def leftShiftIntError() = test()
+  @Test def rightShiftIntError() = test()
+  @Test def rightShiftLongError() = test()
+  @Test def leftShiftLongError() = test()
+  @Test def leftShiftShortError() = test()
+  @Test def rightShiftShortError() = test()
+  @Test def leftShiftByteError() = test()
+  @Test def rightShiftByteError() = test()
+  @Test def leftShiftFloatError01() = test()
+  @Test def rightShiftFloatError01() = test()
+  @Test def leftShiftDoubleError01() = test()
+  @Test def rightShiftDoubleError01() = test()
+  @Test def leftShiftIntegerError01() = test()
+  @Test def rightShiftIntegerError01() = test()
+  @Test def leftShiftDecimalError01() = test()
+  @Test def rightShiftDecimalError01() = test()
+  @Test def leftShiftNonNegativeIntegerError01() = test()
+  @Test def rightShiftNonNegativeIntegerError01() = test()
 }
 
 class TestBitFunctionsXor extends TdmlTests {
   val tdmlSuite = TestBitFunctionsXor
 
-  @Test def testIntXor = test
-  @Test def testLongXor = test
-  @Test def testShortXor = test
-  @Test def testByteXor = test
-  @Test def testUnsignedIntXor = test
-  @Test def testUnsignedLongXor = test
-  @Test def testUnsignedShortXor = test
-  @Test def testUnsignedByteXor = test
+  @Test def testIntXor() = test()
+  @Test def testLongXor() = test()
+  @Test def testShortXor() = test()
+  @Test def testByteXor() = test()
+  @Test def testUnsignedIntXor() = test()
+  @Test def testUnsignedLongXor() = test()
+  @Test def testUnsignedShortXor() = test()
+  @Test def testUnsignedByteXor() = test()
 }
 
 class TestBitFunctionsOr extends TdmlTests {
   val tdmlSuite = TestBitFunctionsOr
 
-  @Test def testIntOr = test
-  @Test def testLongOr = test
-  @Test def testShortOr = test
-  @Test def testByteOr = test
-  @Test def testUnsignedIntOr = test
-  @Test def testUnsignedLongOr = test
-  @Test def testUnsignedShortOr = test
-  @Test def testUnsignedByteOr = test
+  @Test def testIntOr() = test()
+  @Test def testLongOr() = test()
+  @Test def testShortOr() = test()
+  @Test def testByteOr() = test()
+  @Test def testUnsignedIntOr() = test()
+  @Test def testUnsignedLongOr() = test()
+  @Test def testUnsignedShortOr() = test()
+  @Test def testUnsignedByteOr() = test()
 }
 
 class TestBitFunctionsAnd extends TdmlTests {
   val tdmlSuite = TestBitFunctionsAnd
 
-  @Test def testIntAnd = test
-  @Test def testLongAnd = test
-  @Test def testShortAnd = test
-  @Test def testByteAnd = test
-  @Test def testUnsignedIntAnd = test
-  @Test def testUnsignedLongAnd = test
-  @Test def testUnsignedShortAnd = test
-  @Test def testUnsignedByteAnd = test
+  @Test def testIntAnd() = test()
+  @Test def testLongAnd() = test()
+  @Test def testShortAnd() = test()
+  @Test def testByteAnd() = test()
+  @Test def testUnsignedIntAnd() = test()
+  @Test def testUnsignedLongAnd() = test()
+  @Test def testUnsignedShortAnd() = test()
+  @Test def testUnsignedByteAnd() = test()
 }
 
 class TestBitFunctionsNot extends TdmlTests {
   val tdmlSuite = TestBitFunctionsNot
 
-  @Test def testIntNot = test
-  @Test def testLongNot = test
-  @Test def testShortNot = test
-  @Test def testByteNot = test
-  @Test def testUnsignedIntNot = test
-  @Test def testUnsignedLongNot = test
-  @Test def testUnsignedShortNot = test
-  @Test def testUnsignedByteNot = test
+  @Test def testIntNot() = test()
+  @Test def testLongNot() = test()
+  @Test def testShortNot() = test()
+  @Test def testByteNot() = test()
+  @Test def testUnsignedIntNot() = test()
+  @Test def testUnsignedLongNot() = test()
+  @Test def testUnsignedShortNot() = test()
+  @Test def testUnsignedByteNot() = test()
 }

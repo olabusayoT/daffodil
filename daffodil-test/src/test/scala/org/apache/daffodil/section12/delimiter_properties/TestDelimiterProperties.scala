@@ -30,42 +30,42 @@ object TestDelimiterProperties extends TdmlSuite {
 class TestDelimiterProperties extends TdmlTests {
   val tdmlSuite = TestDelimiterProperties
 
-  @Test def DelimProp_01 = test
-  @Test def ParseSequence4 = test
-  @Test def ParseSequence5 = test
-  @Test def DelimProp_02 = test
-  @Test def DelimProp_03 = test
-  @Test def DelimProp_04 = test
-  @Test def DelimProp_05 = test
-  @Test def DelimProp_06 = test
-  @Test def DelimProp_07 = test
-  @Test def initiatedContentSimple1 = test
-  @Test def Lesson4_initiators_terminators = test
+  @Test def DelimProp_01() = test()
+  @Test def ParseSequence4() = test()
+  @Test def ParseSequence5() = test()
+  @Test def DelimProp_02() = test()
+  @Test def DelimProp_03() = test()
+  @Test def DelimProp_04() = test()
+  @Test def DelimProp_05() = test()
+  @Test def DelimProp_06() = test()
+  @Test def DelimProp_07() = test()
+  @Test def initiatedContentSimple1() = test()
+  @Test def Lesson4_initiators_terminators() = test()
 
-  @Test def DelimProp_10 = test
-  @Test def DelimProp_10_01 = test
-  @Test def DelimProp_10_02 = test
-  @Test def DelimProp_10_03 = test
+  @Test def DelimProp_10() = test()
+  @Test def DelimProp_10_01() = test()
+  @Test def DelimProp_10_02() = test()
+  @Test def DelimProp_10_03() = test()
 
-  @Test def E1 = test
+  @Test def E1() = test()
 
-  @Test def ReqFieldMissingAndSepIsPrefixOfTerminator_Prefix = test
-  @Test def ReqFieldMissingAndSepIsPrefixOfTerminator_Infix = test
-  @Test def ReqFieldMissingAndSepIsPrefixOfTerminator_Postfix = test
+  @Test def ReqFieldMissingAndSepIsPrefixOfTerminator_Prefix() = test()
+  @Test def ReqFieldMissingAndSepIsPrefixOfTerminator_Infix() = test()
+  @Test def ReqFieldMissingAndSepIsPrefixOfTerminator_Postfix() = test()
 
-  @Test def OptionalWSPTermWithExplicitLength = test
-  @Test def OptionalWSPTermWithExplicitLength2 = test
+  @Test def OptionalWSPTermWithExplicitLength() = test()
+  @Test def OptionalWSPTermWithExplicitLength2() = test()
 
-  @Test def delims_ignorecase_01 = test
+  @Test def delims_ignorecase_01() = test()
 
-  @Test def percentInitiator = test
-  @Test def percentSeparator = test
-  @Test def percentTerminator = test
-  @Test def percentTerminator2 = test
-  @Test def percentExpression = test
+  @Test def percentInitiator() = test()
+  @Test def percentSeparator() = test()
+  @Test def percentTerminator() = test()
+  @Test def percentTerminator2() = test()
+  @Test def percentExpression() = test()
 
-  @Test def emptyInitiator1 = test
-  @Test def emptyInitiator2 = test
-  @Test def emptyInitiator3 = test
-  @Test def emptyInitiator4 = test
+  @Test def emptyInitiator1() = test()
+  @Test def emptyInitiator2() = test()
+  @Test def emptyInitiator3() = test()
+  @Test def emptyInitiator4() = test()
 }

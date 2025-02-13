@@ -29,9 +29,9 @@ object TestGzipFoldB64 extends TdmlSuite {
 class TestGzipFoldB64 extends TdmlTests {
   val tdmlSuite = TestGzipFoldB64
 
-  @Test def gzipLayer1 = test
-  @Test def foldedIMFBase64Layers1 = test
-  @Test def foldedIMF1 = test
-  @Test def layersErr1 = test
-  @Test def base64GzipLayers1 = test
+  @Test def gzipLayer1() = test()
+  @Test def foldedIMFBase64Layers1() = test()
+  @Test def foldedIMF1() = test()
+  @Test def layersErr1() = test()
+  @Test def base64GzipLayers1() = test()
 }

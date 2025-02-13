@@ -31,10 +31,10 @@ object TestPadTest extends TdmlSuite {
 class TestPadTest extends TdmlTests {
   val tdmlSuite = TestPadTest
 
-  @Test def padtest_00 = test
-  @Test def padtest_01 = test
-  @Test def padtest_16 = test
-  @Test def padtest_17 = test
+  @Test def padtest_00() = test()
+  @Test def padtest_01() = test()
+  @Test def padtest_16() = test()
+  @Test def padtest_17() = test()
 }
 
 object TestPadTestC extends TdmlSuite {
@@ -46,8 +46,8 @@ object TestPadTestC extends TdmlSuite {
 class TestPadTestC extends TdmlTests {
   val tdmlSuite = TestPadTestC
 
-  @Test def padtest_00 = test
-  @Test def padtest_01 = test
-  @Test def padtest_16 = test
-  @Test def padtest_17 = test
+  @Test def padtest_00() = test()
+  @Test def padtest_01() = test()
+  @Test def padtest_16() = test()
+  @Test def padtest_17() = test()
 }

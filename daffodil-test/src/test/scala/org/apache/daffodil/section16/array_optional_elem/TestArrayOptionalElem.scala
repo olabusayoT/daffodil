@@ -44,62 +44,62 @@ object TestFacets extends TdmlSuite {
 class TestArrayOptionalElem extends TdmlTests {
   val tdmlSuite = TestArrayOptionalElem
 
-  @Test def arrayExpressions01 = test
-  @Test def arrayExpressions02 = test
-  @Test def arrayExpressions02b = test
-  @Test def arrayExpressions02c = test
-  @Test def arrayExpressions02d = test
-  @Test def arrayExpressions03 = test
-  @Test def arrayExpressions04 = test
-  @Test def arrayExpressions05 = test
+  @Test def arrayExpressions01() = test()
+  @Test def arrayExpressions02() = test()
+  @Test def arrayExpressions02b() = test()
+  @Test def arrayExpressions02c() = test()
+  @Test def arrayExpressions02d() = test()
+  @Test def arrayExpressions03() = test()
+  @Test def arrayExpressions04() = test()
+  @Test def arrayExpressions05() = test()
 
-  @Test def error01 = test
-  @Test def postfixNoErr = test
+  @Test def error01() = test()
+  @Test def postfixNoErr() = test()
 
-  @Test def optionalElem = test
-  @Test def optionalWithSeparators = test
-  @Test def Lesson6_optional_element = test
-  @Test def Lesson6_optional_element_01 = test
-  @Test def Lesson6_fixed_array = test
-  @Test def Lesson6_variable_array = test
-  @Test def Lesson6_variable_array_01 = test
-  @Test def Lesson6_variable_array_02 = test
+  @Test def optionalElem() = test()
+  @Test def optionalWithSeparators() = test()
+  @Test def Lesson6_optional_element() = test()
+  @Test def Lesson6_optional_element_01() = test()
+  @Test def Lesson6_fixed_array() = test()
+  @Test def Lesson6_variable_array() = test()
+  @Test def Lesson6_variable_array_01() = test()
+  @Test def Lesson6_variable_array_02() = test()
 
-  @Test def occursCountKindImplicitSeparators01a = test
-  @Test def occursCountKindImplicitSeparators01b = test
-  @Test def occursCountKindImplicitSeparators02 = test
-  @Test def occursCountKindImplicitSeparators03 = test
-  @Test def occursCountKindImplicitSeparators04 = test
-  @Test def occursCountKindImplicitSeparators05 = test
-  @Test def occursCountKindImplicitSeparators05Strict = test
-  @Test def occursCountKindImplicitSeparatorsUnparser = test
+  @Test def occursCountKindImplicitSeparators01a() = test()
+  @Test def occursCountKindImplicitSeparators01b() = test()
+  @Test def occursCountKindImplicitSeparators02() = test()
+  @Test def occursCountKindImplicitSeparators03() = test()
+  @Test def occursCountKindImplicitSeparators04() = test()
+  @Test def occursCountKindImplicitSeparators05() = test()
+  @Test def occursCountKindImplicitSeparators05Strict() = test()
+  @Test def occursCountKindImplicitSeparatorsUnparser() = test()
 
-  @Test def ambigSep1 = test
-  @Test def ambigSep2 = test
+  @Test def ambigSep1() = test()
+  @Test def ambigSep2() = test()
 
   // DAFFODIL-1886
-  @Test def manyAdjacentOptionals_01 = test
+  @Test def manyAdjacentOptionals_01() = test()
 
   // DAFFODIL-2263
-  @Test def dfdl2263 = test
+  @Test def dfdl2263() = test()
 }
 
 class TestBacktracking extends TdmlTests {
   val tdmlSuite = TestBacktracking
 
-  @Test def backtrack1Text = test
+  @Test def backtrack1Text() = test()
 }
 
 class TestArrayComb extends TdmlTests {
   val tdmlSuite = TestArrayComb
 
   // DAFFODIL-1964
-  @Test def arrayComb1 = test
-  @Test def arrayComb2 = test
+  @Test def arrayComb1() = test()
+  @Test def arrayComb2() = test()
 }
 
 class TestFacets extends TdmlTests {
   val tdmlSuite = TestFacets
 
-  @Test def leftOverData_Neg = test
+  @Test def leftOverData_Neg() = test()
 }

@@ -29,24 +29,24 @@ object TestSepSuppression extends TdmlSuite {
 class TestSepSuppression extends TdmlTests {
   val tdmlSuite = TestSepSuppression
 
-  @Test def ptg1_1p = test
-  @Test def ptg1_2p = test
-  @Test def ptg1_3p = test
-  @Test def ptg1_4p = test
-  @Test def ptg1_5p = test
-  @Test def ptg1_6p = test
+  @Test def ptg1_1p() = test()
+  @Test def ptg1_2p() = test()
+  @Test def ptg1_3p() = test()
+  @Test def ptg1_4p() = test()
+  @Test def ptg1_5p() = test()
+  @Test def ptg1_6p() = test()
 
-  @Test def ptg1_1u = test
-  @Test def ptg1_2u = test
-  @Test def ptg1_3u = test
-  @Test def ptg1_4u = test
-  @Test def ptg1_5u = test
-  @Test def ptg1_6u = test
+  @Test def ptg1_1u() = test()
+  @Test def ptg1_2u() = test()
+  @Test def ptg1_3u() = test()
+  @Test def ptg1_4u() = test()
+  @Test def ptg1_5u() = test()
+  @Test def ptg1_6u() = test()
 
-  @Test def ptg2_1p = test
-  @Test def ptg2_1u = test
+  @Test def ptg2_1p() = test()
+  @Test def ptg2_1u() = test()
 
-  @Test def ptg3_1p = test
-  @Test def ptg3_1u = test
-  @Test def ptg3_2p_daf = test
+  @Test def ptg3_1p() = test()
+  @Test def ptg3_1u() = test()
+  @Test def ptg3_2p_daf() = test()
 }

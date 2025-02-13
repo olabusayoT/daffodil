@@ -29,30 +29,30 @@ object TestBoolean2 extends TdmlSuite {
 class TestBoolean2 extends TdmlTests {
   val tdmlSuite = TestBoolean2
 
-  @Test def binaryBoolean_0 = test
-  @Test def binaryBoolean_unparse_0 = test
-  @Test def binaryBoolean_1 = test
-  @Test def binaryBoolean_unparse_1 = test
-  @Test def binaryBoolean_unparse_2 = test
-  @Test def binaryBoolean_2 = test
-  @Test def binaryBoolean_pe_0 = test
-  @Test def binaryBoolean_sde_0 = test
-  @Test def binaryBoolean_sde_1 = test
-  @Test def textBoolean_0 = test
-  @Test def textBoolean_0a = test
-  @Test def textBoolean_unparse_0 = test
-  @Test def textBoolean_1 = test
-  @Test def textBoolean_2 = test
-  @Test def textBoolean_3 = test
-  @Test def textBoolean_sde_0 = test
-  @Test def textBoolean_sde_1 = test
-  @Test def textBoolean_sde_2 = test
-  @Test def textBoolean_unparse_sde_0 = test
-  @Test def textBoolean_sde_3 = test
-  @Test def textBoolean_sde_4 = test
-  @Test def textBoolean_sde_5 = test
-  @Test def textBoolean_pe_0 = test
-  @Test def textBoolean_unparseError = test
+  @Test def binaryBoolean_0() = test()
+  @Test def binaryBoolean_unparse_0() = test()
+  @Test def binaryBoolean_1() = test()
+  @Test def binaryBoolean_unparse_1() = test()
+  @Test def binaryBoolean_unparse_2() = test()
+  @Test def binaryBoolean_2() = test()
+  @Test def binaryBoolean_pe_0() = test()
+  @Test def binaryBoolean_sde_0() = test()
+  @Test def binaryBoolean_sde_1() = test()
+  @Test def textBoolean_0() = test()
+  @Test def textBoolean_0a() = test()
+  @Test def textBoolean_unparse_0() = test()
+  @Test def textBoolean_1() = test()
+  @Test def textBoolean_2() = test()
+  @Test def textBoolean_3() = test()
+  @Test def textBoolean_sde_0() = test()
+  @Test def textBoolean_sde_1() = test()
+  @Test def textBoolean_sde_2() = test()
+  @Test def textBoolean_unparse_sde_0() = test()
+  @Test def textBoolean_sde_3() = test()
+  @Test def textBoolean_sde_4() = test()
+  @Test def textBoolean_sde_5() = test()
+  @Test def textBoolean_pe_0() = test()
+  @Test def textBoolean_unparseError() = test()
 
-  @Test def textBoolean_IgnoreCase = test
+  @Test def textBoolean_IgnoreCase() = test()
 }

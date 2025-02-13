@@ -33,10 +33,10 @@ object TestIngressXdccBw extends TdmlSuite {
 class TestIngressXdccBw extends TdmlTests {
   val tdmlSuite = TestIngressXdccBw
 
-  @Test def ingress_xdcc_bw_111 = test
-  @Test def ingress_xdcc_bw_112 = test
-  @Test def ingress_xdcc_bw_113 = test
-  @Test def ingress_xdcc_bw_114 = test
-  @Test def ingress_xdcc_bw_115 = test
-  @Test def ingress_xdcc_bw_116 = test
+  @Test def ingress_xdcc_bw_111() = test()
+  @Test def ingress_xdcc_bw_112() = test()
+  @Test def ingress_xdcc_bw_113() = test()
+  @Test def ingress_xdcc_bw_114() = test()
+  @Test def ingress_xdcc_bw_115() = test()
+  @Test def ingress_xdcc_bw_116() = test()
 }

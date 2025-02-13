@@ -29,6 +29,6 @@ object TestLengthKindEndOfParent2 extends TdmlSuite {
 class TestLengthKindEndOfParent2 extends TdmlTests {
   val tdmlSuite = TestLengthKindEndOfParent2
 
-  @Test def TestEndOfParentNYIComplexTypes = test
-  @Test def TestEndOfParentNYISimpleTypes = test
+  @Test def TestEndOfParentNYIComplexTypes() = test()
+  @Test def TestEndOfParentNYISimpleTypes() = test()
 }

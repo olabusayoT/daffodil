@@ -31,15 +31,15 @@ object TestVariableLen extends TdmlSuite {
 class TestVariableLen extends TdmlTests {
   val tdmlSuite = TestVariableLen
 
-  @Test def fixed = test
-  @Test def implicitLen = test
-  @Test def parsed = test
-  @Test def expression = test
-  @Test def expression_00 = test
-  @Test def expression_01 = test
-  @Test def expression_16 = test
-  @Test def expression_17 = test
-  @Test def stopValue = test
+  @Test def fixed() = test()
+  @Test def implicitLen() = test()
+  @Test def parsed() = test()
+  @Test def expression() = test()
+  @Test def expression_00() = test()
+  @Test def expression_01() = test()
+  @Test def expression_16() = test()
+  @Test def expression_17() = test()
+  @Test def stopValue() = test()
 }
 
 object TestVariableLenC extends TdmlSuite {
@@ -50,11 +50,11 @@ object TestVariableLenC extends TdmlSuite {
 class TestVariableLenC extends TdmlTests {
   val tdmlSuite = TestVariableLenC
 
-  @Test def fixed = test
-  @Test def expression = test
-  @Test def expression_00 = test
-  @Test def expression_01 = test
-  @Test def expression_16 = test
-  @Test def expression_17_error = test
-  @Test def stopValue = test
+  @Test def fixed() = test()
+  @Test def expression() = test()
+  @Test def expression_00() = test()
+  @Test def expression_01() = test()
+  @Test def expression_16() = test()
+  @Test def expression_17_error() = test()
+  @Test def stopValue() = test()
 }

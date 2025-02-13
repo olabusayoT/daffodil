@@ -30,16 +30,16 @@ object TestSequenceGroupInitiatedContent extends TdmlSuite {
 class TestSequenceGroupInitiatedContent extends TdmlTests {
   val tdmlSuite = TestSequenceGroupInitiatedContent
 
-  @Test def initiatedContentSeqBaseline = test
-  @Test def initiatedContentSeq1 = test
-  @Test def initiatedContentSeq2 = test
-  @Test def initiatedContentSeq3 = test
+  @Test def initiatedContentSeqBaseline() = test()
+  @Test def initiatedContentSeq1() = test()
+  @Test def initiatedContentSeq2() = test()
+  @Test def initiatedContentSeq3() = test()
 
   // Tests for DAFFODIL-2143
-  @Test def sequenceScalarChildDoesNotDiscriminateAnything1 = test
-  @Test def sequenceScalarChildDoesNotDiscriminateAnything2 = test
-  @Test def sequenceFixedOccursChildDoesNotDiscriminateAnything1 = test
-  @Test def sequenceExpressionOccursChildDoesNotDiscriminateAnything1 = test
-  @Test def sequenceImplicitOccursLessThanMinOccursDoesNotDiscriminateAnything1 = test
-  @Test def sequenceImplicitOccursZeroOrMoreDiscriminates1 = test
+  @Test def sequenceScalarChildDoesNotDiscriminateAnything1() = test()
+  @Test def sequenceScalarChildDoesNotDiscriminateAnything2() = test()
+  @Test def sequenceFixedOccursChildDoesNotDiscriminateAnything1() = test()
+  @Test def sequenceExpressionOccursChildDoesNotDiscriminateAnything1() = test()
+  @Test def sequenceImplicitOccursLessThanMinOccursDoesNotDiscriminateAnything1() = test()
+  @Test def sequenceImplicitOccursZeroOrMoreDiscriminates1() = test()
 }

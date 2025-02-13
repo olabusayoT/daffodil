@@ -58,17 +58,17 @@ object TestAU extends TdmlSuite {
 class TestBitFlag extends TdmlTests {
   val tdmlSuite = TestBitFlag
 
-  @Test def testNone = test
-  @Test def testOne = test
-  @Test def testMany = test
+  @Test def testNone() = test()
+  @Test def testOne() = test()
+  @Test def testMany() = test()
 }
 
 class TestAH extends TdmlTests {
   val tdmlSuite = TestAH
 
-  @Test def AH000 = test
-  @Test def AH001 = test
-  @Test def AH002 = test
+  @Test def AH000() = test()
+  @Test def AH001() = test()
+  @Test def AH002() = test()
 }
 
 class TestAM extends TdmlTests {
@@ -88,12 +88,12 @@ class TestAM extends TdmlTests {
   // This is fixed by specifying daffodil-specific property
   // dfdlx:parseUnparsePolicy="parseOnly", which suppresses the check for this
   // constraint.
-  @Test def AM000 = test
-  @Test def AM001 = test
+  @Test def AM000() = test()
+  @Test def AM001() = test()
 }
 
 class TestAU extends TdmlTests {
   val tdmlSuite = TestAU
 
-  @Test def AU000 = test
+  @Test def AU000() = test()
 }

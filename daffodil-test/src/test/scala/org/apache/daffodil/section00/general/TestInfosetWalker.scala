@@ -29,8 +29,8 @@ object TestInfosetWalker extends TdmlSuite {
 class TestInfosetWalker extends TdmlTests {
   val tdmlSuite = TestInfosetWalker
 
-  @Test def infosetWalker_01 = test
+  @Test def infosetWalker_01() = test()
   // DAFFODIL-2755
-  @Test def infosetWalker_02 = test
-  @Test def infosetWalker_03 = test
+  @Test def infosetWalker_02() = test()
+  @Test def infosetWalker_03() = test()
 }

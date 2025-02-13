@@ -31,6 +31,6 @@ class TestImportOtherAnnotationSchema extends TdmlTests {
   val tdmlSuite = TestImportOtherAnnotationSchema
 
   // DFDL-1907
-  @Test def importOtherAnnotationSchema1 = test
-  @Test def importOtherAnnotationSchema2 = test
+  @Test def importOtherAnnotationSchema1() = test()
+  @Test def importOtherAnnotationSchema2() = test()
 }

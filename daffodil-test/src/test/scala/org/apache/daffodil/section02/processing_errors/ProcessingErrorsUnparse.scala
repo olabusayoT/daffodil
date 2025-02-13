@@ -47,14 +47,14 @@ object TestProcessingErrorsUnparseValidate extends TdmlSuite {
 class TestProcessingErrorsUnparseNoValidate extends TdmlTests {
   val tdmlSuite = TestProcessingErrorsUnparseNoValidate
 
-  @Test def missingNamespacePrefixUnparse = test
-  @Test def incorrectNamespaceUnparse = test
+  @Test def missingNamespacePrefixUnparse() = test()
+  @Test def incorrectNamespaceUnparse() = test()
 }
 
 class TestProcessingErrorsUnparseValidate extends TdmlTests {
   val tdmlSuite = TestProcessingErrorsUnparseValidate
 
-  @Test def roundTripErrorHalfwayThrough = test
-  @Test def upaInvalidSchemaUnparse = test
-  @Test def upaInvalidSchemaUnparse2 = test
+  @Test def roundTripErrorHalfwayThrough() = test()
+  @Test def upaInvalidSchemaUnparse() = test()
+  @Test def upaInvalidSchemaUnparse2() = test()
 }

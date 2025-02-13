@@ -22,7 +22,7 @@ import org.junit.Assert.fail
 import org.junit.Test
 
 class Thing() extends Serializable {
-  var things: Seq[Thing] = _
+  var things: collection.Seq[Thing] = _
 }
 
 class TestListSerialization {
@@ -48,7 +48,7 @@ class TestListSerialization {
   @Test def testListSerializationProxyError(): Unit = {
     val a = new Thing()
     val b = new Thing()
-    val l = Seq(b)
+    val l = collection.Seq(b)
     a.things = l
     b.things = l
 
@@ -68,7 +68,7 @@ class TestListSerialization {
         fail("Expected ClassCastException to be thrown")
       } catch {
         case e: ClassCastException => {
-          assertTrue(e.getMessage.contains("List$SerializationProxy"))
+          assertTrue(e.getMessage.contains("SerializationProxy"))
           assertTrue(e.getMessage.contains("scala.collection.Seq"))
           assertTrue(e.getMessage.contains("Thing"))
         }
@@ -83,7 +83,7 @@ class TestListSerialization {
   @Test def testListSerializationProxyErrorWorkaround(): Unit = {
     val a = new Thing()
     val b = new Thing()
-    val l = Seq(b)
+    val l = collection.Seq(b)
     a.things = l.map(identity)
     b.things = l.map(identity)
 

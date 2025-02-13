@@ -28,18 +28,18 @@ object TestLookAhead extends TdmlSuite {
 class TestLookAhead extends TdmlTests {
   val tdmlSuite = TestLookAhead
 
-  @Test def lookAhead_01 = test
-  @Test def lookAhead_02 = test
-  @Test def lookAhead_03 = test
-  @Test def lookAhead_04 = test
-  @Test def lookAhead_05 = test
-  @Test def lookAhead_06 = test
-  @Test def lookAhead_tooFar_01 = test
-  @Test def lookAhead_tooFar_02 = test
-  @Test def lookAhead_tooFar_03 = test
-  @Test def lookAhead_negativeOffset_01 = test
-  @Test def lookAhead_negativeBitsize_01 = test
-  @Test def lookAhead_zeroBitsize_01 = test
-  @Test def lookAhead_newVariableInstance_01 = test
-  @Test def lookAhead_setVariable_01 = test
+  @Test def lookAhead_01() = test()
+  @Test def lookAhead_02() = test()
+  @Test def lookAhead_03() = test()
+  @Test def lookAhead_04() = test()
+  @Test def lookAhead_05() = test()
+  @Test def lookAhead_06() = test()
+  @Test def lookAhead_tooFar_01() = test()
+  @Test def lookAhead_tooFar_02() = test()
+  @Test def lookAhead_tooFar_03() = test()
+  @Test def lookAhead_negativeOffset_01() = test()
+  @Test def lookAhead_negativeBitsize_01() = test()
+  @Test def lookAhead_zeroBitsize_01() = test()
+  @Test def lookAhead_newVariableInstance_01() = test()
+  @Test def lookAhead_setVariable_01() = test()
 }

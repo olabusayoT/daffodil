@@ -29,11 +29,11 @@ object TestCharsets extends TdmlSuite {
 class TestCharsets extends TdmlTests {
   val tdmlSuite = TestCharsets
 
-  @Test def parse_charsets = test
-  @Test def unparse_charsets = test
-  @Test def parse_charsets2 = test
-  @Test def unparse_charsets2 = test
-  @Test def parse_charsets3 = test
-  @Test def unparse_charsets3 = test
-  @Test def verify_error_message = test
+  @Test def parse_charsets() = test()
+  @Test def unparse_charsets() = test()
+  @Test def parse_charsets2() = test()
+  @Test def unparse_charsets2() = test()
+  @Test def parse_charsets3() = test()
+  @Test def unparse_charsets3() = test()
+  @Test def verify_error_message() = test()
 }

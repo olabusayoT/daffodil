@@ -29,21 +29,21 @@ object TestEncodings extends TdmlSuite {
 class TestEncodings extends TdmlTests {
   val tdmlSuite = TestEncodings
 
-  @Test def f293u003_01 = test
-  @Test def f293u003_02 = test
-  @Test def f422u001_01 = test
-  @Test def f422u001_02 = test
-  @Test def f422u001_03 = test
-  @Test def f746u002_01 = test
-  @Test def f746u002_02 = test
-  @Test def f746u002_03 = test
-  @Test def f747u001_01 = test
-  @Test def f747u001_02 = test
-  @Test def f747u001_03 = test
-  @Test def f769u002_01 = test
-  @Test def f769u002_02 = test
-  @Test def f769u002_03 = test
-  @Test def f336u002_01 = test
-  @Test def f336u002_02 = test
-  @Test def f336u002_03 = test
+  @Test def f293u003_01() = test()
+  @Test def f293u003_02() = test()
+  @Test def f422u001_01() = test()
+  @Test def f422u001_02() = test()
+  @Test def f422u001_03() = test()
+  @Test def f746u002_01() = test()
+  @Test def f746u002_02() = test()
+  @Test def f746u002_03() = test()
+  @Test def f747u001_01() = test()
+  @Test def f747u001_02() = test()
+  @Test def f747u001_03() = test()
+  @Test def f769u002_01() = test()
+  @Test def f769u002_02() = test()
+  @Test def f769u002_03() = test()
+  @Test def f336u002_01() = test()
+  @Test def f336u002_02() = test()
+  @Test def f336u002_03() = test()
 }

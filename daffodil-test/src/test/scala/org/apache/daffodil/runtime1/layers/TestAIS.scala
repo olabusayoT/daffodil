@@ -33,5 +33,5 @@ object TestAISPayloadArmoring extends TdmlSuite {
 class TestAISPayloadArmoring extends TdmlTests {
   val tdmlSuite = TestAISPayloadArmoring
 
-  @Test def ais1 = test
+  @Test def ais1() = test()
 }

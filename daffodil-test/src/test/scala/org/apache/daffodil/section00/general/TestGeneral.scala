@@ -36,17 +36,17 @@ object TestGeneral extends TdmlSuite {
 class TestGeneral extends TdmlTests {
   val tdmlSuite = TestGeneral
 
-  @Test def check_no_namespace_message = test
-  @Test def capitalization = test
+  @Test def check_no_namespace_message() = test()
+  @Test def capitalization() = test()
 
-  @Test def litNil1 = test
-  @Test def litNil1FullPath = test
-  @Test def referentialIntegrity = test
+  @Test def litNil1() = test()
+  @Test def litNil1FullPath() = test()
+  @Test def referentialIntegrity() = test()
 
-  @Test def nameAndRefError_01 = test
+  @Test def nameAndRefError_01() = test()
 
   // Test causes exception as the file is not found
-  @Ignore @Test def fileDNE = test
+  @Ignore @Test def fileDNE() = test()
 }
 
 object TestLargeInput extends TdmlSuite {
@@ -56,7 +56,7 @@ object TestLargeInput extends TdmlSuite {
 class TestLargeInput extends TdmlTests {
   val tdmlSuite = TestLargeInput
 
-  @Test def largeInput_01 = test
+  @Test def largeInput_01() = test()
 }
 
 object TestSpace1 extends TdmlSuite {
@@ -66,9 +66,9 @@ object TestSpace1 extends TdmlSuite {
 class TestSpace1 extends TdmlTests {
   val tdmlSuite = TestSpace1
 
-  @Test def AB006 = {
+  @Test def AB006() = {
     try {
-      val e = intercept[Exception] { test }
+      val e = intercept[Exception] { test() }
       val m = e.getMessage()
       assertTrue(m.toLowerCase.contains("required resource"))
       assertTrue(m.contains("/test%20space/A%20BTinyData.tdml.dat"))
@@ -88,7 +88,7 @@ class TestSpace2 extends TdmlTests {
   val tdmlSuite = TestSpace2
 
   @Test def no_namespace_02(): Unit = {
-    val e = intercept[Exception] { test }
+    val e = intercept[Exception] { test() }
     val m = e.getMessage()
     assertTrue(m.toLowerCase.contains("required resource"))
     assertTrue(m.contains("/test%20space/test%201/namespaces.tdml"))
@@ -103,34 +103,34 @@ object TestTunables extends TdmlSuite {
 class TestTunables extends TdmlTests {
   val tdmlSuite = TestTunables
 
-  @Test def unqualifiedPathStepPolicy_test_01_defaultNamespace = test
-  @Test def unqualifiedPathStepPolicy_test_01_preferDefaultNamespace = test
-  @Test def unqualifiedPathStepPolicy_test_01_noNamespace = test
-  @Test def unqualifiedPathStepPolicy_test_02_defaultNamespace = test
-  @Test def unqualifiedPathStepPolicy_test_02_preferDefaultNamespace = test
-  @Test def unqualifiedPathStepPolicy_test_02_noNamespace = test
-  @Test def unqualifiedPathStepPolicy_test_03_defaultNamespace = test
-  @Test def unqualifiedPathStepPolicy_test_03_preferDefaultNamespace = test
-  @Test def unqualifiedPathStepPolicy_test_03_noNamespace = test
-  @Test def unqualifiedPathStepPolicy_test_04_defaultNamespace = test
-  @Test def unqualifiedPathStepPolicy_test_04_preferDefaultNamespace = test
-  @Test def unqualifiedPathStepPolicy_test_04_noNamespace = test
+  @Test def unqualifiedPathStepPolicy_test_01_defaultNamespace() = test()
+  @Test def unqualifiedPathStepPolicy_test_01_preferDefaultNamespace() = test()
+  @Test def unqualifiedPathStepPolicy_test_01_noNamespace() = test()
+  @Test def unqualifiedPathStepPolicy_test_02_defaultNamespace() = test()
+  @Test def unqualifiedPathStepPolicy_test_02_preferDefaultNamespace() = test()
+  @Test def unqualifiedPathStepPolicy_test_02_noNamespace() = test()
+  @Test def unqualifiedPathStepPolicy_test_03_defaultNamespace() = test()
+  @Test def unqualifiedPathStepPolicy_test_03_preferDefaultNamespace() = test()
+  @Test def unqualifiedPathStepPolicy_test_03_noNamespace() = test()
+  @Test def unqualifiedPathStepPolicy_test_04_defaultNamespace() = test()
+  @Test def unqualifiedPathStepPolicy_test_04_preferDefaultNamespace() = test()
+  @Test def unqualifiedPathStepPolicy_test_04_noNamespace() = test()
 
-  @Test def maxOccursBoundsExceeded = test
-  @Test def textBidiYes = test
-  @Test def requireTextBidiTrue = test
-  @Test def requireTextBidiFalse = test
-  @Test def floatingYes = test
-  @Test def requireFloatingTrue = test
-  @Test def requireFloatingFalse = test
-  @Test def encodingErrorPolicyError = test
-  @Test def requireEncodingErrorPolicyTrue = test
-  @Test def requireEncodingErrorPolicyFalse = test
-  @Test def maxHexBinaryError = test
-  @Test def maxHexBinaryUnparseError = test
+  @Test def maxOccursBoundsExceeded() = test()
+  @Test def textBidiYes() = test()
+  @Test def requireTextBidiTrue() = test()
+  @Test def requireTextBidiFalse() = test()
+  @Test def floatingYes() = test()
+  @Test def requireFloatingTrue() = test()
+  @Test def requireFloatingFalse() = test()
+  @Test def encodingErrorPolicyError() = test()
+  @Test def requireEncodingErrorPolicyTrue() = test()
+  @Test def requireEncodingErrorPolicyFalse() = test()
+  @Test def maxHexBinaryError() = test()
+  @Test def maxHexBinaryUnparseError() = test()
 
-  @Test def invalidRestrictionPolicyError_01 = test
-  @Test def invalidRestrictionPolicyIgnore_01 = test
-  @Test def invalidRestrictionPolicyValidate_01 = test
-  @Test def invalidRestrictionPolicyValidate_02 = test
+  @Test def invalidRestrictionPolicyError_01() = test()
+  @Test def invalidRestrictionPolicyIgnore_01() = test()
+  @Test def invalidRestrictionPolicyValidate_01() = test()
+  @Test def invalidRestrictionPolicyValidate_02() = test()
 }

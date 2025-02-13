@@ -29,8 +29,8 @@ object TestCSV extends TdmlSuite {
 class TestCSV extends TdmlTests {
   val tdmlSuite = TestCSV
 
-  @Test def csv_01 = test
-  @Test def csv_02 = test
-  @Test def csv_03 = test
-  @Test def csv_04 = test
+  @Test def csv_01() = test()
+  @Test def csv_02() = test()
+  @Test def csv_03() = test()
+  @Test def csv_04() = test()
 }

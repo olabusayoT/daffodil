@@ -30,9 +30,9 @@ object TestSequenceGroupNestedArray extends TdmlSuite {
 class TestSequenceGroupNestedArray extends TdmlTests {
   val tdmlSuite = TestSequenceGroupNestedArray
 
-  @Test def csv_nohang_1 = test
+  @Test def csv_nohang_1() = test()
   // DAFFODIL-2487 hang when minOccurs="0"
-  @Test def csv_hang_1 = test
-  @Test def csv_hang_2 = test
-  @Test def csv_hang_3 = test
+  @Test def csv_hang_1() = test()
+  @Test def csv_hang_2() = test()
+  @Test def csv_hang_3() = test()
 }

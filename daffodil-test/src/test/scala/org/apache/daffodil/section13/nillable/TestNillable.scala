@@ -41,34 +41,34 @@ object TestNillableEntities extends TdmlSuite {
 class TestNillableAA extends TdmlTests {
   val tdmlSuite = TestNillableAA
 
-  @Test def litNil1 = test
-  @Test def litNil2 = test
-  @Test def litNil3 = test
-  @Test def litNil4 = test
-  @Test def litNil4b = test
-  @Test def litNil5 = test
-  @Test def litNil6 = test
-  @Test def litNil7 = test
-  @Test def missing_scalar = test
-  @Test def nillable1 = test
-  @Test def edifact1a = test
-  @Test def complexNillable_01 = test
-  @Test def complexNillable_02 = test
+  @Test def litNil1() = test()
+  @Test def litNil2() = test()
+  @Test def litNil3() = test()
+  @Test def litNil4() = test()
+  @Test def litNil4b() = test()
+  @Test def litNil5() = test()
+  @Test def litNil6() = test()
+  @Test def litNil7() = test()
+  @Test def missing_scalar() = test()
+  @Test def nillable1() = test()
+  @Test def edifact1a() = test()
+  @Test def complexNillable_01() = test()
+  @Test def complexNillable_02() = test()
 }
 
 class TestNillableLN extends TdmlTests {
   val tdmlSuite = TestNillableLN
 
-  @Test def test_complex_nil = test
-  @Test def text_nil_characterClass_04_parse = test
-  @Test def text_03 = test
-  @Test def text_03ic = test
-  @Test def text_04 = test
-  @Test def text_05 = test
-  @Test def text_06 = test
-  @Test def binary_01 = test
-  @Test def test_padded_nils = test
-  @Test def nillable_ovc_01 = test
+  @Test def test_complex_nil() = test()
+  @Test def text_nil_characterClass_04_parse() = test()
+  @Test def text_03() = test()
+  @Test def text_03ic() = test()
+  @Test def text_04() = test()
+  @Test def text_05() = test()
+  @Test def text_06() = test()
+  @Test def binary_01() = test()
+  @Test def test_padded_nils() = test()
+  @Test def nillable_ovc_01() = test()
 }
 
 class TestNillableLC extends TdmlTests {
@@ -83,19 +83,19 @@ class TestNillableLC extends TdmlTests {
    *  According to analysis doc, should also work for numeric
    *  and hex entities.
    * */
-  @Test def text_01 = test
-  @Test def text_01ic = test
-  @Test def text_02 = test
-  @Test def text_03 = test
-  @Test def text_04 = test
-  @Test def binary_01 = test
+  @Test def text_01() = test()
+  @Test def text_01ic() = test()
+  @Test def text_02() = test()
+  @Test def text_03() = test()
+  @Test def text_04() = test()
+  @Test def binary_01() = test()
 }
 
 class TestNillableEntities extends TdmlTests {
   val tdmlSuite = TestNillableEntities
 
-  @Test def entity_fail_05 = test
-  @Test def entity_fail_06 = test
-  @Test def entity_success_05 = test
-  @Test def entity_success_06 = test
+  @Test def entity_fail_05() = test()
+  @Test def entity_fail_06() = test()
+  @Test def entity_success_05() = test()
+  @Test def entity_success_06() = test()
 }

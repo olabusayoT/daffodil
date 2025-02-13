@@ -45,75 +45,75 @@ object TestEscapeScenarios extends TdmlSuite {
 class TestEscapeScheme extends TdmlTests {
   val tdmlSuite = TestEscapeScheme
 
-  @Test def escapeSchemeSimple = test
-  @Test def escapeSchemeEmpty = test
-  @Test def escapeSchemeUnused = test
-  @Test def escapeSchemeFail = test
-  @Test def escapeSchemeFail2 = test
-  @Test def escapeSchemeFail3 = test
-  @Test def escapeSchemeNonEmpty = test
+  @Test def escapeSchemeSimple() = test()
+  @Test def escapeSchemeEmpty() = test()
+  @Test def escapeSchemeUnused() = test()
+  @Test def escapeSchemeFail() = test()
+  @Test def escapeSchemeFail2() = test()
+  @Test def escapeSchemeFail3() = test()
+  @Test def escapeSchemeNonEmpty() = test()
   // DAFFODIL-844
-  @Ignore @Test def escapeSchemeNonUnique = test
+  @Ignore @Test def escapeSchemeNonUnique() = test()
 
-  @Test def escapeExpressions_01 = test
-  @Test def escapeExpressions_01b = test
-  @Test def escapeExpressions_02 = test
-  @Test def escapeExpressions_03 = test
-  @Test def escapeExpressions_04 = test
-  @Test def escapeExpressions_05 = test
-  @Test def escapeExpressions_06 = test
-  @Test def escapeExpressions_07 = test
-  @Test def escapeExpressions_08 = test
+  @Test def escapeExpressions_01() = test()
+  @Test def escapeExpressions_01b() = test()
+  @Test def escapeExpressions_02() = test()
+  @Test def escapeExpressions_03() = test()
+  @Test def escapeExpressions_04() = test()
+  @Test def escapeExpressions_05() = test()
+  @Test def escapeExpressions_06() = test()
+  @Test def escapeExpressions_07() = test()
+  @Test def escapeExpressions_08() = test()
 
-  @Test def escBlkAllQuotes = test
-  @Test def escBlkEndSame = test
-  @Test def escBlkEndSame2 = test
-  @Test def escBlkEndSame3 = test
-  @Ignore @Test def escBlkMultipleEEC = test
+  @Test def escBlkAllQuotes() = test()
+  @Test def escBlkEndSame() = test()
+  @Test def escBlkEndSame2() = test()
+  @Test def escBlkEndSame3() = test()
+  @Ignore @Test def escBlkMultipleEEC() = test()
 
-  @Test def escapeScheme_with_comment = test
+  @Test def escapeScheme_with_comment() = test()
 }
 
 class TestEscapeSchemeNeg extends TdmlTests {
   val tdmlSuite = TestEscapeSchemeNeg
 
-  @Test def escapeSchemeNeg = test
+  @Test def escapeSchemeNeg() = test()
 }
 
 class TestEscapeScenarios extends TdmlTests {
   val tdmlSuite = TestEscapeScenarios
 
-  @Test def scenario1_1 = test
-  @Test def scenario1_2 = test
-  @Test def scenario1_3 = test
-  @Test def scenario1_4 = test
-  @Test def scenario1_5 = test
-  @Test def scenario1_6 = test
-  @Test def scenario1_7 = test
-  @Test def scenario1_7_postfix = test
-  @Test def scenario1_8 = test
-  @Test def scenario1_8_req_term = test
-  @Test def scenario1_9 = test
-  @Test def scenario1_9_postfix = test
-  @Test def scenario1_10 = test
-  @Test def scenario1_10_postfix = test
-  @Test def scenario1_11 = test
-  @Test def scenario1_11_postfix = test
-  @Test def scenario1_12 = test
-  @Test def scenario1_12_postfix = test
-  @Test def scenario1_13 = test
-  @Test def scenario1_13_postfix = test
+  @Test def scenario1_1() = test()
+  @Test def scenario1_2() = test()
+  @Test def scenario1_3() = test()
+  @Test def scenario1_4() = test()
+  @Test def scenario1_5() = test()
+  @Test def scenario1_6() = test()
+  @Test def scenario1_7() = test()
+  @Test def scenario1_7_postfix() = test()
+  @Test def scenario1_8() = test()
+  @Test def scenario1_8_req_term() = test()
+  @Test def scenario1_9() = test()
+  @Test def scenario1_9_postfix() = test()
+  @Test def scenario1_10() = test()
+  @Test def scenario1_10_postfix() = test()
+  @Test def scenario1_11() = test()
+  @Test def scenario1_11_postfix() = test()
+  @Test def scenario1_12() = test()
+  @Test def scenario1_12_postfix() = test()
+  @Test def scenario1_13() = test()
+  @Test def scenario1_13_postfix() = test()
 
-  @Test def scenario2_1 = test
-  @Test def scenario2_11_req_term = test
-  @Test def scenario2_14_req_term = test
+  @Test def scenario2_1() = test()
+  @Test def scenario2_11_req_term() = test()
+  @Test def scenario2_14_req_term() = test()
 
-  @Test def scenario3_1 = test
+  @Test def scenario3_1() = test()
 
-  @Test def scenario4_7_req_term = test
-  @Test def scenario4_9_req_term = test
-  @Test def scenario4_10_req_term = test
-  @Test def scenario4_12_req_term = test
+  @Test def scenario4_7_req_term() = test()
+  @Test def scenario4_9_req_term() = test()
+  @Test def scenario4_10_req_term() = test()
+  @Test def scenario4_12_req_term() = test()
 
-  @Test def scenario5_1 = test
+  @Test def scenario5_1() = test()
 }

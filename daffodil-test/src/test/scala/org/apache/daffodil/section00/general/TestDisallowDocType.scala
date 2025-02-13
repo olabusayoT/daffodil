@@ -45,8 +45,8 @@ object TestDisallowTdmlDocType extends TdmlSuite {
 class TestDisallowTdmlDocType extends TdmlTests {
   val tdmlSuite = TestDisallowTdmlDocType
 
-  @Test def ignored = {
-    val e = intercept[TDMLException] { test }
+  @Test def ignored() = {
+    val e = intercept[TDMLException] { test() }
     val msg = e.getMessage()
     assertTrue(msg.contains("DOCTYPE is disallowed"))
     assertTrue(msg.contains("hasDocType.tdml"))
@@ -61,17 +61,17 @@ class TestDisallowDocType extends TdmlTests {
   val tdmlSuite = TestDisallowDocType
 
   @Test def configMustNotHaveDocType(): Unit = {
-    val e = intercept[TDMLException] { test }
+    val e = intercept[TDMLException] { test() }
     val msg = e.getMessage()
     assertTrue(msg.contains("DOCTYPE is disallowed"))
     assertTrue(msg.contains("hasDocType.cfg"))
   }
 
-  @Test def dfdlSchemaMustNotHaveDocType = test
-  @Test def dfdlSchemaMustNotHaveDocTypeViaInclude = test
-  @Test def dfdlSchemaMustNotHaveDocTypeViaImport = test
+  @Test def dfdlSchemaMustNotHaveDocType() = test()
+  @Test def dfdlSchemaMustNotHaveDocTypeViaInclude() = test()
+  @Test def dfdlSchemaMustNotHaveDocTypeViaImport() = test()
   @Test def infosetFileMustNotHaveDocType(): Unit = {
-    val e = intercept[TDMLException] { test }
+    val e = intercept[TDMLException] { test() }
     val msg = e.getMessage()
     assertTrue(msg.contains("DOCTYPE is disallowed"))
     assertTrue(msg.contains("hasDocType-infoset.xml"))

@@ -31,5 +31,5 @@ class TestSSPNeverDiagnostic extends TdmlTests {
   val tdmlSuite = TestSSPNeverDiagnostic
 
   // DAFFODIL-2274
-  @Ignore @Test def testSeparatorSuppressionNeverBadDiagnostic = test
+  @Ignore @Test def testSeparatorSuppressionNeverBadDiagnostic() = test()
 }

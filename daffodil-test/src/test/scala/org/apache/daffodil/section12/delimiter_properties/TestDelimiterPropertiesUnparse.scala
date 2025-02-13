@@ -31,26 +31,26 @@ object TestDelimiterPropertiesUnparse extends TdmlSuite {
 class TestDelimiterPropertiesUnparse extends TdmlTests {
   val tdmlSuite = TestDelimiterPropertiesUnparse
 
-  @Test def unparseSeparatorLeadingSpace = test
+  @Test def unparseSeparatorLeadingSpace() = test()
 
   // DFDL-1493, DFDL-1477
-  @Ignore @Test def unparseMultipleInitiators04 = test
-  @Ignore @Test def unparseMultipleInitiators06 = test
+  @Ignore @Test def unparseMultipleInitiators04() = test()
+  @Ignore @Test def unparseMultipleInitiators06() = test()
 
-  @Test def unparseMultipleInitiators05 = test
-  @Test def unparseMultipleTerminators03 = test
+  @Test def unparseMultipleInitiators05() = test()
+  @Test def unparseMultipleTerminators03() = test()
 
-  @Test def unparseMultipleInitiators01 = test
-  @Test def unparseMultipleInitiators02 = test
-  @Test def unparseMultipleInitiators03 = test
-  @Test def unparseMultipleInitiators07 = test
+  @Test def unparseMultipleInitiators01() = test()
+  @Test def unparseMultipleInitiators02() = test()
+  @Test def unparseMultipleInitiators03() = test()
+  @Test def unparseMultipleInitiators07() = test()
 
-  @Test def unparseMultipleTerminators01 = test
-  @Test def unparseMultipleTerminators02 = test
-  @Test def unparseMultipleTerminators04 = test
-  @Test def unparseMultipleTerminators05 = test
+  @Test def unparseMultipleTerminators01() = test()
+  @Test def unparseMultipleTerminators02() = test()
+  @Test def unparseMultipleTerminators04() = test()
+  @Test def unparseMultipleTerminators05() = test()
 
-  @Test def unparseMultipleSeparators01 = test
-  @Test def unparseMultipleSeparators02 = test
-  @Test def unparseMultipleSeparators03 = test
+  @Test def unparseMultipleSeparators01() = test()
+  @Test def unparseMultipleSeparators02() = test()
+  @Test def unparseMultipleSeparators03() = test()
 }

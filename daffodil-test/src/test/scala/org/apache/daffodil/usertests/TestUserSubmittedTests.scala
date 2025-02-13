@@ -37,15 +37,15 @@ object TestNameDOB extends TdmlSuite {
 class TestUserSubmittedTests extends TdmlTests {
   val tdmlSuite = TestUserSubmittedTests
 
-  @Test def test_prefix_separator_as_variable = test
-  @Test def test_DFDL_2262 = test
-  @Test def test_DFDL_2586 = test
-  @Test def test_DFDL_2399 = test
+  @Test def test_prefix_separator_as_variable() = test()
+  @Test def test_DFDL_2262() = test()
+  @Test def test_DFDL_2586() = test()
+  @Test def test_DFDL_2399() = test()
 
   // DAFFODIL-2378 (decided as not a bug. These tests characterize that behavior.)
-  @Test def textNumberPattern1 = test
-  @Test def textNumberPattern2 = test
-  @Test def textNumberPattern3 = test
+  @Test def textNumberPattern1() = test()
+  @Test def textNumberPattern2() = test()
+  @Test def textNumberPattern3() = test()
 
   // custom trace debugger runner that just counts the number of lines output by the debugger
   class CountTraceDebuggerRunner extends TraceDebuggerRunner {
@@ -62,7 +62,7 @@ class TestUserSubmittedTests extends TdmlTests {
 
     // run a test with the debugger and debugging enabled so that we count the lines. Running
     // the test will disable debugging when it completes
-    test
+    test()
     assertTrue(crunner.numLines > 0)
 
     // reset the numLines counter to 0
@@ -70,7 +70,7 @@ class TestUserSubmittedTests extends TdmlTests {
 
     // run the test again, this should not count any lines because debugging was disabled when
     // the previous test finished
-    test
+    test()
     assertTrue(crunner.numLines == 0)
   }
 }
@@ -78,5 +78,5 @@ class TestUserSubmittedTests extends TdmlTests {
 class TestNameDOB extends TdmlTests {
   val tdmlSuite = TestNameDOB
 
-  @Test def nameDOB_test2_pass = test
+  @Test def nameDOB_test2_pass() = test()
 }

@@ -29,5 +29,5 @@ object TestUnseparated extends TdmlSuite {
 class TestUnseparated extends TdmlTests {
   val tdmlSuite = TestUnseparated
 
-  @Test def unseparated_optionals1 = test
+  @Test def unseparated_optionals1() = test()
 }

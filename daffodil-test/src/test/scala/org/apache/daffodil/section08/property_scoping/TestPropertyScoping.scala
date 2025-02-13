@@ -33,52 +33,52 @@ object TestPropertyScoping01 extends TdmlSuite {
 class TestPropertyScoping extends TdmlTests {
   val tdmlSuite = TestPropertyScoping
 
-  @Test def defaultForm_01 = test
-  @Test def defaultForm_02 = test
-  @Test def defaultForm_03 = test
-  @Test def defaultForm_04 = test
+  @Test def defaultForm_01() = test()
+  @Test def defaultForm_02() = test()
+  @Test def defaultForm_03() = test()
+  @Test def defaultForm_04() = test()
 
-  @Test def localAnnotation_01 = test
-  @Test def localAnnotation_02 = test
-  @Test def localAnnotation_03 = test
-  @Test def localAnnotation_04 = test
-  @Test def localAnnotation_05 = test
+  @Test def localAnnotation_01() = test()
+  @Test def localAnnotation_02() = test()
+  @Test def localAnnotation_03() = test()
+  @Test def localAnnotation_04() = test()
+  @Test def localAnnotation_05() = test()
 
-  @Test def property_scoping_01 = test
-  @Test def unparse_property_scoping_01 = test
-  @Test def property_scoping_06 = test
-  @Test def unparse_property_scoping_06 = test
-  @Test def group_ref = test
-  @Test def multipleDefinition = test
-  @Test def multipleDefinition2 = test
-  @Test def multipleDefinition3 = test
+  @Test def property_scoping_01() = test()
+  @Test def unparse_property_scoping_01() = test()
+  @Test def property_scoping_06() = test()
+  @Test def unparse_property_scoping_06() = test()
+  @Test def group_ref() = test()
+  @Test def multipleDefinition() = test()
+  @Test def multipleDefinition2() = test()
+  @Test def multipleDefinition3() = test()
 
-  @Test def format_nesting_01 = test
+  @Test def format_nesting_01() = test()
 }
 
 class TestPropertyScoping01 extends TdmlTests {
   val tdmlSuite = TestPropertyScoping01
 
-  @Test def property_scoping_02 = test
-  @Test def unparse_property_scoping_02 = test
-  @Test def property_scoping_03 = test
-  @Test def unparse_property_scoping_03 = test
-  @Test def property_scoping_04 = test
-  @Test def property_scoping_05 = test
-  @Test def unparse_property_scoping_04 = test
-  @Test def unparse_property_scoping_05 = test
-  @Test def property_scoping_07 = test
-  @Test def unparse_property_scoping_07 = test
-  @Test def property_scoping_08 = test
-  @Test def unparse_property_scoping_08 = test
-  @Test def property_scoping_09 = test
-  @Test def unparse_property_scoping_09 = test
-  @Test def property_scoping_10 = test
-  @Test def unparse_property_scoping_10 = test
-  @Test def property_scoping_11 = test
-  @Test def unparse_property_scoping_11 = test
-  @Test def unparse_property_scoping_12 = test
-  @Test def NearestEnclosingSequenceElementRef = test
+  @Test def property_scoping_02() = test()
+  @Test def unparse_property_scoping_02() = test()
+  @Test def property_scoping_03() = test()
+  @Test def unparse_property_scoping_03() = test()
+  @Test def property_scoping_04() = test()
+  @Test def property_scoping_05() = test()
+  @Test def unparse_property_scoping_04() = test()
+  @Test def unparse_property_scoping_05() = test()
+  @Test def property_scoping_07() = test()
+  @Test def unparse_property_scoping_07() = test()
+  @Test def property_scoping_08() = test()
+  @Test def unparse_property_scoping_08() = test()
+  @Test def property_scoping_09() = test()
+  @Test def unparse_property_scoping_09() = test()
+  @Test def property_scoping_10() = test()
+  @Test def unparse_property_scoping_10() = test()
+  @Test def property_scoping_11() = test()
+  @Test def unparse_property_scoping_11() = test()
+  @Test def unparse_property_scoping_12() = test()
+  @Test def NearestEnclosingSequenceElementRef() = test()
 
-  @Test def refElementFormFail = test
+  @Test def refElementFormFail() = test()
 }

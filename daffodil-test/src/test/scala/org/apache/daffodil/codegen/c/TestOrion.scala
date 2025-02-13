@@ -33,9 +33,9 @@ object TestOrion extends TdmlSuite {
 class TestOrion extends TdmlTests {
   val tdmlSuite = TestOrion
 
-  @Test def orion_aptina = test
-  @Test def orion_camera = test
-  @Test def orion_command = test
-  @Test def orion_limits = test
-  @Test def orion_video = test
+  @Test def orion_aptina() = test()
+  @Test def orion_camera() = test()
+  @Test def orion_command() = test()
+  @Test def orion_limits() = test()
+  @Test def orion_video() = test()
 }

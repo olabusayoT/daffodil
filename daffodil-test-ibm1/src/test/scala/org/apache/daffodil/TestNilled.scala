@@ -29,5 +29,5 @@ object TestNilled extends TdmlSuite {
 class TestNilled extends TdmlTests {
   val tdmlSuite = TestNilled
 
-  @Test def nilled_ES_optional = test
+  @Test def nilled_ES_optional() = test()
 }

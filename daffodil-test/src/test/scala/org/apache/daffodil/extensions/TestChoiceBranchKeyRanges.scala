@@ -29,12 +29,12 @@ object TestChoiceBranchKeyRanges extends TdmlSuite {
 class TestChoiceBranchKeyRanges extends TdmlTests {
   val tdmlSuite = TestChoiceBranchKeyRanges
 
-  @Test def choiceBranchKeyRanges_01 = test
-  @Test def choiceBranchKeyRanges_overlap_01 = test
-  @Test def choiceBranchKeyRanges_overlap_02 = test
-  @Test def choiceBranchKeyRanges_overlap_03 = test
-  @Test def choiceBranchKeyRanges_oddLength_01 = test
-  @Test def choiceBranchKeyRanges_badOrder_01 = test
-  @Test def choiceBranchKeyRanges_nonintDispatch_01 = test
-  @Test def choiceBranchKeyRanges_nonintDispatch_02 = test
+  @Test def choiceBranchKeyRanges_01() = test()
+  @Test def choiceBranchKeyRanges_overlap_01() = test()
+  @Test def choiceBranchKeyRanges_overlap_02() = test()
+  @Test def choiceBranchKeyRanges_overlap_03() = test()
+  @Test def choiceBranchKeyRanges_oddLength_01() = test()
+  @Test def choiceBranchKeyRanges_badOrder_01() = test()
+  @Test def choiceBranchKeyRanges_nonintDispatch_01() = test()
+  @Test def choiceBranchKeyRanges_nonintDispatch_02() = test()
 }

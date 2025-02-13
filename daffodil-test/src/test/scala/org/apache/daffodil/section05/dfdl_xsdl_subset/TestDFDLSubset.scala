@@ -36,17 +36,17 @@ object TestDFDLSubsetNoValidate extends TdmlSuite {
 class TestDFDLSubset extends TdmlTests {
   val tdmlSuite = TestDFDLSubset
 
-  @Test def groupRefGroupRef = test
-  @Test def refInitiator3 = test
-  @Test def badGroupRef = test
-  @Test def badSeq = test
+  @Test def groupRefGroupRef() = test()
+  @Test def refInitiator3() = test()
+  @Test def badGroupRef() = test()
+  @Test def badSeq() = test()
 
-  @Test def groupRefDFDL = test
+  @Test def groupRefDFDL() = test()
 }
 
 class TestDFDLSubsetNoValidate extends TdmlTests {
   val tdmlSuite = TestDFDLSubsetNoValidate
 
-  @Test def groupRef = test
-  @Test def groupRefChoice = test
+  @Test def groupRef() = test()
+  @Test def groupRefChoice() = test()
 }

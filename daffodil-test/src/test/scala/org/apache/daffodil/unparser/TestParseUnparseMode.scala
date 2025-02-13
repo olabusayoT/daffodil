@@ -33,8 +33,8 @@ class TestParseUnparseMode extends TdmlTests {
 
   val tdmlSuite = TestParseUnparseMode
 
-  @Test def parse1 = test
-  @Test def unparse1 = test
-  @Test def unparse2 = test
-  @Test def unparse3 = test
+  @Test def parse1() = test()
+  @Test def unparse1() = test()
+  @Test def unparse2() = test()
+  @Test def unparse3() = test()
 }

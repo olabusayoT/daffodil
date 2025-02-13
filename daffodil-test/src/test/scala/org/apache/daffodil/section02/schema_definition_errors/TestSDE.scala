@@ -30,20 +30,20 @@ object TestSDE extends TdmlSuite {
 class TestSDE extends TdmlTests {
   val tdmlSuite = TestSDE
 
-  @Test def AS000_rev = test
+  @Test def AS000_rev() = test()
 
-  @Test def schema_component_err = test
+  @Test def schema_component_err() = test()
 
-  @Test def schema_line_number = test
-  @Test def schema_warning = test
-  @Test def missing_appinfo_source = test
-  @Test def missing_appinfo_source_nondfdl = test
-  @Test def missing_closing_tag = test
-  @Test def ignoreAttributeFormDefault = test
+  @Test def schema_line_number() = test()
+  @Test def schema_warning() = test()
+  @Test def missing_appinfo_source() = test()
+  @Test def missing_appinfo_source_nondfdl() = test()
+  @Test def missing_closing_tag() = test()
+  @Test def ignoreAttributeFormDefault() = test()
 
-  @Test def schema_warning_locally_suppressed = test
+  @Test def schema_warning_locally_suppressed() = test()
 
-  @Test def schema_warning_escalated_to_error = test
+  @Test def schema_warning_escalated_to_error() = test()
 
-  @Test def schema_warning_escalated_to_error2 = test
+  @Test def schema_warning_escalated_to_error2() = test()
 }

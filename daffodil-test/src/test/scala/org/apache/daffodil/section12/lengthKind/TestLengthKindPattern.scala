@@ -34,53 +34,53 @@ object TestLengthKindPatternAI extends TdmlSuite {
 class TestLengthKindPattern extends TdmlTests {
   val tdmlSuite = TestLengthKindPattern
 
-  @Test def unmatchedPattern01 = test
-  @Test def unmatchedPattern02 = test
-  @Test def unmatchedPattern03 = test
+  @Test def unmatchedPattern01() = test()
+  @Test def unmatchedPattern02() = test()
+  @Test def unmatchedPattern03() = test()
 
-  @Test def invalid_pattern = test
-  @Test def invalid_pattern2 = test
-  @Test def invalid_pattern3 = test
+  @Test def invalid_pattern() = test()
+  @Test def invalid_pattern2() = test()
+  @Test def invalid_pattern3() = test()
 
-  @Test def AI000_rev = test
-  @Test def LengthKindPattern = test
-  @Test def LengthKindPatternCompound = test
-  @Test def LengthKindPatternCompound2 = test
-  @Test def lengthKindPattern_01 = test
-  @Test def lengthKindPattern_02 = test
-  @Test def lengthKindPattern_03 = test
-  @Test def lengthKindPattern_04 = test
+  @Test def AI000_rev() = test()
+  @Test def LengthKindPattern() = test()
+  @Test def LengthKindPatternCompound() = test()
+  @Test def LengthKindPatternCompound2() = test()
+  @Test def lengthKindPattern_01() = test()
+  @Test def lengthKindPattern_02() = test()
+  @Test def lengthKindPattern_03() = test()
+  @Test def lengthKindPattern_04() = test()
 
-  @Test def LengthPatternIllegalBits_01 = test
-  @Test def LengthPatternLegalBits_01 = test
+  @Test def LengthPatternIllegalBits_01() = test()
+  @Test def LengthPatternLegalBits_01() = test()
 
   // DFDL-309
-  @Test def LengthPatternIllegalBits_02_EncodingErrorPolicy_Replace = test
+  @Test def LengthPatternIllegalBits_02_EncodingErrorPolicy_Replace() = test()
   // DFDL-935 dfdl:encodingErrorPolicy='error'
-  @Ignore @Test def LengthPatternIllegalBits_02_EncodingErrorPolicy_Error = test
+  @Ignore @Test def LengthPatternIllegalBits_02_EncodingErrorPolicy_Error() = test()
 
-  @Test def LengthPatternLegalBits_02 = test
-  @Test def lengthKindPatternFail = test
+  @Test def LengthPatternLegalBits_02() = test()
+  @Test def lengthKindPatternFail() = test()
 
-  @Test def ComplexWithBinaryChild = test
+  @Test def ComplexWithBinaryChild() = test()
 
-  @Test def LengthPatternNil_NoNil = test
-  @Test def LengthPatternNil_FindsNil = test
-  @Test def LengthPatternNil_EmptyStringAllowed = test
-  @Test def nested_patterns = test
-  @Test def nested_patterns_01 = test
-  @Test def nested_patterns_02 = test
-  @Test def nested_patterns_03 = test
+  @Test def LengthPatternNil_NoNil() = test()
+  @Test def LengthPatternNil_FindsNil() = test()
+  @Test def LengthPatternNil_EmptyStringAllowed() = test()
+  @Test def nested_patterns() = test()
+  @Test def nested_patterns_01() = test()
+  @Test def nested_patterns_02() = test()
+  @Test def nested_patterns_03() = test()
 
-  @Test def hexBinaryLengthKindPattern01 = test
+  @Test def hexBinaryLengthKindPattern01() = test()
 
-  @Test def lengthPatternEncodingErrorReplace = test
+  @Test def lengthPatternEncodingErrorReplace() = test()
 
-  @Test def lengthPatternBinaryPatternLimit = test
+  @Test def lengthPatternBinaryPatternLimit() = test()
 }
 
 class TestLengthKindPatternAI extends TdmlTests {
   val tdmlSuite = TestLengthKindPatternAI
 
-  @Test def AI000 = test
+  @Test def AI000() = test()
 }

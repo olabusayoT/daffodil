@@ -28,8 +28,8 @@ object TestSharedGroups extends TdmlSuite {
 class TestSharedGroups extends TdmlTests {
   val tdmlSuite = TestSharedGroups
 
-  @Test def Ack = test
+  @Test def Ack() = test()
   // DAFFODIL-2615 - shared groups problem
-  @Test def Nack = test
-  @Test def badElement = test
+  @Test def Nack() = test()
+  @Test def badElement() = test()
 }

@@ -30,25 +30,25 @@ object TestBlobs extends TdmlSuite {
 class TestBlobs extends TdmlTests {
   val tdmlSuite = TestBlobs
 
-  @Test def blob_01 = test
-  @Test def blob_01_insufficient = test
-  @Test def blob_01_insufficient_complex = test
-  @Test def blob_02 = test
-  @Test def blob_03 = test
-  @Test def blob_04 = test
-  @Test def blob_05 = test
-  @Test def blob_06 = test
-  @Test def blob_07 = test
-  @Test def blob_08 = test
-  @Test def blob_09 = test
-  @Test def blob_10 = test
-  @Test def blob_11 = test
-  @Test def blob_12 = test
-  @Test def blob_13 = test
-  @Test def blob_14 = test
-  @Test def blob_15 = test
+  @Test def blob_01() = test()
+  @Test def blob_01_insufficient() = test()
+  @Test def blob_01_insufficient_complex() = test()
+  @Test def blob_02() = test()
+  @Test def blob_03() = test()
+  @Test def blob_04() = test()
+  @Test def blob_05() = test()
+  @Test def blob_06() = test()
+  @Test def blob_07() = test()
+  @Test def blob_08() = test()
+  @Test def blob_09() = test()
+  @Test def blob_10() = test()
+  @Test def blob_11() = test()
+  @Test def blob_12() = test()
+  @Test def blob_13() = test()
+  @Test def blob_14() = test()
+  @Test def blob_15() = test()
 
-  @Test def blob_unparseError = test
+  @Test def blob_unparseError() = test()
 
-  @Test def clob_01 = test
+  @Test def clob_01() = test()
 }

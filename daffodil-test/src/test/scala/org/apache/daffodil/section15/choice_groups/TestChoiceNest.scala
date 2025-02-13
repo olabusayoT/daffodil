@@ -29,9 +29,9 @@ object TestChoiceNest extends TdmlSuite {
 class TestChoiceNest extends TdmlTests {
   val tdmlSuite = TestChoiceNest
 
-  @Test def choiceNest1 = test
-  @Test def choiceNest2 = test
-  @Test def choiceNest2a = test
-  @Test def choiceNest3 = test
-  @Test def choiceNest4 = test
+  @Test def choiceNest1() = test()
+  @Test def choiceNest2() = test()
+  @Test def choiceNest2a() = test()
+  @Test def choiceNest3() = test()
+  @Test def choiceNest4() = test()
 }

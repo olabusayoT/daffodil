@@ -35,26 +35,26 @@ object TestHiddenSequencesNoValidate extends TdmlSuite {
 class TestHiddenSequences extends TdmlTests {
   val tdmlSuite = TestHiddenSequences
 
-  @Test def parseHiddenGroupRef = test
-  @Test def parseRegularGroupRef = test
-  @Test def parseSeqOfHiddenAndRegularRef = test
-  @Test def parseNestedHiddenAndRegularRef = test
-  @Test def parseNestedRegularAndHiddenRef = test
-  @Test def parseNestedHiddenGroupRefs = test
+  @Test def parseHiddenGroupRef() = test()
+  @Test def parseRegularGroupRef() = test()
+  @Test def parseSeqOfHiddenAndRegularRef() = test()
+  @Test def parseNestedHiddenAndRegularRef() = test()
+  @Test def parseNestedRegularAndHiddenRef() = test()
+  @Test def parseNestedHiddenGroupRefs() = test()
 
-  @Test def unparseHiddenGroupRef = test
-  @Test def unparseRegularGroupRef = test
-  @Test def unparseSeqOfHiddenAndRegularRef = test
-  @Test def unparseNestedHiddenAndRegularRef = test
-  @Test def unparseNestedRegularAndHiddenRef = test
-  @Test def unparseNestedHiddenGroupRefs = test
-  @Test def noOVCinHiddenContext = test
-  @Test def nestedNoOVCinHiddenContext = test
+  @Test def unparseHiddenGroupRef() = test()
+  @Test def unparseRegularGroupRef() = test()
+  @Test def unparseSeqOfHiddenAndRegularRef() = test()
+  @Test def unparseNestedHiddenAndRegularRef() = test()
+  @Test def unparseNestedRegularAndHiddenRef() = test()
+  @Test def unparseNestedHiddenGroupRefs() = test()
+  @Test def noOVCinHiddenContext() = test()
+  @Test def nestedNoOVCinHiddenContext() = test()
 }
 
 class TestHiddenSequencesNoValidate extends TdmlTests {
   val tdmlSuite = TestHiddenSequencesNoValidate
 
-  @Test def invalidGroupDefWithHiddenSequenceModelGroup = test
-  @Test def ComplexTypeWithHiddenGroupRefSequence1 = test
+  @Test def invalidGroupDefWithHiddenSequenceModelGroup() = test()
+  @Test def ComplexTypeWithHiddenGroupRefSequence1() = test()
 }

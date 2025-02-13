@@ -29,6 +29,6 @@ object TestOVCAndLength extends TdmlSuite {
 class TestOVCAndLength extends TdmlTests {
   val tdmlSuite = TestOVCAndLength
 
-  @Test def ovcContentLengthCycle1 = test
-  @Test def ovcContentLengthCycle2 = test
+  @Test def ovcContentLengthCycle1() = test()
+  @Test def ovcContentLengthCycle2() = test()
 }

@@ -30,6 +30,6 @@ class TestSetVarWithValueLength extends TdmlTests {
   val tdmlSuite = TestSetVarWithValueLength
 
   // DAFFODIL-2629 Runtime SDE
-  @Test def setVarWithValueLength1 = test
-  @Test def setVarWithValueLength2 = test
+  @Test def setVarWithValueLength1() = test()
+  @Test def setVarWithValueLength2() = test()
 }

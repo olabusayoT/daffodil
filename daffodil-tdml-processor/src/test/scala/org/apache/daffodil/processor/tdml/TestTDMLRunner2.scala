@@ -286,7 +286,7 @@ class TestTDMLRunner2 {
    * the ignoreUnexpectedValidationError defaults to true, the unexpected validation
    * error will be ignored, and the test will poss
    */
-  @Test def testValidationLimitedValidationErrorNotCaptured = {
+  @Test def testValidationLimitedValidationErrorNotCaptured() = {
     val testSuite =
       <tdml:testSuite suiteName="theSuiteName" xmlns:tns={tns} xmlns:tdml={tdml} xmlns:dfdl={
         dfdl

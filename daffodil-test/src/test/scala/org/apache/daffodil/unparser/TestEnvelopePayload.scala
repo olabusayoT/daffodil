@@ -29,7 +29,7 @@ object TestEnvelopePayload extends TdmlSuite {
 class TestEnvelopePayload extends TdmlTests {
   val tdmlSuite = TestEnvelopePayload
 
-  @Test def ep1 = test
-  @Test def ep2 = test
-  @Test def ep3 = test
+  @Test def ep1() = test()
+  @Test def ep2() = test()
+  @Test def ep3() = test()
 }

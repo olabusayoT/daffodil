@@ -29,51 +29,51 @@ object TestRepType extends TdmlSuite {
 class TestRepType extends TdmlTests {
   val tdmlSuite = TestRepType
 
-  @Test def repType_keysetValue_00 = test
-  @Test def repType_keysetValue_01 = test
-  @Test def repType_keysetValue_02 = test
+  @Test def repType_keysetValue_00() = test()
+  @Test def repType_keysetValue_01() = test()
+  @Test def repType_keysetValue_02() = test()
 
-  @Test def repType_unparse_keysetValue_00 = test
-  @Test def repType_unparse_keysetValue_01 = test
-  @Test def repType_unparse_keysetValue_02 = test
+  @Test def repType_unparse_keysetValue_00() = test()
+  @Test def repType_unparse_keysetValue_01() = test()
+  @Test def repType_unparse_keysetValue_02() = test()
 
-  @Test def inherited_LengthKind = test
+  @Test def inherited_LengthKind() = test()
 
-  @Test def valueNotFound_1 = test
-  @Test def unparseValueNotFound_1 = test
-  @Test def valueNotFound_2 = test
-  @Test def unparseValueNotFound_2 = test
+  @Test def valueNotFound_1() = test()
+  @Test def unparseValueNotFound_1() = test()
+  @Test def valueNotFound_2() = test()
+  @Test def unparseValueNotFound_2() = test()
 
-  @Test def primitiveRep_invalid_01 = test
+  @Test def primitiveRep_invalid_01() = test()
 
-  @Test def repType_overlap_01 = test
-  @Test def repType_bad_range_01 = test
-  @Test def repType_odd_range_01 = test
-  @Test def repType_complex_01 = test
-  @Test def repType_no_restriction_01 = test
-  @Test def repType_no_enumerations_01 = test
+  @Test def repType_overlap_01() = test()
+  @Test def repType_bad_range_01() = test()
+  @Test def repType_odd_range_01() = test()
+  @Test def repType_complex_01() = test()
+  @Test def repType_no_restriction_01() = test()
+  @Test def repType_no_enumerations_01() = test()
 
-  @Test def repType_immediate_01 = test
-  @Test def repType_immediate_02 = test
-  @Test def repType_indirection_01 = test
+  @Test def repType_immediate_01() = test()
+  @Test def repType_immediate_02() = test()
+  @Test def repType_indirection_01() = test()
 
-  @Test def repType_length_facet_01 = test
-  @Test def repType_length_facet_02 = test
-  @Test def repType_length_facet_03 = test
-  @Test def repType_length_facet_04 = test
-  @Test def repType_length_facet_05 = test
-  @Test def repType_length_facet_06 = test
+  @Test def repType_length_facet_01() = test()
+  @Test def repType_length_facet_02() = test()
+  @Test def repType_length_facet_03() = test()
+  @Test def repType_length_facet_04() = test()
+  @Test def repType_length_facet_05() = test()
+  @Test def repType_length_facet_06() = test()
 
-  @Test def repType_negative_01 = test
-  @Test def repType_negative_02 = test
-  @Test def repType_negative_03 = test
-  @Test def repType_negative_04 = test
+  @Test def repType_negative_01() = test()
+  @Test def repType_negative_02() = test()
+  @Test def repType_negative_03() = test()
+  @Test def repType_negative_04() = test()
 
-  @Test def repType_hiddenGroup_01 = test
+  @Test def repType_hiddenGroup_01() = test()
 
-  @Test def repType_different_namespaces_01 = test
+  @Test def repType_different_namespaces_01() = test()
 
-  @Test def repValuesWithSpaces_01 = test
+  @Test def repValuesWithSpaces_01() = test()
 
-  @Test def repValuesWithSpaces_02 = test
+  @Test def repValuesWithSpaces_02() = test()
 }

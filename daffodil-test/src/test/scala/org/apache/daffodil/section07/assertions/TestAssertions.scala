@@ -30,69 +30,69 @@ object TestAssertions extends TdmlSuite {
 class TestAssertions extends TdmlTests {
   val tdmlSuite = TestAssertions
 
-  @Test def assertPass = test
-  @Test def assertFail1 = test
-  @Test def assertFail2 = test
-  @Test def assertFail2_recoverable = test
+  @Test def assertPass() = test()
+  @Test def assertFail1() = test()
+  @Test def assertFail2() = test()
+  @Test def assertFail2_recoverable() = test()
 
   // DAFFODIL-752
-  @Ignore @Test def assertFailShowsValue = test
+  @Ignore @Test def assertFailShowsValue() = test()
 
-  @Test def assertFailShowsValue2 = test
-  @Test def assertFailShowsDetails = test
-  @Test def assertWithWhitespace = test
-  @Test def assertWithWhitespaceAndCdata = test
+  @Test def assertFailShowsValue2() = test()
+  @Test def assertFailShowsDetails() = test()
+  @Test def assertWithWhitespace() = test()
+  @Test def assertWithWhitespaceAndCdata() = test()
 
-  @Test def assertGuidesChoice = test
+  @Test def assertGuidesChoice() = test()
 
-  @Test def assertPatternLiteralTextMatch = test
-  @Test def assertPatternCombinedTextMatch = test
-  @Test def assertPatternCombinedTextMatch2 = test
-  @Test def assertPatternCombinedTextMatch3 = test
+  @Test def assertPatternLiteralTextMatch() = test()
+  @Test def assertPatternCombinedTextMatch() = test()
+  @Test def assertPatternCombinedTextMatch2() = test()
+  @Test def assertPatternCombinedTextMatch3() = test()
 
-  @Test def assertPatternPass = test
-  @Test def assertPatternFail = test
-  @Test def assertPatternPass2 = test
-  @Test def assertPatternPass3 = test
-  @Test def assertPatternFail2 = test
-  @Test def assertPatternFail2_recoverable = test
-  @Test def assertPatternInitsTerms = test
-  @Test def assertOnSequence = test
+  @Test def assertPatternPass() = test()
+  @Test def assertPatternFail() = test()
+  @Test def assertPatternPass2() = test()
+  @Test def assertPatternPass3() = test()
+  @Test def assertPatternFail2() = test()
+  @Test def assertPatternFail2_recoverable() = test()
+  @Test def assertPatternInitsTerms() = test()
+  @Test def assertOnSequence() = test()
 
-  @Test def assertOnGroupRef = test
-  @Test def assertOnElemRef = test
+  @Test def assertOnGroupRef() = test()
+  @Test def assertOnElemRef() = test()
 
-  @Test def assertPatternMatch = test
-  @Test def assertPatternMatch2 = test
+  @Test def assertPatternMatch() = test()
+  @Test def assertPatternMatch2() = test()
 
-  @Test def assertMultFormsFail = test
-  @Test def assertMultFormsFail2 = test
-  @Test def assertPatternAndExp = test
-  @Test def assertPatternAndExp2 = test
-  @Test def assertOnSimpleType = test
-  @Test def assertPass2 = test
-  @Test def assertPatternEmpty = test
+  @Test def assertMultFormsFail() = test()
+  @Test def assertMultFormsFail2() = test()
+  @Test def assertPatternAndExp() = test()
+  @Test def assertPatternAndExp2() = test()
+  @Test def assertOnSimpleType() = test()
+  @Test def assertPass2() = test()
+  @Test def assertPatternEmpty() = test()
 
   // DFDL-474
-  @Ignore @Test def assertExpressionEmpty = test
+  @Ignore @Test def assertExpressionEmpty() = test()
 
-  @Test def assertExpressionRef = test
-  @Test def assertExpressionRefFail = test
-  @Test def assertMessage = test
-  @Test def unparseAssertionIgnored = test
+  @Test def assertExpressionRef() = test()
+  @Test def assertExpressionRefFail() = test()
+  @Test def assertMessage() = test()
+  @Test def unparseAssertionIgnored() = test()
 
   // DFDL-2001
-  @Ignore @Test def testPatternX = test
-  @Ignore @Test def testPatternUnicode = test
-  @Test def testPatternHex = test
-  @Test def testPatternFreeFormat = test
-  @Test def testPatternUregexUword = test
-  @Test def testPatternWordChar = test
+  @Ignore @Test def testPatternX() = test()
+  @Ignore @Test def testPatternUnicode() = test()
+  @Test def testPatternHex() = test()
+  @Test def testPatternFreeFormat() = test()
+  @Test def testPatternUregexUword() = test()
+  @Test def testPatternWordChar() = test()
 
   // JIRA DFDL-1672
-  @Test def testNumberFormatErrorInExprRuntime = test
-  @Test def testNumberFormatErrorInExprCompileTime = test
+  @Test def testNumberFormatErrorInExprRuntime() = test()
+  @Test def testNumberFormatErrorInExprCompileTime() = test()
 
-  @Test def test_assertWithMessageExpression_01 = test
-  @Test def test_assertWithMessageExpression_02 = test
+  @Test def test_assertWithMessageExpression_01() = test()
+  @Test def test_assertWithMessageExpression_02() = test()
 }

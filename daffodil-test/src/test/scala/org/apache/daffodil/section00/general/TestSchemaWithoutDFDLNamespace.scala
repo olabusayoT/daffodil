@@ -30,5 +30,5 @@ object TestSchemaWithoutDFDLNamespace extends TdmlSuite {
 class TestSchemaWithoutDFDLNamespace extends TdmlTests {
   val tdmlSuite = TestSchemaWithoutDFDLNamespace
 
-  @Test def schemaWithoutDFDLNamespace = test
+  @Test def schemaWithoutDFDLNamespace() = test()
 }

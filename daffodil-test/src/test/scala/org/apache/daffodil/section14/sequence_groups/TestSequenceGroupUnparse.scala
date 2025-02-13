@@ -29,11 +29,11 @@ object TestSequenceGroupUnparse extends TdmlSuite {
 class TestSequenceGroupUnparse extends TdmlTests {
   val tdmlSuite = TestSequenceGroupUnparse
 
-  @Test def seqWithOptionals1 = test
-  @Test def seqWithOptionals2 = test
-  @Test def seqWithOptionals3 = test
-  @Test def seqWithOptionals4 = test
-  @Test def seqWithOptionals5 = test
+  @Test def seqWithOptionals1() = test()
+  @Test def seqWithOptionals2() = test()
+  @Test def seqWithOptionals3() = test()
+  @Test def seqWithOptionals4() = test()
+  @Test def seqWithOptionals5() = test()
 
-  @Test def seqWithHiddenGroupContainingComplex = test
+  @Test def seqWithHiddenGroupContainingComplex() = test()
 }

@@ -48,21 +48,21 @@ object TestProcessingErrorsValidate extends TdmlSuite {
 class TestSchemaValidation extends TdmlTests {
   val tdmlSuite = TestSchemaValidation
 
-  @Test def twoDFDLSchemaValidationErrors = test
-  @Test def twoDFDLSchemaValidationErrors2 = test
-  @Test def fiveDFDLSchemaValidationErrors = test
+  @Test def twoDFDLSchemaValidationErrors() = test()
+  @Test def twoDFDLSchemaValidationErrors2() = test()
+  @Test def fiveDFDLSchemaValidationErrors() = test()
 }
 
 class TestProcessingErrorsNoValidate extends TdmlTests {
   val tdmlSuite = TestProcessingErrorsNoValidate
 
   // DFDL-756
-  @Ignore @Test def delimiterNotFound01 = test
+  @Ignore @Test def delimiterNotFound01() = test()
 }
 
 class TestProcessingErrorsValidate extends TdmlTests {
   val tdmlSuite = TestProcessingErrorsValidate
 
-  @Test def upaInvalidSchema = test
-  @Test def upaInvalidSchema2 = test
+  @Test def upaInvalidSchema() = test()
+  @Test def upaInvalidSchema2() = test()
 }

@@ -33,14 +33,14 @@ class TestPadCharacter extends TdmlTests {
   val tdmlSuite = TestPadCharacter
 
   // in the short form of the pad character's property binding syntax
-  @Test def short_form_pad_char = test
+  @Test def short_form_pad_char() = test()
 
   // This test demonstrates that you cannot use a literal whitespace character
   // in the attribute (long) form of the pad character's property binding syntax
-  @Test def long_form_pad_char = test
+  @Test def long_form_pad_char() = test()
 
   // This test demonstrates that you can use a literal whitespace character
   // in the element (property) form of the pad character's property binding
   // syntax but internal validation logic will throw an error
-  @Test def property_form_pad_char = test
+  @Test def property_form_pad_char() = test()
 }

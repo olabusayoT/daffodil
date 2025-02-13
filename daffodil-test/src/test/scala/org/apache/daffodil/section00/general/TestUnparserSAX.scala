@@ -29,7 +29,7 @@ object TestUnparserSAX extends TdmlSuite {
 class TestUnparserSAX extends TdmlTests {
   val tdmlSuite = TestUnparserSAX
 
-  @Test def test_saxUnparseBatchSize_1 = test
-  @Test def test_saxUnparseBatchSize_5 = test
-  @Test def test_saxUnparseBatchSize_1000 = test
+  @Test def test_saxUnparseBatchSize_1() = test()
+  @Test def test_saxUnparseBatchSize_5() = test()
+  @Test def test_saxUnparseBatchSize_1000() = test()
 }

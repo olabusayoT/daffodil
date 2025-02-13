@@ -31,5 +31,5 @@ class RCTest extends TdmlTests {
   val tdmlSuite = RCTest
 
   // DAFFODIL-2217
-  @Ignore @Test def parse_test_6 = test
+  @Ignore @Test def parse_test_6() = test()
 }

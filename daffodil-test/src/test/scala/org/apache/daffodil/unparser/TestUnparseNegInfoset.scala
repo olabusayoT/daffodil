@@ -32,21 +32,21 @@ object TestUnparseNegInfoset extends TdmlSuite {
 class TestUnparseNegInfoset extends TdmlTests {
   val tdmlSuite = TestUnparseNegInfoset
 
-  @Test def schemaElementRoot1Good = test
-  @Test def schemaElementRoot2Good = test
+  @Test def schemaElementRoot1Good() = test()
+  @Test def schemaElementRoot2Good() = test()
 
-  @Test def unexpectedNextNone = test
-  @Test def unexpectedNextSingle = test
-  @Test def unexpectedNextMultiple = test
+  @Test def unexpectedNextNone() = test()
+  @Test def unexpectedNextSingle() = test()
+  @Test def unexpectedNextMultiple() = test()
 
-  @Test def unexpectedChildNone = test
-  @Test def unexpectedChildSingle = test
-  @Test def unexpectedChildMultiple = test
-  @Test def unexpectedChildSameAsSibling = test
+  @Test def unexpectedChildNone() = test()
+  @Test def unexpectedChildSingle() = test()
+  @Test def unexpectedChildMultiple() = test()
+  @Test def unexpectedChildSameAsSibling() = test()
 
-  @Test def nilledTrueNonNillable = test
-  @Test def nilledFalseNonNillable = test
-  @Test def nilledSimpleWithContent = test
-  @Test def nilledComplexWithContent = test
-  @Test def nilledBadValue = test
+  @Test def nilledTrueNonNillable() = test()
+  @Test def nilledFalseNonNillable() = test()
+  @Test def nilledSimpleWithContent() = test()
+  @Test def nilledComplexWithContent() = test()
+  @Test def nilledBadValue() = test()
 }

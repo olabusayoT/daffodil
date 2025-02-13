@@ -56,9 +56,9 @@ package org.apache.daffodil.junit
  * class MyTests extends TdmlTests {
  *   val tdmlSuite = MyTests
  *
- *   @Test def test1 = test
- *   @Test def test2 = test
- *   @Test def test3 = test
+ *   @Test def test1() = test()
+ *   @Test def test2() = test()
+ *   @Test def test3() = test()
  * }
  *}}}
  */

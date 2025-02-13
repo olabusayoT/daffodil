@@ -31,14 +31,14 @@ object TestExNums extends TdmlSuite {
 class TestExNums extends TdmlTests {
   val tdmlSuite = TestExNums
 
-  @Test def ex_nums = test
-  @Test def length = test
-  @Test def parse_error_off = test
-  @Test def parse_error_limited = test
-  @Test def parse_error_on = test
-  @Test def unparse_error_off = test
-  @Test def unparse_error_limited = test
-  @Test def unparse_error_on = test
+  @Test def ex_nums() = test()
+  @Test def length() = test()
+  @Test def parse_error_off() = test()
+  @Test def parse_error_limited() = test()
+  @Test def parse_error_on() = test()
+  @Test def unparse_error_off() = test()
+  @Test def unparse_error_limited() = test()
+  @Test def unparse_error_on() = test()
 }
 
 object TestExNumsC extends TdmlSuite {
@@ -49,12 +49,12 @@ object TestExNumsC extends TdmlSuite {
 class TestExNumsC extends TdmlTests {
   val tdmlSuite = TestExNumsC
 
-  @Test def ex_nums = test
-  @Test def length = test
-  @Test def parse_error_off = test
-  @Test def parse_error_limitedC = test
-  @Test def parse_error_on = test
-  @Test def unparse_error_offC = test
-  @Test def unparse_error_limitedC = test
-  @Test def unparse_error_onC = test
+  @Test def ex_nums() = test()
+  @Test def length() = test()
+  @Test def parse_error_off() = test()
+  @Test def parse_error_limitedC() = test()
+  @Test def parse_error_on() = test()
+  @Test def unparse_error_offC() = test()
+  @Test def unparse_error_limitedC() = test()
+  @Test def unparse_error_onC() = test()
 }

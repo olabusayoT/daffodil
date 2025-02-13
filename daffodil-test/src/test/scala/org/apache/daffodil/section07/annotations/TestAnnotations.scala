@@ -29,12 +29,12 @@ object TestAnnotations extends TdmlSuite {
 class TestAnnotations extends TdmlTests {
   val tdmlSuite = TestAnnotations
 
-  @Test def annotationInElementPass = test
-  @Test def annotationInElementFail = test
+  @Test def annotationInElementPass() = test()
+  @Test def annotationInElementFail() = test()
 
   // DAFFODIL-2142
-  @Test def annotationInComplexTypeWarn = test
-  @Test def multipleAppsInfosWarn = test
-  @Test def noAnnotationsInCTPass = test
-  @Test def noDFDLAnnotationsInCTPass = test
+  @Test def annotationInComplexTypeWarn() = test()
+  @Test def multipleAppsInfosWarn() = test()
+  @Test def noAnnotationsInCTPass() = test()
+  @Test def noDFDLAnnotationsInCTPass() = test()
 }

@@ -38,68 +38,68 @@ object TestMultipleDiscriminators extends TdmlSuite {
 class TestDiscriminator extends TdmlTests {
   val tdmlSuite = TestDiscriminator
 
-  @Test def discriminatorGuidesChoice = test
-  @Test def discriminatorGuidesChoice2 = test
-  @Test def discriminatorGuidesChoice3 = test
-  @Test def discriminatorGuidesChoice4 = test
-  @Test def discriminatorGuidesChoice5 = test
+  @Test def discriminatorGuidesChoice() = test()
+  @Test def discriminatorGuidesChoice2() = test()
+  @Test def discriminatorGuidesChoice3() = test()
+  @Test def discriminatorGuidesChoice4() = test()
+  @Test def discriminatorGuidesChoice5() = test()
 
-  @Test def discrimPatternPass = test
-  @Test def discrimPatternFail = test
+  @Test def discrimPatternPass() = test()
+  @Test def discrimPatternFail() = test()
 
-  @Test def discrimPatternFail2 = test
-  @Test def discrimPatternFail3 = test
-  @Test def choiceBranchDiscrim = test
-  @Test def unparseDiscrimIgnored = test
+  @Test def discrimPatternFail2() = test()
+  @Test def discrimPatternFail3() = test()
+  @Test def choiceBranchDiscrim() = test()
+  @Test def unparseDiscrimIgnored() = test()
 
-  @Test def discrimInvalidSchema = test
-  @Test def discrimOnSimpleType = test
-  @Test def discrimOnGroupRef = test
-  @Test def discrimOnGroupRef2 = test
-  @Test def discrimOnElementRef = test
-  @Test def choiceBranchDiscrimFail = test
+  @Test def discrimInvalidSchema() = test()
+  @Test def discrimOnSimpleType() = test()
+  @Test def discrimOnGroupRef() = test()
+  @Test def discrimOnGroupRef2() = test()
+  @Test def discrimOnElementRef() = test()
+  @Test def choiceBranchDiscrimFail() = test()
 
-  @Test def discrimPatternMatch = test
-  @Test def discrimPatternNoMatch = test
+  @Test def discrimPatternMatch() = test()
+  @Test def discrimPatternNoMatch() = test()
 
-  @Test def discrimExpression_01 = test
-  @Test def discrimExpression_02 = test
-  @Test def discrimExpression_03 = test
+  @Test def discrimExpression_01() = test()
+  @Test def discrimExpression_02() = test()
+  @Test def discrimExpression_03() = test()
 
   // DAFFODIL-1971
-  @Ignore @Test def discrimExpression_04 = test
+  @Ignore @Test def discrimExpression_04() = test()
 
-  @Test def discrimFailStopsFollowingAssert1 = test
-  @Test def discrimPEnotSDE1 = test
-  @Test def assertSDENotPE1 = test
-  @Test def occursCountSDENotPE1 = test
-  @Test def discrimPEvalueLength1 = test
-  @Test def discrimPEvalueLengthEnclosingParent1 = test
-  @Test def discrimOnChoiceArray_01 = test
+  @Test def discrimFailStopsFollowingAssert1() = test()
+  @Test def discrimPEnotSDE1() = test()
+  @Test def assertSDENotPE1() = test()
+  @Test def occursCountSDENotPE1() = test()
+  @Test def discrimPEvalueLength1() = test()
+  @Test def discrimPEvalueLengthEnclosingParent1() = test()
+  @Test def discrimOnChoiceArray_01() = test()
 
-  @Test def discrimPlacementExpressionSDW = test
-  @Test def discrimPlacementPatternSDW = test
-  @Test def assertPlacementExpressionSDW = test
-  @Test def assertPlacementPatternSDW = test
+  @Test def discrimPlacementExpressionSDW() = test()
+  @Test def discrimPlacementPatternSDW() = test()
+  @Test def assertPlacementExpressionSDW() = test()
+  @Test def assertPlacementPatternSDW() = test()
 }
 
 class TestDiscriminator2 extends TdmlTests {
   val tdmlSuite = TestDiscriminator2
 
-  @Test def nameDOB_test1 = test
-  @Test def nameDOB_test_bad_date_first_row = test
+  @Test def nameDOB_test1() = test()
+  @Test def nameDOB_test_bad_date_first_row() = test()
   // DAFFODIL-2486 - discriminator bug - interaction with separators
-  @Ignore @Test def nameDOB_test_bad_1 = test
+  @Ignore @Test def nameDOB_test_bad_1() = test()
 
-  @Test def nameDOB_test_bad_using_terminators = test
+  @Test def nameDOB_test_bad_using_terminators() = test()
 }
 
 class TestMultipleDiscriminators extends TdmlTests {
   val tdmlSuite = TestMultipleDiscriminators
 
-  @Test def multipleDiscriminators1 = test
-  @Test def multipleDiscriminators2 = test
-  @Test def multipleDiscriminators3 = test
-  @Test def multipleDiscriminators4 = test
-  @Test def multipleDiscriminators5 = test
+  @Test def multipleDiscriminators1() = test()
+  @Test def multipleDiscriminators2() = test()
+  @Test def multipleDiscriminators3() = test()
+  @Test def multipleDiscriminators4() = test()
+  @Test def multipleDiscriminators5() = test()
 }

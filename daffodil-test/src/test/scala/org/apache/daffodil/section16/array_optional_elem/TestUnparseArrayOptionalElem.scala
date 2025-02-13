@@ -50,85 +50,85 @@ object TestUnparseArrayExpressionConst extends TdmlSuite {
 class TestUnparseArrayOptionalElemFixed extends TdmlTests {
   val tdmlSuite = TestUnparseArrayOptionalElemFixed
 
-  @Test def fixedUnparseArrayTooManyElements01 = test
-  @Test def fixedUnparseArrayTooFewElements01 = test
-  @Test def fixedOptPresent = test
-  @Test def fixedOptPresentArray = test
-  @Test def fixedOptAbsentArray = test
-  @Test def fixedOptTwoArrays = test
-  @Test def fixedOptScalarThenArray = test
-  @Test def fixedOptArrayThenScalar = test
+  @Test def fixedUnparseArrayTooManyElements01() = test()
+  @Test def fixedUnparseArrayTooFewElements01() = test()
+  @Test def fixedOptPresent() = test()
+  @Test def fixedOptPresentArray() = test()
+  @Test def fixedOptAbsentArray() = test()
+  @Test def fixedOptTwoArrays() = test()
+  @Test def fixedOptScalarThenArray() = test()
+  @Test def fixedOptArrayThenScalar() = test()
 }
 
 class TestUnparseArrayOptionalElemImplicit extends TdmlTests {
   val tdmlSuite = TestUnparseArrayOptionalElemImplicit
 
-  @Test def impOptScalarThenArray03 = test
-  @Test def impOptArrayThenScalar03 = test
+  @Test def impOptScalarThenArray03() = test()
+  @Test def impOptArrayThenScalar03() = test()
 
-  @Test def impOptPresent = test
-  @Test def impOptPresentArray = test
-  @Test def impOptPresentArrayMax2 = test
-  @Test def impOptAbsentArray = test
-  @Test def impOptTwoArrays = test
+  @Test def impOptPresent() = test()
+  @Test def impOptPresentArray() = test()
+  @Test def impOptPresentArrayMax2() = test()
+  @Test def impOptAbsentArray() = test()
+  @Test def impOptTwoArrays() = test()
 
-  @Test def impOptScalarThenArray = test
-  @Test def impOptScalarThenArray02 = test
+  @Test def impOptScalarThenArray() = test()
+  @Test def impOptScalarThenArray02() = test()
 
-  @Test def impOptArrayThenScalar = test
-  @Test def impOptArrayThenScalar02 = test
-  @Test def impOptArrayThenScalar02parse = test
+  @Test def impOptArrayThenScalar() = test()
+  @Test def impOptArrayThenScalar02() = test()
+  @Test def impOptArrayThenScalar02parse() = test()
 
-  @Test def scalarThenImpOptArray01 = test
-  @Test def scalarThenImpOptArray02 = test
-  @Test def scalarThenImpOptArray03 = test
+  @Test def scalarThenImpOptArray01() = test()
+  @Test def scalarThenImpOptArray02() = test()
+  @Test def scalarThenImpOptArray03() = test()
 }
 
 class TestUnparseArrayOptionalElemParsed extends TdmlTests {
   val tdmlSuite = TestUnparseArrayOptionalElemParsed
 
-  @Test def parsedOptPresent = test
-  @Test def parsedOptPresentArray = test
-  @Test def parsedOptAbsentArray = test
-  @Test def parsedOptTwoArrays = test
+  @Test def parsedOptPresent() = test()
+  @Test def parsedOptPresentArray() = test()
+  @Test def parsedOptAbsentArray() = test()
+  @Test def parsedOptTwoArrays() = test()
 
-  @Test def parsedOptScalarThenArray = test
-  @Test def parsedOptScalarThenArray02 = test
-  @Test def parsedOptArrayThenScalar = test
-  @Test def parsedOptArrayThenScalar02 = test
-  @Test def parsedOptArrayThenScalar03 = test
+  @Test def parsedOptScalarThenArray() = test()
+  @Test def parsedOptScalarThenArray02() = test()
+  @Test def parsedOptArrayThenScalar() = test()
+  @Test def parsedOptArrayThenScalar02() = test()
+  @Test def parsedOptArrayThenScalar03() = test()
 }
 
 class TestUnparseArrayOptionalElemDelimited extends TdmlTests {
   val tdmlSuite = TestUnparseArrayOptionalElemDelimited
 
-  @Test def delimOptPresent = test
-  @Test def delimOptPresentArray = test
-  @Test def delimOptPresentArrayMax2 = test
-  @Test def delimOptAbsentArray = test
-  @Test def delimOptTwoArrays = test
+  @Test def delimOptPresent() = test()
+  @Test def delimOptPresentArray() = test()
+  @Test def delimOptPresentArrayMax2() = test()
+  @Test def delimOptAbsentArray() = test()
+  @Test def delimOptTwoArrays() = test()
 
-  @Test def delimOptScalarThenArray = test
-  @Test def delimOptScalarThenArray02 = test
-  @Test def delimOptScalarThenArray03 = test
-  @Test def delimOptArrayThenScalar = test
-  @Test def delimOptArrayThenScalar02 = test
-  @Test def delimOptArrayThenScalar03 = test
+  @Test def delimOptScalarThenArray() = test()
+  @Test def delimOptScalarThenArray02() = test()
+  @Test def delimOptScalarThenArray03() = test()
+  @Test def delimOptArrayThenScalar() = test()
+  @Test def delimOptArrayThenScalar02() = test()
+  @Test def delimOptArrayThenScalar03() = test()
 }
 
 class TestUnparseArrayExpressionConst extends TdmlTests {
   val tdmlSuite = TestUnparseArrayExpressionConst
 
-  @Test def exprOptPresent = test
-  @Test def exprOptPresentArray = test
-  @Test def exprOptAbsentArray = test
-  @Test def exprOptTwoArrays = test
-  @Test def exprOptScalarThenArray = test
-  @Test def exprOptArrayThenScalar = test
+  @Test def exprOptPresent() = test()
+  @Test def exprOptPresentArray() = test()
+  @Test def exprOptAbsentArray() = test()
+  @Test def exprOptTwoArrays() = test()
+  @Test def exprOptScalarThenArray() = test()
+  @Test def exprOptArrayThenScalar() = test()
 
-  @Test def exprOptParsedData_01 = test
-  @Test def exprOptParsedData_02 = test
-  @Test def exprOptParsedData_03 = test
-  @Test def exprOptParsedData_04 = test
-  @Test def exprReqAbsentArray_01 = test
+  @Test def exprOptParsedData_01() = test()
+  @Test def exprOptParsedData_02() = test()
+  @Test def exprOptParsedData_03() = test()
+  @Test def exprOptParsedData_04() = test()
+  @Test def exprReqAbsentArray_01() = test()
 }

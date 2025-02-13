@@ -137,72 +137,72 @@ object TestSequence extends TdmlSuite {
 class TestAF extends TdmlTests {
   val tdmlSuite = TestAF
 
-  @Test def AF000 = test
-  @Test def AF001 = test
-  @Test def AF002 = test
+  @Test def AF000() = test()
+  @Test def AF001() = test()
+  @Test def AF002() = test()
 }
 
 class TestAG extends TdmlTests {
   val tdmlSuite = TestAG
 
-  @Test def AG000 = test
-  @Test def AG001 = test
-  @Test def AG002 = test
+  @Test def AG000() = test()
+  @Test def AG001() = test()
+  @Test def AG002() = test()
 }
 
 class TestAP extends TdmlTests {
   val tdmlSuite = TestAP
 
-  @Ignore @Test def AP000 = test
+  @Ignore @Test def AP000() = test()
 }
 
 class TestAV000 extends TdmlTests {
   val tdmlSuite = TestAV000
 
-  @Test def AV000 = test
+  @Test def AV000() = test()
 }
 
 class TestAV001 extends TdmlTests {
   val tdmlSuite = TestAV001
 
-  @Test def AV001 = test
+  @Test def AV001() = test()
 }
 
 class TestAV002 extends TdmlTests {
   val tdmlSuite = TestAV002
 
-  @Test def AV002 = test
+  @Test def AV002() = test()
 }
 
 class TestAV003 extends TdmlTests {
   val tdmlSuite = TestAV003
 
-  @Test def AV003 = test
+  @Test def AV003() = test()
 }
 
 class TestAW extends TdmlTests {
   val tdmlSuite = TestAW
 
-  @Test def AW000 = test
-  @Test def AW001 = test
+  @Test def AW000() = test()
+  @Test def AW001() = test()
 }
 
 class TestAX extends TdmlTests {
   val tdmlSuite = TestAX
 
-  @Test def AX000 = test
+  @Test def AX000() = test()
 }
 
 class TestAY extends TdmlTests {
   val tdmlSuite = TestAY
 
-  @Test def AY000 = test
+  @Test def AY000() = test()
 }
 
 class TestAZ extends TdmlTests {
   val tdmlSuite = TestAZ
 
-  @Test def AZ000 = test
+  @Test def AZ000() = test()
 }
 
 class TestBA extends TdmlTests {
@@ -210,7 +210,7 @@ class TestBA extends TdmlTests {
 
   // Jira DFDL-1392 - Issue with escapeEscape character that is first and precedes an escape-block start.
   // Is being removed, but should be preserved as it does not precede an escape character, nor an escape block end.
-  @Ignore @Test def BA000 = test
+  @Ignore @Test def BA000() = test()
 }
 
 class TestBB extends TdmlTests {
@@ -218,102 +218,102 @@ class TestBB extends TdmlTests {
 
   // Jira DFDL-1392 - Issue with escapeEscape character that is first and precedes an escape-block start.
   // Is being removed, but should be preserved as it does not precede an escape character, nor an escape block end.
-  @Ignore @Test def BB000 = test
+  @Ignore @Test def BB000() = test()
 }
 
 class TestBC extends TdmlTests {
   val tdmlSuite = TestBC
 
-  @Test def BC000 = test
+  @Test def BC000() = test()
 }
 
 class TestBD extends TdmlTests {
   val tdmlSuite = TestBD
 
-  @Test def BD000 = test
+  @Test def BD000() = test()
 }
 
 class TestBE extends TdmlTests {
   val tdmlSuite = TestBE
 
   // DFDL-1010
-  @Test def BE000 = test
-  @Test def BE001 = test
+  @Test def BE000() = test()
+  @Test def BE001() = test()
 }
 
 class TestBF extends TdmlTests {
   val tdmlSuite = TestBF
 
   // DFDL-1010
-  @Test def BF000 = test
-  @Test def BF001 = test
+  @Test def BF000() = test()
+  @Test def BF001() = test()
 }
 
 class TestBG extends TdmlTests {
   val tdmlSuite = TestBG
 
-  @Test def BG000 = test
+  @Test def BG000() = test()
 }
 
 class TestDelimited extends TdmlTests {
   val tdmlSuite = TestDelimited
 
-  @Test def length_delimited_12_03_controversial = test
+  @Test def length_delimited_12_03_controversial() = test()
 }
 
 class TestMixedBinary extends TdmlTests {
   val tdmlSuite = TestMixedBinary
 
   // DFDL-935
-  @Ignore @Test def encodingErrorPolicy_error = test
-  @Ignore @Test def t2 = test
-  @Ignore @Test def t3 = test
-  @Test def t1 = test
+  @Ignore @Test def encodingErrorPolicy_error() = test()
+  @Ignore @Test def t2() = test()
+  @Ignore @Test def t3() = test()
+  @Test def t1() = test()
 }
 
 class TestMultipleDiagnostics extends TdmlTests {
   val tdmlSuite = TestMultipleDiagnostics
 
-  @Test def twoMissingTypeDefErrors = test
-  @Test def manyErrors1 = test
+  @Test def twoMissingTypeDefErrors() = test()
+  @Test def manyErrors1() = test()
 }
 
 class TestMultipleDiagnosticsNoValidate extends TdmlTests {
   val tdmlSuite = TestMultipleDiagnosticsNoValidate
 
-  @Test def manyErrors2 = test
+  @Test def manyErrors2() = test()
 }
 
 class TestNestedGroupRef extends TdmlTests {
   val tdmlSuite = TestNestedGroupRef
 
-  @Test def nestedGroupRefs1 = test
+  @Test def nestedGroupRefs1() = test()
 }
 
 class TestNestedSeparatorDelimited extends TdmlTests {
   val tdmlSuite = TestNestedSeparatorDelimited
 
-  @Test def baseline = test
+  @Test def baseline() = test()
 
   // Fails in IBM DFDL - ambiguous separator/terminator not accepted.
-  @Test def baseline_ibm = test
+  @Test def baseline_ibm() = test()
 
-  @Test def basicNest = test
-  @Test def basicNest2 = test
+  @Test def basicNest() = test()
+  @Test def basicNest2() = test()
 
-  @Test def nest1 = test
-  @Test def nest2 = test
-  @Test def nest3 = test
+  @Test def nest1() = test()
+  @Test def nest2() = test()
+  @Test def nest3() = test()
 }
 
 class TestRuntimeDiagnostics extends TdmlTests {
   val tdmlSuite = TestRuntimeDiagnostics
 
-  @Test def PE1 = test
+  @Test def PE1() = test()
 }
 
 class TestSequence extends TdmlTests {
   val tdmlSuite = TestSequence
 
-  @Test def seq1 = test
+  @Test def seq1() = test()
 }

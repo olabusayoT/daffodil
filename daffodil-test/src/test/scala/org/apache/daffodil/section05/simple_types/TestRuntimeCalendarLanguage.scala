@@ -29,8 +29,8 @@ object TestRuntimeCalendarLanguage extends TdmlSuite {
 class TestRuntimeCalendarLanguage extends TdmlTests {
   val tdmlSuite = TestRuntimeCalendarLanguage
 
-  @Test def runtimeCalendarLanguage1 = test
-  @Test def invalidCalendarLanguage1 = test
-  @Test def unparseRuntimeCalendarLanguageOVC = test
-  @Test def unparseRuntimeCalendarLanguageOVCCacheCheck = test
+  @Test def runtimeCalendarLanguage1() = test()
+  @Test def invalidCalendarLanguage1() = test()
+  @Test def unparseRuntimeCalendarLanguageOVC() = test()
+  @Test def unparseRuntimeCalendarLanguageOVCCacheCheck() = test()
 }

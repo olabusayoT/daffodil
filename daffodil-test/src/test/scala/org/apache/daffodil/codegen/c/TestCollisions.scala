@@ -33,5 +33,5 @@ object TestCollisions extends TdmlSuite {
 class TestCollisions extends TdmlTests {
   val tdmlSuite = TestCollisions
 
-  @Test def collisions = test
+  @Test def collisions() = test()
 }

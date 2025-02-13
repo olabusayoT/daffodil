@@ -32,14 +32,14 @@ object TestEgressXdccBw extends TdmlSuite {
 class TestEgressXdccBw extends TdmlTests {
   val tdmlSuite = TestEgressXdccBw
 
-  @Test def egress_xdcc_bw_11 = test
-  @Test def egress_xdcc_bw_12 = test
-  @Test def egress_xdcc_bw_13 = test
-  @Test def egress_xdcc_bw_14 = test
-  @Test def egress_xdcc_bw_15 = test
-  @Test def egress_xdcc_bw_16 = test
-  @Test def egress_xdcc_bw_17 = test
-  @Test def egress_xdcc_bw_18 = test
-  @Test def egress_xdcc_bw_19 = test
-  @Test def egress_xdcc_bw_20 = test
+  @Test def egress_xdcc_bw_11() = test()
+  @Test def egress_xdcc_bw_12() = test()
+  @Test def egress_xdcc_bw_13() = test()
+  @Test def egress_xdcc_bw_14() = test()
+  @Test def egress_xdcc_bw_15() = test()
+  @Test def egress_xdcc_bw_16() = test()
+  @Test def egress_xdcc_bw_17() = test()
+  @Test def egress_xdcc_bw_18() = test()
+  @Test def egress_xdcc_bw_19() = test()
+  @Test def egress_xdcc_bw_20() = test()
 }

@@ -42,34 +42,34 @@ class TestChoice1765 extends TdmlTests {
   val tdmlSuite = TestChoice1765
 
   // DFDL-1765
-  @Test def backtrack1 = test
-  @Test def backtrack2 = test
-  @Test def backtrack3 = test
-  @Test def backtrack4 = test
+  @Test def backtrack1() = test()
+  @Test def backtrack2() = test()
+  @Test def backtrack3() = test()
+  @Test def backtrack4() = test()
 }
 
 class TestChoice1773 extends TdmlTests {
   val tdmlSuite = TestChoice1773
 
   // DFDL-1773
-  @Test def choiceSlotAmbiguous1 = test
-  @Test def choiceSlotAmbiguous2 = test
+  @Test def choiceSlotAmbiguous1() = test()
+  @Test def choiceSlotAmbiguous2() = test()
 
   // DAFFODIL-1773
-  @Test def queryStyle1 = test
-  @Test def queryStyle2 = test
+  @Test def queryStyle1() = test()
+  @Test def queryStyle2() = test()
 }
 
 class TestChoice2162 extends TdmlTests {
   val tdmlSuite = TestChoice2162
 
   // DAFFODIL-2162
-  @Test def choiceArrayDirectDispatch1 = test
+  @Test def choiceArrayDirectDispatch1() = test()
 }
 
 class TestChoice2736 extends TdmlTests {
   val tdmlSuite = TestChoice2736
 
   // DAFFODIL-2736
-  @Test def choiceAmbiguousUPA = test
+  @Test def choiceAmbiguousUPA() = test()
 }

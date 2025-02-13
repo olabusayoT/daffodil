@@ -31,25 +31,25 @@ class TestSepTests extends TdmlTests {
 
   val tdmlSuite = TestSepTests
 
-  @Test def test_sep_trailing_1 = test
-  @Test def test_sep_anyEmpty_1 = test
+  @Test def test_sep_trailing_1() = test()
+  @Test def test_sep_anyEmpty_1() = test()
   // DAFFODIL-2498 anyEmpty with minOccurs '0', and empty as first occurrence.
-  @Test def test_sep_anyEmpty_2 = test
+  @Test def test_sep_anyEmpty_2() = test()
 
   // DAFFODIL-2217 - trailingEmptyStrict violation not detected when maxOccurs is '3'
-  @Ignore @Test def test_sep_trailingEmptyStrict_1 = test
-  @Test def test_sep_trailingEmptyStrict_2 = test
+  @Ignore @Test def test_sep_trailingEmptyStrict_1() = test()
+  @Test def test_sep_trailingEmptyStrict_2() = test()
 
-  @Test def test_sep_ssp_never_1 = test
-  @Test def test_sep_ssp_never_2 = test
-  @Test def test_sep_ssp_never_3 = test
-  @Test def test_sep_ssp_never_4_ibm = test
-  @Test def test_sep_ssp_never_4_daffodil = test
-  @Test def test_sep_ssp_never_5 = test
+  @Test def test_sep_ssp_never_1() = test()
+  @Test def test_sep_ssp_never_2() = test()
+  @Test def test_sep_ssp_never_3() = test()
+  @Test def test_sep_ssp_never_4_ibm() = test()
+  @Test def test_sep_ssp_never_4_daffodil() = test()
+  @Test def test_sep_ssp_never_5() = test()
 
-  @Test def test_sep_ssp_never_6 = test
-  @Test def test_sep_ssp_never_7 = test
+  @Test def test_sep_ssp_never_6() = test()
+  @Test def test_sep_ssp_never_7() = test()
 
   // DAFFODIL-2791
-  @Test def test_treatAsAbsent_occursIndex = test
+  @Test def test_treatAsAbsent_occursIndex() = test()
 }

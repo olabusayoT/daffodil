@@ -41,10 +41,10 @@ class TestCheckDigit extends TdmlTests {
   //
   // These are regular TDML tests
   //
-  @Test def test_checkDigit_ok_01 = test
-  @Test def test_checkDigit_bad_parse_short_01 = test
-  @Test def test_checkDigit_bad_invalid = test
-  @Test def test_checkDigit_unparse_ok_01 = test
+  @Test def test_checkDigit_ok_01() = test()
+  @Test def test_checkDigit_bad_parse_short_01() = test()
+  @Test def test_checkDigit_bad_invalid() = test()
+  @Test def test_checkDigit_unparse_ok_01() = test()
 
   //
   // These don't use the TDML framework

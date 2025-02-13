@@ -29,14 +29,14 @@ object TestUnparseChoice extends TdmlSuite {
 class TestUnparseChoice extends TdmlTests {
   val tdmlSuite = TestUnparseChoice
 
-  @Test def choice1 = test
-  @Test def choice2 = test
-  @Test def choice3 = test
-  @Test def choice4 = test
-  @Test def choice5 = test
-  @Test def choice6 = test
-  @Test def choice7 = test
-  @Test def choice8 = test
-  @Test def choice9 = test
-  @Test def choice10 = test
+  @Test def choice1() = test()
+  @Test def choice2() = test()
+  @Test def choice3() = test()
+  @Test def choice4() = test()
+  @Test def choice5() = test()
+  @Test def choice6() = test()
+  @Test def choice7() = test()
+  @Test def choice8() = test()
+  @Test def choice9() = test()
+  @Test def choice10() = test()
 }

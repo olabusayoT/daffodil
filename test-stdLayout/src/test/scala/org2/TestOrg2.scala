@@ -33,11 +33,11 @@ object TestOrg2Embedded extends TdmlSuite {
 class TestOrg2NonEmbedded extends TdmlTests {
   val tdmlSuite = TestOrg2NonEmbedded
 
-  @Test def test_schemaFilesUnderSrcTest_02 = test
+  @Test def test_schemaFilesUnderSrcTest_02() = test()
 }
 
 class TestOrg2Embedded extends TdmlTests {
   val tdmlSuite = TestOrg2Embedded
 
-  @Test def test_embeddedSchema_01 = test
+  @Test def test_embeddedSchema_01() = test()
 }

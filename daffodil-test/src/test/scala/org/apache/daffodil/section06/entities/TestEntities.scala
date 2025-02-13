@@ -42,98 +42,98 @@ object TestInvalidEntities extends TdmlSuite {
 class TestCharClassEntities extends TdmlTests {
   val tdmlSuite = TestCharClassEntities
 
-  @Test def doubleNL2 = test
+  @Test def doubleNL2() = test()
 
-  @Test def entityInError = test
-  @Test def LineFeed = test
-  @Test def CarriageReturn = test
-  @Test def LineSeparator = test
-  @Test def NextLine = test
-  @Test def LineFeed_byte = test
-  @Test def CarriageReturn_byte = test
-  @Test def CRLF_byte = test
-  @Test def LineSeparator_byte = test
-  @Test def NextLine_byte = test
-  @Test def FormFeed = test
-  @Test def HexCodePoint = test
+  @Test def entityInError() = test()
+  @Test def LineFeed() = test()
+  @Test def CarriageReturn() = test()
+  @Test def LineSeparator() = test()
+  @Test def NextLine() = test()
+  @Test def LineFeed_byte() = test()
+  @Test def CarriageReturn_byte() = test()
+  @Test def CRLF_byte() = test()
+  @Test def LineSeparator_byte() = test()
+  @Test def NextLine_byte() = test()
+  @Test def FormFeed() = test()
+  @Test def HexCodePoint() = test()
 }
 
 class TestEntities extends TdmlTests {
   val tdmlSuite = TestEntities
 
-  @Test def entityAndNonMix_01 = test
-  @Test def entityAndNonMix_02 = test
-  @Test def entityAndNonMix_03 = test
-  @Test def entityAndNonMix_04 = test
+  @Test def entityAndNonMix_01() = test()
+  @Test def entityAndNonMix_02() = test()
+  @Test def entityAndNonMix_03() = test()
+  @Test def entityAndNonMix_04() = test()
 
   // DFDL-378
-  @Ignore @Test def dataDumpEncoding = test
-  @Test def errorEncoding = test
+  @Ignore @Test def dataDumpEncoding() = test()
+  @Test def errorEncoding() = test()
 
-  @Test def doubleNLterminator = test
-  @Test def doubleNLseparator = test
+  @Test def doubleNLterminator() = test()
+  @Test def doubleNLseparator() = test()
 
-  @Test def text_entities_6_02 = test
-  @Test def text_entities_6_03 = test
-  @Test def text_entities_6_03b = test
-  @Test def text_entities_6_04 = test
-  @Test def byte_entities_6_01 = test
-  @Test def byte_entities_6_02 = test
-  @Test def byte_entities_6_03 = test
-  @Test def byte_entities_6_04 = test
-  @Test def byte_entities_6_05 = test
-  @Test def byte_entities_6_06 = test
-  @Test def byte_entities_6_07 = test
-  @Test def byte_entities_6_08 = test
+  @Test def text_entities_6_02() = test()
+  @Test def text_entities_6_03() = test()
+  @Test def text_entities_6_03b() = test()
+  @Test def text_entities_6_04() = test()
+  @Test def byte_entities_6_01() = test()
+  @Test def byte_entities_6_02() = test()
+  @Test def byte_entities_6_03() = test()
+  @Test def byte_entities_6_04() = test()
+  @Test def byte_entities_6_05() = test()
+  @Test def byte_entities_6_06() = test()
+  @Test def byte_entities_6_07() = test()
+  @Test def byte_entities_6_08() = test()
   // DAFFODIL-2102
-  @Ignore @Test def byte_entities_6_10 = test
+  @Ignore @Test def byte_entities_6_10() = test()
 
-  @Test def whitespace_01 = test
-  @Test def whitespace_02 = test
-  @Test def whitespace_03 = test
-  @Test def whitespace_04 = test
-  @Test def whitespace_05 = test
-  @Test def whitespace_06 = test
-  @Test def whitespace_07 = test
-  @Test def whitespace_08 = test
-  @Test def whitespace_09 = test
-  @Test def whitespace_10 = test
+  @Test def whitespace_01() = test()
+  @Test def whitespace_02() = test()
+  @Test def whitespace_03() = test()
+  @Test def whitespace_04() = test()
+  @Test def whitespace_05() = test()
+  @Test def whitespace_06() = test()
+  @Test def whitespace_07() = test()
+  @Test def whitespace_08() = test()
+  @Test def whitespace_09() = test()
+  @Test def whitespace_10() = test()
 
   // DAFFODIL-1475
-  @Test def emptyStringEntityTermInExpression_01 = test
-  @Test def emptyStringEntityTermInExpression_02 = test
-  @Test def emptyStringEntityTermInExpressionDelimited_01 = test
-  @Test def emptyStringEntityTermInComplex_01 = test
-  @Test def emptyStringEntityTermInComplex_02 = test
+  @Test def emptyStringEntityTermInExpression_01() = test()
+  @Test def emptyStringEntityTermInExpression_02() = test()
+  @Test def emptyStringEntityTermInExpressionDelimited_01() = test()
+  @Test def emptyStringEntityTermInComplex_01() = test()
+  @Test def emptyStringEntityTermInComplex_02() = test()
 
-  @Test def emptyStringEntityInitiator_01 = test
-  @Test def emptyStringEntityInitiator_02 = test
-  @Test def emptyStringEntityInitiator_03 = test
+  @Test def emptyStringEntityInitiator_01() = test()
+  @Test def emptyStringEntityInitiator_02() = test()
+  @Test def emptyStringEntityInitiator_03() = test()
 
-  @Test def allAsciiHexEntities = test
-  @Test def allAsciiDecEntities = test
+  @Test def allAsciiHexEntities() = test()
+  @Test def allAsciiDecEntities() = test()
 }
 
 class TestEntities01 extends TdmlTests {
   val tdmlSuite = TestEntities01
 
-  @Test def entity_fail_01 = test
-  @Test def entity_fail_02 = test
+  @Test def entity_fail_01() = test()
+  @Test def entity_fail_02() = test()
 
   // DAFFODIL-1477
-  @Test def entity_fail_03a = test
-  @Test def entity_fail_03b = test
-  @Test def entity_fail_04 = test
+  @Test def entity_fail_03a() = test()
+  @Test def entity_fail_03b() = test()
+  @Test def entity_fail_04() = test()
 }
 
 class TestInvalidEntities extends TdmlTests {
   val tdmlSuite = TestInvalidEntities
 
-  @Test def text_invalid_entity_name = test
-  @Test def text_invalid_entity_decimalCodePoint = test
-  @Test def text_invalid_entity_hexaDecimalCodePoint = test
-  @Test def text_invalid_entity_rawBytes = test
-  @Test def text_invalid_entity_among_multiple_valid = test
-  @Test def text_invalid_entity_among_multiple_valid_combined = test
-  @Test def text_invalid_entity_escaped = test
+  @Test def text_invalid_entity_name() = test()
+  @Test def text_invalid_entity_decimalCodePoint() = test()
+  @Test def text_invalid_entity_hexaDecimalCodePoint() = test()
+  @Test def text_invalid_entity_rawBytes() = test()
+  @Test def text_invalid_entity_among_multiple_valid() = test()
+  @Test def text_invalid_entity_among_multiple_valid_combined() = test()
+  @Test def text_invalid_entity_escaped() = test()
 }

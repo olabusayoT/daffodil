@@ -40,31 +40,31 @@ object TestPropertySyntaxValidate extends TdmlSuite {
 class TestPropertySyntax extends TdmlTests {
   val tdmlSuite = TestPropertySyntax
 
-  @Test def ShortAndLongForm = test
-  @Test def ShortAnnotationAndElementForm = test
-  @Test def AnnotationAndElementForm = test
-  @Test def ShortAndElementForm = test
-  @Test def Lesson3_attribute_form = test
-  @Test def Lesson3_element_form = test
-  @Test def Lesson3_short_form = test
+  @Test def ShortAndLongForm() = test()
+  @Test def ShortAnnotationAndElementForm() = test()
+  @Test def AnnotationAndElementForm() = test()
+  @Test def ShortAndElementForm() = test()
+  @Test def Lesson3_attribute_form() = test()
+  @Test def Lesson3_element_form() = test()
+  @Test def Lesson3_short_form() = test()
 
-  @Test def dafProperty1 = test
-  @Test def dafProperty2 = test
-  @Test def dfdlxProperty1 = test
-  @Test def dfdlxProperty2 = test
+  @Test def dafProperty1() = test()
+  @Test def dafProperty2() = test()
+  @Test def dfdlxProperty1() = test()
+  @Test def dfdlxProperty2() = test()
 
-  @Test def ignoredPropertiesWarning = test
+  @Test def ignoredPropertiesWarning() = test()
 
   // DFDL-1842
-  @Test def overlappingProperties1 = test
-  @Test def overlappingProperties2 = test
+  @Test def overlappingProperties1() = test()
+  @Test def overlappingProperties2() = test()
 
-  @Test def badElementFormProperty = test
-  @Test def badElementFormProperty2 = test
+  @Test def badElementFormProperty() = test()
+  @Test def badElementFormProperty2() = test()
 }
 
 class TestPropertySyntaxValidate extends TdmlTests {
   val tdmlSuite = TestPropertySyntaxValidate
 
-  @Test def encodingEmptyFail = test
+  @Test def encodingEmptyFail() = test()
 }

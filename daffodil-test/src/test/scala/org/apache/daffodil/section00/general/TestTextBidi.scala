@@ -33,6 +33,6 @@ object TestTextBidi extends TdmlSuite {
 class TestTextBidi extends TdmlTests {
   val tdmlSuite = TestTextBidi
 
-  @Test def textBidiNo = test
-  @Test def textBidiYes = test
+  @Test def textBidiNo() = test()
+  @Test def textBidiYes() = test()
 }

@@ -32,18 +32,18 @@ object TestHiddenChoices extends TdmlSuite {
 class TestHiddenChoices extends TdmlTests {
   val tdmlSuite = TestHiddenChoices
 
-  @Test def parseHiddenGroupRef = test
-  @Test def parseRegularGroupRef = test
-  @Test def parseSeqOfHiddenAndRegularRef = test
-  @Test def parseNestedHiddenAndRegularRef = test
-  @Test def parseNestedHiddenGroupRefs = test
+  @Test def parseHiddenGroupRef() = test()
+  @Test def parseRegularGroupRef() = test()
+  @Test def parseSeqOfHiddenAndRegularRef() = test()
+  @Test def parseNestedHiddenAndRegularRef() = test()
+  @Test def parseNestedHiddenGroupRefs() = test()
 
-  @Test def unparseHiddenGroupRef = test
-  @Test def unparseRegularGroupRef = test
-  @Test def unparseSeqOfHiddenAndRegularRef = test
-  @Test def unparseNestedHiddenAndRegularRef = test
-  @Test def unparseNestedRegularAndHiddenRef = test
-  @Test def unparseNestedHiddenGroupRefs = test
-  @Test def noOVCinHiddenContext = test
-  @Test def nestedNoOVCinHiddenContext = test
+  @Test def unparseHiddenGroupRef() = test()
+  @Test def unparseRegularGroupRef() = test()
+  @Test def unparseSeqOfHiddenAndRegularRef() = test()
+  @Test def unparseNestedHiddenAndRegularRef() = test()
+  @Test def unparseNestedRegularAndHiddenRef() = test()
+  @Test def unparseNestedHiddenGroupRefs() = test()
+  @Test def noOVCinHiddenContext() = test()
+  @Test def nestedNoOVCinHiddenContext() = test()
 }

@@ -33,19 +33,19 @@ object TestParseUnparsePolicy extends TdmlSuite {
 class TestParseUnparsePolicy extends TdmlTests {
   val tdmlSuite = TestParseUnparsePolicy
 
-  @Test def pb_parse = test
-  @Test def pb_unparse = test
-  @Test def pp_parse = test
-  @Test def pp_unparse = test
-  @Test def pu = test
+  @Test def pb_parse() = test()
+  @Test def pb_unparse() = test()
+  @Test def pp_parse() = test()
+  @Test def pp_unparse() = test()
+  @Test def pu() = test()
 
-  @Test def ub_parse = test
-  @Test def ub_unparse = test
-  @Test def uu_parse = test
-  @Test def uu_unparse = test
-  @Test def up = test
+  @Test def ub_parse() = test()
+  @Test def ub_unparse() = test()
+  @Test def uu_parse() = test()
+  @Test def uu_unparse() = test()
+  @Test def up() = test()
 
-  @Test def bb = test
-  @Test def bp = test
-  @Test def bu = test
+  @Test def bb() = test()
+  @Test def bp() = test()
+  @Test def bu() = test()
 }

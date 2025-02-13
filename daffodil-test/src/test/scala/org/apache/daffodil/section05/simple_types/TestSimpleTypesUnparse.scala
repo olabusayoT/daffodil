@@ -29,33 +29,33 @@ object TestSimpleTypesUnparse extends TdmlSuite {
 class TestSimpleTypesUnparse extends TdmlTests {
   val tdmlSuite = TestSimpleTypesUnparse
 
-  @Test def hexBinary_unparse_01 = test
-  @Test def hexBinary_unparse_02 = test
-  @Test def hexBinary_unparse_03 = test
-  @Test def hexBinary_unparse_04 = test
-  @Test def hexBinary_unparse_05 = test
-  @Test def hexBinary_unparse_06 = test
-  @Test def hexBinary_unparse_07 = test
-  @Test def hexBinary_unparse_08 = test
-  @Test def hexBinary_unparse_09 = test
-  @Test def hexBinary_unparse_10 = test
-  @Test def hexBinary_unparse_11 = test
-  @Test def hexBinary_unparse_12 = test
-  @Test def hexBinary_unparse_13 = test
-  @Test def hexBinary_unparse_14 = test
+  @Test def hexBinary_unparse_01() = test()
+  @Test def hexBinary_unparse_02() = test()
+  @Test def hexBinary_unparse_03() = test()
+  @Test def hexBinary_unparse_04() = test()
+  @Test def hexBinary_unparse_05() = test()
+  @Test def hexBinary_unparse_06() = test()
+  @Test def hexBinary_unparse_07() = test()
+  @Test def hexBinary_unparse_08() = test()
+  @Test def hexBinary_unparse_09() = test()
+  @Test def hexBinary_unparse_10() = test()
+  @Test def hexBinary_unparse_11() = test()
+  @Test def hexBinary_unparse_12() = test()
+  @Test def hexBinary_unparse_13() = test()
+  @Test def hexBinary_unparse_14() = test()
 
-  @Test def hexBinary_unparse_15 = test
-  @Test def hexBinary_unparse_16 = test
-  @Test def hexBinary_unparse_17 = test
-  @Test def hexBinary_unparse_18 = test
-  @Test def hexBinary_unparse_19 = test
+  @Test def hexBinary_unparse_15() = test()
+  @Test def hexBinary_unparse_16() = test()
+  @Test def hexBinary_unparse_17() = test()
+  @Test def hexBinary_unparse_18() = test()
+  @Test def hexBinary_unparse_19() = test()
 
-  @Test def hexBinary_variable_unparse_01 = test
-  @Test def hexBinary_variable_unparse_02 = test
-  @Test def hexBinary_variable_unparse_03 = test
-  @Test def hexBinary_variable_unparse_04 = test
+  @Test def hexBinary_variable_unparse_01() = test()
+  @Test def hexBinary_variable_unparse_02() = test()
+  @Test def hexBinary_variable_unparse_03() = test()
+  @Test def hexBinary_variable_unparse_04() = test()
 
-  @Test def float_binary_unparse_01 = test
-  @Test def double_binary_unparse_01 = test
-  @Test def integer_binary_unparse_01 = test
+  @Test def float_binary_unparse_01() = test()
+  @Test def double_binary_unparse_01() = test()
+  @Test def integer_binary_unparse_01() = test()
 }

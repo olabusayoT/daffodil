@@ -29,25 +29,25 @@ object TestLayers extends TdmlSuite {
 class TestLayers extends TdmlTests {
   val tdmlSuite = TestLayers
 
-  @Test def testAllTypes = test
+  @Test def testAllTypes() = test()
 
-  @Test def testOk1 = test
-  @Test def testOk2 = test
-  @Test def testOk3 = test
-  @Test def testOk4 = test
+  @Test def testOk1() = test()
+  @Test def testOk2() = test()
+  @Test def testOk3() = test()
+  @Test def testOk4() = test()
 
   //
   // All the various ways a layer author can misconfigure a layer
   // These all result in SDE.
   //
-  @Test def testBadTypeInLayerCode1 = test
-  @Test def testBadTypeInLayerCode2 = test
-  @Test def testBadNotInMETAINFServices = test
-  @Test def testBadMissingSetter = test
-  @Test def testBadMissingSetterArg = test
-  @Test def testBadMissingGetter = test
-  @Test def testBadMissingSetterVar = test
-  @Test def testBadMissingGetterVar = test
-  @Test def testBadMissingDefaultConstructor = test
-  @Test def testBadNotALayer = test
+  @Test def testBadTypeInLayerCode1() = test()
+  @Test def testBadTypeInLayerCode2() = test()
+  @Test def testBadNotInMETAINFServices() = test()
+  @Test def testBadMissingSetter() = test()
+  @Test def testBadMissingSetterArg() = test()
+  @Test def testBadMissingGetter() = test()
+  @Test def testBadMissingSetterVar() = test()
+  @Test def testBadMissingGetterVar() = test()
+  @Test def testBadMissingDefaultConstructor() = test()
+  @Test def testBadNotALayer() = test()
 }

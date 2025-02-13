@@ -33,11 +33,11 @@ object TestNested extends TdmlSuite {
 class TestNested extends TdmlTests {
   val tdmlSuite = TestNested
 
-  @Test def nested_struct = test
-  @Test def nested_struct_diag1 = test
-  @Test def nested_struct_diag2 = test
-  @Test def nested_struct_err1 = test
-  @Test def nested_struct_err2 = test
-  @Test def nested_union_bar = test
-  @Test def nested_union_foo = test
+  @Test def nested_struct() = test()
+  @Test def nested_struct_diag1() = test()
+  @Test def nested_struct_diag2() = test()
+  @Test def nested_struct_err1() = test()
+  @Test def nested_struct_err2() = test()
+  @Test def nested_union_bar() = test()
+  @Test def nested_union_foo() = test()
 }

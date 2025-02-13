@@ -29,25 +29,25 @@ object TestExternalVariables extends TdmlSuite {
 class TestExternalVariables extends TdmlTests {
   val tdmlSuite = TestExternalVariables
 
-  @Test def override_define_vars_01 = test
-  @Test def override_define_vars_02 = test
-  @Test def override_define_vars_04 = test
-  @Test def override_define_vars_05 = test
-  @Test def override_define_vars_06 = test
-  @Test def override_define_vars_07 = test
+  @Test def override_define_vars_01() = test()
+  @Test def override_define_vars_02() = test()
+  @Test def override_define_vars_04() = test()
+  @Test def override_define_vars_05() = test()
+  @Test def override_define_vars_06() = test()
+  @Test def override_define_vars_07() = test()
 
-  @Test def access_default_predefined_vars = test
+  @Test def access_default_predefined_vars() = test()
 
-  @Test def set_predefined_var = test
+  @Test def set_predefined_var() = test()
 
   // Tests that we can specify a file in the parser
   // test case.
-  @Test def read_config_from_file = test
+  @Test def read_config_from_file() = test()
 
   /**
    * Test that a default XMLNS binding isn't present. That would be broken
    * as this schema depends on unqualified child element names
    * (elementFormDefault unqualified, which is the default)
    */
-  @Test def testNoRootUnnecessaryBinding = test
+  @Test def testNoRootUnnecessaryBinding() = test()
 }

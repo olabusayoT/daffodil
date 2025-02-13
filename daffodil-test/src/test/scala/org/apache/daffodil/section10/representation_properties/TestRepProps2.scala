@@ -29,27 +29,27 @@ object TestRepProps2 extends TdmlSuite {
 class TestRepProps2 extends TdmlTests {
   val tdmlSuite = TestRepProps2
 
-  @Test def ebcdic1 = test
-  @Test def bits1 = test
-  @Test def bits1a = test
-  @Test def bits2 = test
-  @Test def bits2a = test
+  @Test def ebcdic1() = test()
+  @Test def bits1() = test()
+  @Test def bits1a() = test()
+  @Test def bits2() = test()
+  @Test def bits2a() = test()
 
-  @Test def bitsTerm1 = test
+  @Test def bitsTerm1() = test()
 
   // fails Left-over data byte 1 limit(bytes) 2
-  @Test def bitsTerm2 = test
-  @Test def bitsTerm3 = test
+  @Test def bitsTerm2() = test()
+  @Test def bitsTerm3() = test()
 
-  @Test def fiveBitDFI1661DUI001 = test
-  @Test def fiveBitDFI1661DUI001_roundTrip = test
+  @Test def fiveBitDFI1661DUI001() = test()
+  @Test def fiveBitDFI1661DUI001_roundTrip() = test()
 
-  @Test def sixBit1 = test
+  @Test def sixBit1() = test()
 
-  @Test def iso88591msbbitsmisaligned = test
-  @Test def iso88591lsbbitsmisaligned = test
+  @Test def iso88591msbbitsmisaligned() = test()
+  @Test def iso88591lsbbitsmisaligned() = test()
 
-  @Test def unalignedCharsetWithMandatory8BitAlignment = test
+  @Test def unalignedCharsetWithMandatory8BitAlignment() = test()
 
-  @Test def automaticAlignedCharsetWithMandatory8BitAlignment = test
+  @Test def automaticAlignedCharsetWithMandatory8BitAlignment() = test()
 }

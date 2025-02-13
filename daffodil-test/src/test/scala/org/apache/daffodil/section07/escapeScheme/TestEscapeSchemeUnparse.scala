@@ -29,19 +29,19 @@ object TestEscapeSchemeUnparse extends TdmlSuite {
 class TestEscapeSchemeUnparse extends TdmlTests {
   val tdmlSuite = TestEscapeSchemeUnparse
 
-  @Test def unparseDelimitedEscapedString01 = test
-  @Test def unparseDelimitedEscapedString02 = test
-  @Test def unparseDelimitedEscapedString03 = test
-  @Test def unparseDelimitedEscapedString04 = test
-  @Test def unparseDelimitedEscapedString05 = test
-  @Test def unparseDelimitedEscapedString06 = test
-  @Test def unparseDelimitedEscapedString07 = test
-  @Test def unparseDelimitedEscapedString08 = test
-  @Test def unparseDelimitedEscapedString09 = test
-  @Test def unparseDelimitedEscapedString10 = test
-  @Test def unparseDelimitedEscapedString12 = test
-  @Test def unparseDelimitedEscapedString13 = test
-  @Test def unparseDelimitedEscapedString14 = test
+  @Test def unparseDelimitedEscapedString01() = test()
+  @Test def unparseDelimitedEscapedString02() = test()
+  @Test def unparseDelimitedEscapedString03() = test()
+  @Test def unparseDelimitedEscapedString04() = test()
+  @Test def unparseDelimitedEscapedString05() = test()
+  @Test def unparseDelimitedEscapedString06() = test()
+  @Test def unparseDelimitedEscapedString07() = test()
+  @Test def unparseDelimitedEscapedString08() = test()
+  @Test def unparseDelimitedEscapedString09() = test()
+  @Test def unparseDelimitedEscapedString10() = test()
+  @Test def unparseDelimitedEscapedString12() = test()
+  @Test def unparseDelimitedEscapedString13() = test()
+  @Test def unparseDelimitedEscapedString14() = test()
 
   /*
    * The following tests demonstrate that for extraEscapedCharacters during Unparsing that:
@@ -53,20 +53,20 @@ class TestEscapeSchemeUnparse extends TdmlTests {
    * 5. DFDL decimal entities are allowed
    * 6. When an extra escaped character is not present, the text is not escaped.
    * */
-  @Test def unparseDelimitedEscapedString15 = test
-  @Test def unparseDelimitedEscapedString16 = test
-  @Test def unparseDelimitedEscapedString17 = test
-  @Test def unparseDelimitedEscapedString18 = test
-  @Test def unparseDelimitedEscapedString19 = test
-  @Test def unparseDelimitedEscapedString20 = test
-  @Test def unparseDelimitedEscapedString21 = test
-  @Test def unparseDelimitedEscapedString22 = test
+  @Test def unparseDelimitedEscapedString15() = test()
+  @Test def unparseDelimitedEscapedString16() = test()
+  @Test def unparseDelimitedEscapedString17() = test()
+  @Test def unparseDelimitedEscapedString18() = test()
+  @Test def unparseDelimitedEscapedString19() = test()
+  @Test def unparseDelimitedEscapedString20() = test()
+  @Test def unparseDelimitedEscapedString21() = test()
+  @Test def unparseDelimitedEscapedString22() = test()
 
-  @Test def parseDelimitedEscapedString01 = test
-  @Test def parseDelimitedEscapedString03 = test
-  @Test def parseDelimitedEscapedString04 = test
+  @Test def parseDelimitedEscapedString01() = test()
+  @Test def parseDelimitedEscapedString03() = test()
+  @Test def parseDelimitedEscapedString04() = test()
 
-  @Test def runtimeUnparseDelimiterEscapeConflict = test
+  @Test def runtimeUnparseDelimiterEscapeConflict() = test()
 
-  @Test def unparseInvalidExtraEscapedCharacters = test
+  @Test def unparseInvalidExtraEscapedCharacters() = test()
 }

@@ -29,8 +29,8 @@ object TestNillable2 extends TdmlSuite {
 class TestNillable2 extends TdmlTests {
   val tdmlSuite = TestNillable2
 
-  @Test def foo1 = test
-  @Test def foo2 = test
-  @Test def foo3 = test
-  @Test def foo4 = test
+  @Test def foo1() = test()
+  @Test def foo2() = test()
+  @Test def foo3() = test()
+  @Test def foo4() = test()
 }

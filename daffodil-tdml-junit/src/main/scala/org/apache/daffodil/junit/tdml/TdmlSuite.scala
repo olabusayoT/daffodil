@@ -86,7 +86,7 @@ trait TdmlTests {
    * test test as having violated an assumption. This prevents the test from generating a test
    * case failure, and instead it is marked as "skipped".
    */
-  final def test: Unit = {
+  final def test(): Unit = {
     try {
       tdmlSuite.runner.runOneTest(testName)
     } catch {
@@ -100,9 +100,9 @@ trait TdmlTests {
    * a single test since "trace" modifies the state of the Runner causing all later tests in the
    * suite to run with trace enabled
    */
-  final def trace: Unit = {
+  final def trace(): Unit = {
     tdmlSuite.runner.trace
-    test
+    test()
   }
 
   /**

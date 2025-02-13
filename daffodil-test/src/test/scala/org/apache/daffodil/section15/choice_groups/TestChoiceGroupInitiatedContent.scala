@@ -30,32 +30,32 @@ object TestChoiceGroupInitiatedContent extends TdmlSuite {
 class TestChoiceGroupInitiatedContent extends TdmlTests {
   val tdmlSuite = TestChoiceGroupInitiatedContent
 
-  @Test def initiatedContentChoice1 = test
-  @Test def initiatedContentChoice2 = test
-  @Test def initiatedContentChoice3 = test
-  @Test def initiatedContentChoice4 = test
-  @Test def initiatedContentChoice5 = test
-  @Test def initiatedContentChoice6 = test
-  @Test def initiatedContentChoice7 = test
-  @Test def initiatedContentChoice8 = test
-  @Test def initiatedContentChoice9 = test
-  @Test def initiatedContentChoice10 = test
+  @Test def initiatedContentChoice1() = test()
+  @Test def initiatedContentChoice2() = test()
+  @Test def initiatedContentChoice3() = test()
+  @Test def initiatedContentChoice4() = test()
+  @Test def initiatedContentChoice5() = test()
+  @Test def initiatedContentChoice6() = test()
+  @Test def initiatedContentChoice7() = test()
+  @Test def initiatedContentChoice8() = test()
+  @Test def initiatedContentChoice9() = test()
+  @Test def initiatedContentChoice10() = test()
 
   // Test for DAFFODIL-2143
-  @Test def arrayOptionalChildDiscriminatesElementAndChoice1 = test
+  @Test def arrayOptionalChildDiscriminatesElementAndChoice1() = test()
 
-  @Test def fixedArrayInitiatedContentDiscriminatesChoice = test
-  @Test def parsedArrayMin1InitiatedContentDiscriminatesChoice = test
+  @Test def fixedArrayInitiatedContentDiscriminatesChoice() = test()
+  @Test def parsedArrayMin1InitiatedContentDiscriminatesChoice() = test()
 
-  @Test def arrayOfChoice = test
-  @Test def arrayOfChoice2 = test
-  @Test def discriminatorNesting1 = test
-  @Test def discriminatorNesting2 = test
-  @Test def Lesson5_choice_state = test
-  @Test def Lesson5_choice_county = test
-  @Test def Lesson5_choice_province = test
+  @Test def arrayOfChoice() = test()
+  @Test def arrayOfChoice2() = test()
+  @Test def discriminatorNesting1() = test()
+  @Test def discriminatorNesting2() = test()
+  @Test def Lesson5_choice_state() = test()
+  @Test def Lesson5_choice_county() = test()
+  @Test def Lesson5_choice_province() = test()
 
-  @Test def unparse_initiatedContentChoice1 = test
-  @Test def initiatedContentNestedChoices1 = test
-  @Test def initiatedContentNestedChoices2 = test
+  @Test def unparse_initiatedContentChoice1() = test()
+  @Test def initiatedContentNestedChoices1() = test()
+  @Test def initiatedContentNestedChoices2() = test()
 }

@@ -30,21 +30,21 @@ object TestComputedLengthFields extends TdmlSuite {
 class TestComputedLengthFields extends TdmlTests {
   val tdmlSuite = TestComputedLengthFields
 
-  @Test def computedLengthAroundPrefixedLengths1p = test
+  @Test def computedLengthAroundPrefixedLengths1p() = test()
 
   // DAFFODIL-2626 - deadlock interaction between computed length and prefixed-length strings.
-  @Test def computedLengthAroundPrefixedLengths1u = test
+  @Test def computedLengthAroundPrefixedLengths1u() = test()
 
   // This test shows you can work around DAFFODIL-2626 using the dfdlx:alignmentKind='manual' property.
-  @Test def computedLengthAroundPrefixedLengths1uWithAlignmentKindManual = test
+  @Test def computedLengthAroundPrefixedLengths1uWithAlignmentKindManual() = test()
 
-  @Test def computedLengthAroundFixedLengths1 = test
+  @Test def computedLengthAroundFixedLengths1() = test()
 
   // DAFFODIL-2626 circular deadlock
   // Reproduces one of the circular issues - with prefixed length for the root element surrounding
   // text, where the alignment region isn't optimized out.
-  @Test def prefixedAroundDelimitedString1 = test
+  @Test def prefixedAroundDelimitedString1() = test()
 
   // This test shows you can work around DAFFODIL-2626 using the dfdlx:alignmentKind='manual' property.
-  @Test def prefixedAroundDelimitedString1WithAlignmentKindManual = test
+  @Test def prefixedAroundDelimitedString1WithAlignmentKindManual() = test()
 }

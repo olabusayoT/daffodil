@@ -29,5 +29,5 @@ object TestPayloadAndTypes extends TdmlSuite {
 class TestPayloadAndTypes extends TdmlTests {
   val tdmlSuite = TestPayloadAndTypes
 
-  @Test def data_01 = test
+  @Test def data_01() = test()
 }

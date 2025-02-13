@@ -30,5 +30,5 @@ class TestDynamicSeparator extends TdmlTests {
   val tdmlSuite = TestDynamicSeparator
 
   // DAFFODIL-2092
-  @Test def dynSepAllWhitespace = test
+  @Test def dynSepAllWhitespace() = test()
 }

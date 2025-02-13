@@ -30,10 +30,10 @@ class TestUnparseChoice2 extends TdmlTests {
   val tdmlSuite = TestUnparseChoice2
 
   // DAFFODIL-2259
-  @Test def choice_with_array_branch1 = test
-  @Test def choice_with_array_branch2 = test
-  @Test def choice_with_array_branch3 = test
-  @Test def choice_with_presence_bits_followed_by_array = test
+  @Test def choice_with_array_branch1() = test()
+  @Test def choice_with_array_branch2() = test()
+  @Test def choice_with_array_branch3() = test()
+  @Test def choice_with_presence_bits_followed_by_array() = test()
 
-  @Test def choice_default_branch_is_empty = test
+  @Test def choice_default_branch_is_empty() = test()
 }

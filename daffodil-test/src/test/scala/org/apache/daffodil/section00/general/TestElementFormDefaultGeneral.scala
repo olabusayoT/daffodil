@@ -29,19 +29,19 @@ object TestElementFormDefaultGeneral extends TdmlSuite {
 class TestElementFormDefaultGeneral extends TdmlTests {
   val tdmlSuite = TestElementFormDefaultGeneral
 
-  @Test def delimOptPresentQualified01 = test
-  @Test def delimOptPresentQualified02 = test
-  @Test def delimOptPresentQualified02_additionalByte = test
-  @Test def delimOptPresentQualified03 = test
-  @Test def delimOptPresentQualified04 = test
-  @Test def delimOptPresentQualified05 = test
+  @Test def delimOptPresentQualified01() = test()
+  @Test def delimOptPresentQualified02() = test()
+  @Test def delimOptPresentQualified02_additionalByte() = test()
+  @Test def delimOptPresentQualified03() = test()
+  @Test def delimOptPresentQualified04() = test()
+  @Test def delimOptPresentQualified05() = test()
 
-  @Test def delimOptPresentUnqualified01 = test
-  @Test def delimOptPresentUnqualified02 = test
-  @Test def delimOptPresentUnqualified03 = test
-  @Test def delimOptPresentUnqualified04 = test
-  @Test def delimOptPresentMissing = test
+  @Test def delimOptPresentUnqualified01() = test()
+  @Test def delimOptPresentUnqualified02() = test()
+  @Test def delimOptPresentUnqualified03() = test()
+  @Test def delimOptPresentUnqualified04() = test()
+  @Test def delimOptPresentMissing() = test()
 
-  @Test def delimOptPresentGlobalQualified01 = test
-  @Test def delimOptPresentGlobalQualified02 = test
+  @Test def delimOptPresentGlobalQualified01() = test()
+  @Test def delimOptPresentGlobalQualified02() = test()
 }

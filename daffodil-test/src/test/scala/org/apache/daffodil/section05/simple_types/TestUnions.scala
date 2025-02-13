@@ -29,11 +29,11 @@ object TestUnions extends TdmlSuite {
 class TestUnions extends TdmlTests {
   val tdmlSuite = TestUnions
 
-  @Test def unionOf1 = test
-  @Test def unionOf1b = test
-  @Test def uu1 = test
-  @Test def uu2 = test
-  @Test def uu3 = test
-  @Test def uu1neg = test
-  @Test def uu2neg = test
+  @Test def unionOf1() = test()
+  @Test def unionOf1b() = test()
+  @Test def uu1() = test()
+  @Test def uu2() = test()
+  @Test def uu3() = test()
+  @Test def uu1neg() = test()
+  @Test def uu2neg() = test()
 }

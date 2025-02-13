@@ -42,53 +42,53 @@ class TestLayers2 extends TdmlTests {
   // These should never result in an abort, no matter what the layer does.
   // with the exception of explicitly calling Assert.abort (or equivalent thereof.)
   //
-  @Test def testNoBomb = test // baseline
-  @Test def testNoBomb2 = test // baseline
-  @Test def testNoBomb3 = test // baseline
+  @Test def testNoBomb() = test() // baseline
+  @Test def testNoBomb2() = test() // baseline
+  @Test def testNoBomb3() = test() // baseline
 
   //
   // Runtime SDE from each place in the API
   //
-  @Test def testBombSetterRSDE = test
-  @Test def testBombGetterRSDE = test
-  @Test def testBombCloseOutputRSDE = test
-  @Test def testBombCloseOutputRSDEWithSuspension = test
-  @Test def testBombWriteRSDE = test
-  @Test def testBombWriteRSDEWithSuspension = test
-  @Test def testBombReadRSDE = test
-  @Test def testBombCloseInputRSDE = test
-  @Test def testBombWrapInputRSDE = test
-  @Test def testBombWrapOutputRSDE = test
+  @Test def testBombSetterRSDE() = test()
+  @Test def testBombGetterRSDE() = test()
+  @Test def testBombCloseOutputRSDE() = test()
+  @Test def testBombCloseOutputRSDEWithSuspension() = test()
+  @Test def testBombWriteRSDE() = test()
+  @Test def testBombWriteRSDEWithSuspension() = test()
+  @Test def testBombReadRSDE() = test()
+  @Test def testBombCloseInputRSDE() = test()
+  @Test def testBombWrapInputRSDE() = test()
+  @Test def testBombWrapOutputRSDE() = test()
   //
   // Processing Error from each place in the API
   //
   // In the setter, getter, read and close methods, a processing error causes
   // backtracking.
   //
-  @Test def testBombSetterProcErr = test
-  @Test def testBombGetterProcErr = test
-  @Test def testBombReadProcErr = test
-  @Test def testBombCloseInputProcErr = test
-  @Test def testBombWrapInputProcErr = test
-  @Test def testBombWrapInputProcErrWithCause = test
-  @Test def testBombWrapOutputProcErr = test
+  @Test def testBombSetterProcErr() = test()
+  @Test def testBombGetterProcErr() = test()
+  @Test def testBombReadProcErr() = test()
+  @Test def testBombCloseInputProcErr() = test()
+  @Test def testBombWrapInputProcErr() = test()
+  @Test def testBombWrapInputProcErrWithCause() = test()
+  @Test def testBombWrapOutputProcErr() = test()
   //
   // In the write and close (output) methods, a processing error is an Unparse Error, which
   // terminates unparsing, but in the right way.
   //
-  @Test def testBombWriteProcErr = test
-  @Test def testBombWriteProcErrWithSuspension = test
-  @Test def testBombCloseOutputProcErr = test
-  @Test def testBombCloseOutputProcErrWithSuspension = test
-  @Test def testBombGetterProcErrWithSuspension = test
+  @Test def testBombWriteProcErr() = test()
+  @Test def testBombWriteProcErrWithSuspension() = test()
+  @Test def testBombCloseOutputProcErr() = test()
+  @Test def testBombCloseOutputProcErrWithSuspension() = test()
+  @Test def testBombGetterProcErrWithSuspension() = test()
 
   // This function is useful if the bomb layer test rig does NOT convert all Exceptions to PEs.
   // We might want to test it both ways. See below tests.
-  def handleEX = {
+  def handleEX() = {
     val h = new Handle("ThrowEX") {
       def f() =
         intercept[Exception] {
-          test
+          test()
         }.asInstanceOf[Exception]
     }
     h()
@@ -99,16 +99,16 @@ class TestLayers2 extends TdmlTests {
   //
   // If the bomb layer test rig does not convert all Exceptions to PE, it might be helpful to
   // change the below "test" calls to "handleEX"
-  @Test def testBombSetterThrowEX = test
-  @Test def testBombGetterThrowEX = test
-  @Test def testBombReadThrowEX = test
-  @Test def testBombCloseInputThrowEX = test
-  @Test def testBombWrapInputThrowEX = test
-  @Test def testBombWrapOutputThrowEX = test
-  @Test def testBombWriteThrowEX = test
-  @Test def testBombWriteThrowEXWithSuspension = test
-  @Test def testBombCloseOutputThrowEX = test
-  @Test def testBombCloseOutputThrowEXWithSuspension = test
+  @Test def testBombSetterThrowEX() = test()
+  @Test def testBombGetterThrowEX() = test()
+  @Test def testBombReadThrowEX() = test()
+  @Test def testBombCloseInputThrowEX() = test()
+  @Test def testBombWrapInputThrowEX() = test()
+  @Test def testBombWrapOutputThrowEX() = test()
+  @Test def testBombWriteThrowEX() = test()
+  @Test def testBombWriteThrowEXWithSuspension() = test()
+  @Test def testBombCloseOutputThrowEX() = test()
+  @Test def testBombCloseOutputThrowEXWithSuspension() = test()
 
   //
   // Runtime Exception thrown from each place in the API
@@ -132,45 +132,45 @@ class TestLayers2 extends TdmlTests {
     def f(): Throwable
   }
 
-  def handle = {
+  def handle() = {
     val h = new Handle("ThrowRE") {
       def f() =
         intercept[TDMLException] {
-          test
+          test()
         }.asInstanceOf[Exception]
     }
     h()
   }
 
-  @Test def testBombSetterThrowRE = handle
-  @Test def testBombGetterThrowRE = handle
-  @Test def testBombCloseOutputThrowRE = handle
-  @Test def testBombCloseOutputThrowREWithSuspension = handle
-  @Test def testBombWriteThrowRE = handle
-  @Test def testBombWriteThrowREWithSuspension = handle
-  @Test def testBombReadThrowRE = handle
-  @Test def testBombCloseInputThrowRE = handle
-  @Test def testBombWrapInputThrowRE = handle
-  @Test def testBombWrapOutputThrowRE = handle
+  @Test def testBombSetterThrowRE() = handle()
+  @Test def testBombGetterThrowRE() = handle()
+  @Test def testBombCloseOutputThrowRE() = handle()
+  @Test def testBombCloseOutputThrowREWithSuspension() = handle()
+  @Test def testBombWriteThrowRE() = handle()
+  @Test def testBombWriteThrowREWithSuspension() = handle()
+  @Test def testBombReadThrowRE() = handle()
+  @Test def testBombCloseInputThrowRE() = handle()
+  @Test def testBombWrapInputThrowRE() = handle()
+  @Test def testBombWrapOutputThrowRE() = handle()
 
-  def handleA: Unit = {
+  def handleA(): Unit = {
     val h = new Handle("Abort") {
       def f() =
         intercept[Abort] {
-          test
+          test()
         }
     }
     h()
   }
 
-  @Test def testBombSetterAbort = handleA
-  @Test def testBombGetterAbort = handleA
-  @Test def testBombCloseOutputAbort = handleA
-  @Test def testBombCloseOutputAbortWithSuspension = handleA
-  @Test def testBombWriteAbort = handleA
-  @Test def testBombWriteAbortWithSuspension = handleA
-  @Test def testBombReadAbort = handleA
-  @Test def testBombCloseInputAbort = handleA
-  @Test def testBombWrapInputAbort = handleA
-  @Test def testBombWrapOutputAbort = handleA
+  @Test def testBombSetterAbort() = handleA()
+  @Test def testBombGetterAbort() = handleA()
+  @Test def testBombCloseOutputAbort() = handleA()
+  @Test def testBombCloseOutputAbortWithSuspension() = handleA()
+  @Test def testBombWriteAbort() = handleA()
+  @Test def testBombWriteAbortWithSuspension() = handleA()
+  @Test def testBombReadAbort() = handleA()
+  @Test def testBombCloseInputAbort() = handleA()
+  @Test def testBombWrapInputAbort() = handleA()
+  @Test def testBombWrapOutputAbort() = handleA()
 }

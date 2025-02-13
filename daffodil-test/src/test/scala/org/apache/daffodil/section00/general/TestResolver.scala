@@ -29,5 +29,5 @@ object TestResolver extends TdmlSuite {
 class TestResolver extends TdmlTests {
   val tdmlSuite = TestResolver
 
-  @Test def includeWithNonExistingSchemaLocation = test
+  @Test def includeWithNonExistingSchemaLocation() = test()
 }

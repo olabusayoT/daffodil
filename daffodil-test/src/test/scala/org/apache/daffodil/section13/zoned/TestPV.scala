@@ -29,49 +29,49 @@ object TestPV extends TdmlSuite {
 class TestPV extends TdmlTests {
   val tdmlSuite = TestPV
 
-  @Test def vpattern_01 = test
-  @Test def vpattern_02 = test
-  @Test def vpattern_03 = test
-  @Test def vpattern_04 = test
-  @Test def vpattern_05 = test
-  @Test def vpattern_06 = test
-  @Test def vpattern_07 = test
-  @Test def vpattern_08 = test
-  @Test def vpattern_09 = test
+  @Test def vpattern_01() = test()
+  @Test def vpattern_02() = test()
+  @Test def vpattern_03() = test()
+  @Test def vpattern_04() = test()
+  @Test def vpattern_05() = test()
+  @Test def vpattern_06() = test()
+  @Test def vpattern_07() = test()
+  @Test def vpattern_08() = test()
+  @Test def vpattern_09() = test()
 
-  @Test def vpattern_zero = test
-  @Test def vpattern_ZZZ = test
+  @Test def vpattern_zero() = test()
+  @Test def vpattern_ZZZ() = test()
 
-  @Test def vpattern_float = test
-  @Test def vpattern_double = test
-  @Test def vpattern_float_NaN = test
-  @Test def vpattern_double_NaN = test
-  @Test def vpattern_float_Inf = test
-  @Test def vpattern_double_Inf = test
+  @Test def vpattern_float() = test()
+  @Test def vpattern_double() = test()
+  @Test def vpattern_float_NaN() = test()
+  @Test def vpattern_double_NaN() = test()
+  @Test def vpattern_float_Inf() = test()
+  @Test def vpattern_double_Inf() = test()
 
-  @Test def float_vpattern_01 = test
-  @Test def double_vpattern_01 = test
+  @Test def float_vpattern_01() = test()
+  @Test def double_vpattern_01() = test()
 
-  @Test def vpattern_bad_01 = test
-  @Test def vpattern_bad_02 = test
-  @Test def vpattern_bad_03 = test
-  @Test def vpattern_warn_04 = test
+  @Test def vpattern_bad_01() = test()
+  @Test def vpattern_bad_02() = test()
+  @Test def vpattern_bad_03() = test()
+  @Test def vpattern_warn_04() = test()
 
-  @Test def zoned_vpattern_01 = test
-  @Test def zoned_vpattern_02 = test
-  @Test def zoned_vpattern_03 = test
-  @Test def zoned_vpattern_04 = test
-  @Test def zoned_vpattern_05 = test
+  @Test def zoned_vpattern_01() = test()
+  @Test def zoned_vpattern_02() = test()
+  @Test def zoned_vpattern_03() = test()
+  @Test def zoned_vpattern_04() = test()
+  @Test def zoned_vpattern_05() = test()
 
-  @Test def bad_byte_vpattern_01 = test
+  @Test def bad_byte_vpattern_01() = test()
 
-  @Test def zoned_float_vpattern_01 = test
-  @Test def zoned_double_vpattern_01 = test
+  @Test def zoned_float_vpattern_01() = test()
+  @Test def zoned_double_vpattern_01() = test()
 
-  @Test def zoned_vpattern_bad_01 = test
-  @Test def zoned_vpattern_bad_02 = test
-  @Test def zoned_vpattern_bad_03 = test
+  @Test def zoned_vpattern_bad_01() = test()
+  @Test def zoned_vpattern_bad_02() = test()
+  @Test def zoned_vpattern_bad_03() = test()
 
-  @Test def ppattern_01 = test
-  @Test def ppattern_02 = test
+  @Test def ppattern_01() = test()
+  @Test def ppattern_02() = test()
 }

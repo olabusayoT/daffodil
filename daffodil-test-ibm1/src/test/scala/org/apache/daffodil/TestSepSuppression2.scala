@@ -29,17 +29,17 @@ object TestSepSuppression2 extends TdmlSuite {
 class TestSepSuppression2 extends TdmlTests {
   val tdmlSuite = TestSepSuppression2
 
-  @Test def ptLax0_1u = test
-  @Test def ptLax0_2u = test
-  @Test def ptLax0_3u = test
+  @Test def ptLax0_1u() = test()
+  @Test def ptLax0_2u() = test()
+  @Test def ptLax0_3u() = test()
 
-  @Test def ptLax1rt = test
+  @Test def ptLax1rt() = test()
 
-  @Test def ptLax2p = test
-  @Test def ptLax2u = test
-  @Test def ptLax2p2 = test
+  @Test def ptLax2p() = test()
+  @Test def ptLax2u() = test()
+  @Test def ptLax2p2() = test()
 
-  @Test def ptLax3rt = test
+  @Test def ptLax3rt() = test()
 
-  @Test def testAnyEmptyTrailing1 = test
+  @Test def testAnyEmptyTrailing1() = test()
 }

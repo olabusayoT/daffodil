@@ -29,11 +29,11 @@ object TestIPv4 extends TdmlSuite {
 class TestIPv4 extends TdmlTests {
   val tdmlSuite = TestIPv4
 
-  @Test def IPv4_1 = test
+  @Test def IPv4_1() = test()
   // DAFFODIL-2608
-  @Test def IPv4_array = test
-  @Test def IPv4_1e = test
-  @Test def IPv4_2 = test
-  @Test def IPv4_1u = test
-  @Test def IPv4_2u = test
+  @Test def IPv4_array() = test()
+  @Test def IPv4_1e() = test()
+  @Test def IPv4_2() = test()
+  @Test def IPv4_1u() = test()
+  @Test def IPv4_2u() = test()
 }

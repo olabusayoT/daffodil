@@ -30,15 +30,15 @@ object DefineFormatTests extends TdmlSuite {
 class DefineFormatTests extends TdmlTests {
   val tdmlSuite = DefineFormatTests
 
-  @Test def format_with_comment = test
+  @Test def format_with_comment() = test()
 
   // DFDL-478
-  @Ignore @Test def nameCollision = test
+  @Ignore @Test def nameCollision() = test()
 
-  @Test def defineFormat_01 = test
-  @Test def Lesson3_defineFormat = test
-  @Test def Lesson3_inherit_defineFormat = test
-  @Test def formatOnlyDefine = test
-  @Test def circularRef = test
-  @Test def noNameFormat = test
+  @Test def defineFormat_01() = test()
+  @Test def Lesson3_defineFormat() = test()
+  @Test def Lesson3_inherit_defineFormat() = test()
+  @Test def formatOnlyDefine() = test()
+  @Test def circularRef() = test()
+  @Test def noNameFormat() = test()
 }

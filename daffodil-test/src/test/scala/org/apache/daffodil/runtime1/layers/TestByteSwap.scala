@@ -28,13 +28,13 @@ object TestByteSwap extends TdmlSuite {
 class TestByteSwap extends TdmlTests {
   val tdmlSuite = TestByteSwap
 
-  @Test def test_twobyteswap_01 = test
-  @Test def test_twobyteswap_02 = test
-  @Test def test_twobyteswap_03 = test
-  @Test def test_twobyteswap_04 = test
-  @Test def test_twobyteswap_05 = test
-  @Test def test_twobyteswap_bad_01 = test
-  @Test def test_twobyteswap_bad_02 = test
-  @Test def test_twobyteswap_bad_03 = test
-  @Test def test_twobyteswap_unparse_odd = test
+  @Test def test_twobyteswap_01() = test()
+  @Test def test_twobyteswap_02() = test()
+  @Test def test_twobyteswap_03() = test()
+  @Test def test_twobyteswap_04() = test()
+  @Test def test_twobyteswap_05() = test()
+  @Test def test_twobyteswap_bad_01() = test()
+  @Test def test_twobyteswap_bad_02() = test()
+  @Test def test_twobyteswap_bad_03() = test()
+  @Test def test_twobyteswap_unparse_odd() = test()
 }

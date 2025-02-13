@@ -34,44 +34,44 @@ object TestNillableUnparseLC extends TdmlSuite {
 class TestNillableUnparseLN extends TdmlTests {
   val tdmlSuite = TestNillableUnparseLN
 
-  @Test def scalar_nonDefaultable_nillable = test
-  @Test def scalar_nonDefaultable_nillable_02 = test
-  @Test def scalar_nonDefaultable_nillable_03 = test
+  @Test def scalar_nonDefaultable_nillable() = test()
+  @Test def scalar_nonDefaultable_nillable_02() = test()
+  @Test def scalar_nonDefaultable_nillable_03() = test()
 
-  @Test def text_complex_nil = test
-  @Test def text_complex_nil2 = test
-  @Test def text_complex_nil3 = test
-  @Test def text_complex_nil4 = test
+  @Test def text_complex_nil() = test()
+  @Test def text_complex_nil2() = test()
+  @Test def text_complex_nil3() = test()
+  @Test def text_complex_nil4() = test()
 
-  @Test def text_nil_only1 = test
-  @Test def text_nil_only2 = test
-  @Test def text_nil_only3 = test
-  @Test def text_nil_only4 = test
-  @Test def text_nil_only5 = test
-  @Test def text_nil_only6 = test
-  @Test def text_nil_only7 = test
-  @Test def text_nil_only8 = test
-  @Test def text_nil_only9 = test
-  @Test def text_nil_only10 = test
-  @Test def text_nil_only11 = test
-  @Test def text_nil_only12 = test
-  @Test def text_nil_only13 = test
-  @Test def text_nil_only14 = test
-  @Test def text_nil_only15 = test
-  @Test def text_nil_only16 = test
-  @Test def text_nil_only17 = test
+  @Test def text_nil_only1() = test()
+  @Test def text_nil_only2() = test()
+  @Test def text_nil_only3() = test()
+  @Test def text_nil_only4() = test()
+  @Test def text_nil_only5() = test()
+  @Test def text_nil_only6() = test()
+  @Test def text_nil_only7() = test()
+  @Test def text_nil_only8() = test()
+  @Test def text_nil_only9() = test()
+  @Test def text_nil_only10() = test()
+  @Test def text_nil_only11() = test()
+  @Test def text_nil_only12() = test()
+  @Test def text_nil_only13() = test()
+  @Test def text_nil_only14() = test()
+  @Test def text_nil_only15() = test()
+  @Test def text_nil_only16() = test()
+  @Test def text_nil_only17() = test()
 
-  @Test def text_nil_characterClass_01 = test
-  @Test def text_nil_characterClass_02 = test
-  @Test def text_nil_characterClass_03 = test
-  @Test def text_nil_characterClass_04 = test
-  @Test def text_nil_characterClass_05 = test
-  @Test def text_nil_characterClass_06 = test
+  @Test def text_nil_characterClass_01() = test()
+  @Test def text_nil_characterClass_02() = test()
+  @Test def text_nil_characterClass_03() = test()
+  @Test def text_nil_characterClass_04() = test()
+  @Test def text_nil_characterClass_05() = test()
+  @Test def text_nil_characterClass_06() = test()
 }
 
 class TestNillableUnparseLC extends TdmlTests {
   val tdmlSuite = TestNillableUnparseLC
 
-  @Test def text_01 = test
-  @Test def text_01a = test
+  @Test def text_01() = test()
+  @Test def text_01a() = test()
 }

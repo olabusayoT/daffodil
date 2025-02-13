@@ -32,5 +32,5 @@ object TestDFDLFormatPrefixedAttributesSDE extends TdmlSuite {
 class TestDFDLFormatPrefixedAttributesSDE extends TdmlTests {
   val tdmlSuite = TestDFDLFormatPrefixedAttributesSDE
 
-  @Test def dfdl_format_prefixed_attributes_sde = test
+  @Test def dfdl_format_prefixed_attributes_sde() = test()
 }

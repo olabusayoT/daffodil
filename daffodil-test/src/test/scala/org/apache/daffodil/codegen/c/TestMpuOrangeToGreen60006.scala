@@ -33,6 +33,6 @@ object TestMpuOrangeToGreen60006 extends TdmlSuite {
 class TestMpuOrangeToGreen60006 extends TdmlTests {
   val tdmlSuite = TestMpuOrangeToGreen60006
 
-  @Test def MPU_orange_to_green_60006_0 = test
-  @Test def MPU_orange_to_green_60006_1 = test
+  @Test def MPU_orange_to_green_60006_0() = test()
+  @Test def MPU_orange_to_green_60006_1() = test()
 }

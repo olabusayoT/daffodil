@@ -28,8 +28,8 @@ object TestPatternRanges extends TdmlSuite {
 class TestPatternRanges extends TdmlTests {
   val tdmlSuite = TestPatternRanges
 
-  @Test def patternRanges1 = test
-  @Test def patternRanges2 = test
-  @Test def patternRangesXerces1 = test
-  @Test def patternRangesXerces2 = test
+  @Test def patternRanges1() = test()
+  @Test def patternRanges2() = test()
+  @Test def patternRangesXerces1() = test()
+  @Test def patternRangesXerces2() = test()
 }

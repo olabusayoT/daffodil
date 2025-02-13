@@ -30,9 +30,9 @@ object TestNestedChoices extends TdmlSuite {
 class TestNestedChoices extends TdmlTests {
   val tdmlSuite = TestNestedChoices
 
-  @Test def nestedChoice1 = test
-  @Test def nestedChoice2 = test
-  @Test def nestedChoice3 = test
-  @Test def nestedChoice3b = test
-  @Test def nestedChoice4 = test
+  @Test def nestedChoice1() = test()
+  @Test def nestedChoice2() = test()
+  @Test def nestedChoice3() = test()
+  @Test def nestedChoice3b() = test()
+  @Test def nestedChoice4() = test()
 }

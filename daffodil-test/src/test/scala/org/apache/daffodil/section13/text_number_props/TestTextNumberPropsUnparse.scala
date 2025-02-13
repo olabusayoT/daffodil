@@ -30,46 +30,46 @@ object TestTextNumberPropsUnparse extends TdmlSuite {
 class TestTextNumberPropsUnparse extends TdmlTests {
   val tdmlSuite = TestTextNumberPropsUnparse
 
-  @Test def unparseDelimitedPaddedString01 = test
-  @Test def unparseDelimitedPaddedString02 = test
-  @Test def unparseDelimitedPaddedString03 = test
-  @Test def unparseDelimitedPaddedString04 = test
-  @Test def unparseDelimitedPaddedString05 = test
-  @Test def unparseDelimitedPaddedString06 = test
-  @Test def unparseDelimitedPaddedString07 = test
-  @Test def unparseDelimitedPaddedString08 = test
-  @Test def unparseDelimitedPaddedString09 = test
-  @Test def unparseDelimitedPaddedString11 = test
-  @Test def unparseDelimitedPaddedString12 = test
-  @Test def unparseDelimitedPaddedString13 = test
-  @Test def unparseDelimitedPaddedString14 = test
+  @Test def unparseDelimitedPaddedString01() = test()
+  @Test def unparseDelimitedPaddedString02() = test()
+  @Test def unparseDelimitedPaddedString03() = test()
+  @Test def unparseDelimitedPaddedString04() = test()
+  @Test def unparseDelimitedPaddedString05() = test()
+  @Test def unparseDelimitedPaddedString06() = test()
+  @Test def unparseDelimitedPaddedString07() = test()
+  @Test def unparseDelimitedPaddedString08() = test()
+  @Test def unparseDelimitedPaddedString09() = test()
+  @Test def unparseDelimitedPaddedString11() = test()
+  @Test def unparseDelimitedPaddedString12() = test()
+  @Test def unparseDelimitedPaddedString13() = test()
+  @Test def unparseDelimitedPaddedString14() = test()
 
-  @Test def unparsePaddedString10 = test
-  @Test def unparsePaddedString11 = test
-  @Test def unparsePaddedString12 = test
+  @Test def unparsePaddedString10() = test()
+  @Test def unparsePaddedString11() = test()
+  @Test def unparsePaddedString12() = test()
 
-  @Test def unparsePaddedStringTruncate01 = test
-  @Test def unparsePaddedStringTruncate02 = test
-  @Test def unparsePaddedStringTruncate03 = test
-  @Test def unparsePaddedStringTruncate04 = test
-  @Test def unparsePaddedStringTruncate05 = test
-  @Test def unparsePaddedStringTruncate06 = test
+  @Test def unparsePaddedStringTruncate01() = test()
+  @Test def unparsePaddedStringTruncate02() = test()
+  @Test def unparsePaddedStringTruncate03() = test()
+  @Test def unparsePaddedStringTruncate04() = test()
+  @Test def unparsePaddedStringTruncate05() = test()
+  @Test def unparsePaddedStringTruncate06() = test()
 
-  @Test def parseDelimitedPaddedString01 = test
+  @Test def parseDelimitedPaddedString01() = test()
 
-  @Test def unparse_int_01 = test
-  @Test def parse_int_01 = test
+  @Test def unparse_int_01() = test()
+  @Test def parse_int_01() = test()
 
-  @Test def unparse_tnp_01 = test
-  @Test def unparse_tnp_02 = test
-  @Test def unparse_tnp_03 = test
-  @Test def unparse_tnp_04 = test
-  @Test def unparse_tnp_05a = test
-  @Test def unparse_tnp_05b = test
+  @Test def unparse_tnp_01() = test()
+  @Test def unparse_tnp_02() = test()
+  @Test def unparse_tnp_03() = test()
+  @Test def unparse_tnp_04() = test()
+  @Test def unparse_tnp_05a() = test()
+  @Test def unparse_tnp_05b() = test()
 
-  @Test def textStandardZeroRepNotDefinedByDefault = test
+  @Test def textStandardZeroRepNotDefinedByDefault() = test()
 
-  @Test def textStandardZeroRep1 = test
+  @Test def textStandardZeroRep1() = test()
 
-  @Test def textStandardZeroRep2 = test
+  @Test def textStandardZeroRep2() = test()
 }

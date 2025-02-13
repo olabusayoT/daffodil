@@ -33,6 +33,6 @@ object TestIsrmGreenToOrange60000 extends TdmlSuite {
 class TestIsrmGreenToOrange60000 extends TdmlTests {
   val tdmlSuite = TestIsrmGreenToOrange60000
 
-  @Test def ISRM_green_to_orange_60000_0 = test
-  @Test def ISRM_green_to_orange_60000_1 = test
+  @Test def ISRM_green_to_orange_60000_0() = test()
+  @Test def ISRM_green_to_orange_60000_1() = test()
 }

@@ -32,26 +32,26 @@ class TestRegularExpressions extends TdmlTests {
 
   val tdmlSuite = TestRegularExpressions
 
-  @Test def entity_in_regex_fail = test
-  @Test def entity_in_regex_fail_2 = test
-  @Test def entity_in_regex_fail_3 = test
-  @Test def entity_in_regex_fail_4 = test
+  @Test def entity_in_regex_fail() = test()
+  @Test def entity_in_regex_fail_2() = test()
+  @Test def entity_in_regex_fail_3() = test()
+  @Test def entity_in_regex_fail_4() = test()
 
-  @Test def testRegEx_01 = test
-  @Test def testRegEx_02 = test
-  @Test def testRegEx_03 = test
+  @Test def testRegEx_01() = test()
+  @Test def testRegEx_02() = test()
+  @Test def testRegEx_03() = test()
 
   // DFDL-517
   // // Unsupported Java 7 features (should return Schema Definition Errors)
-  @Ignore @Test def testRegEx_04 = test
-  @Ignore @Test def testRegEx_05 = test
-  @Ignore @Test def testRegEx_06 = test
-  @Ignore @Test def testRegEx_07 = test
+  @Ignore @Test def testRegEx_04() = test()
+  @Ignore @Test def testRegEx_05() = test()
+  @Ignore @Test def testRegEx_06() = test()
+  @Ignore @Test def testRegEx_07() = test()
 
   // DFDL-922
-  @Test def testDFDL_922 = test
-  @Test def testDFDL_922_2 = test
+  @Test def testDFDL_922() = test()
+  @Test def testDFDL_922_2() = test()
 
   // DAFFODIL-809
-  @Test def testAssertWithPattern1 = test
+  @Test def testAssertWithPattern1() = test()
 }

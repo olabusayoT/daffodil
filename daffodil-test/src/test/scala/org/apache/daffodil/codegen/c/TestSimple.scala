@@ -33,19 +33,19 @@ object TestSimple extends TdmlSuite {
 class TestSimple extends TdmlTests {
   val tdmlSuite = TestSimple
 
-  @Test def simple_boolean = test
-  @Test def simple_byte = test
-  @Test def simple_double = test
-  @Test def simple_float = test
-  @Test def simple_hexBinary = test
-  @Test def simple_hexBinaryPrefixed = test
-  @Test def simple_int = test
-  @Test def simple_integer = test
-  @Test def simple_long = test
-  @Test def simple_nonNegativeInteger = test
-  @Test def simple_short = test
-  @Test def simple_unsignedByte = test
-  @Test def simple_unsignedInt = test
-  @Test def simple_unsignedLong = test
-  @Test def simple_unsignedShort = test
+  @Test def simple_boolean() = test()
+  @Test def simple_byte() = test()
+  @Test def simple_double() = test()
+  @Test def simple_float() = test()
+  @Test def simple_hexBinary() = test()
+  @Test def simple_hexBinaryPrefixed() = test()
+  @Test def simple_int() = test()
+  @Test def simple_integer() = test()
+  @Test def simple_long() = test()
+  @Test def simple_nonNegativeInteger() = test()
+  @Test def simple_short() = test()
+  @Test def simple_unsignedByte() = test()
+  @Test def simple_unsignedInt() = test()
+  @Test def simple_unsignedLong() = test()
+  @Test def simple_unsignedShort() = test()
 }

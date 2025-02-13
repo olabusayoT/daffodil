@@ -29,10 +29,10 @@ object TestLengthKindImplicit extends TdmlSuite {
 class TestLengthKindImplicit extends TdmlTests {
   val tdmlSuite = TestLengthKindImplicit
 
-  @Test def nested_seq = test
-  @Test def nested_seq_01 = test
+  @Test def nested_seq() = test()
+  @Test def nested_seq_01() = test()
 
-  @Test def implicit_with_len = test
-  @Test def implicit_ignored_len = test
-  @Test def implicitLenTime = test
+  @Test def implicit_with_len() = test()
+  @Test def implicit_ignored_len() = test()
+  @Test def implicitLenTime() = test()
 }

@@ -29,8 +29,8 @@ object TestBoolean extends TdmlSuite {
 class TestBoolean extends TdmlTests {
   val tdmlSuite = TestBoolean
 
-  @Test def booleanDefault = test
-  @Test def booleanDefaultSDE = test
-  @Test def booleanInputValueCalc = test
-  @Test def booleanInputValueCalcError = test
+  @Test def booleanDefault() = test()
+  @Test def booleanDefaultSDE() = test()
+  @Test def booleanInputValueCalc() = test()
+  @Test def booleanInputValueCalcError() = test()
 }

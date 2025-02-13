@@ -29,31 +29,31 @@ object TestOCKImplicit extends TdmlSuite {
 class TestOCKImplicit extends TdmlTests {
   val tdmlSuite = TestOCKImplicit
 
-  @Test def ockImplicit1 = test
-  @Test def ockImplicit2 = test
-  @Test def ockImplicit3 = test
-  @Test def ockImplicit4 = test
-  @Test def ockImplicit5 = test
-  @Test def ockImplicit6 = test
-  @Test def ockImplicit7 = test
-  @Test def ockImplicit8 = test
-  @Test def ockImplicit9 = test
-  @Test def ockImplicit10 = test
-  @Test def ockImplicit11 = test
-  @Test def ockImplicit12 = test
-  @Test def ockImplicit13 = test
-  @Test def ockImplicit14 = test
-  @Test def ockImplicit15 = test
+  @Test def ockImplicit1() = test()
+  @Test def ockImplicit2() = test()
+  @Test def ockImplicit3() = test()
+  @Test def ockImplicit4() = test()
+  @Test def ockImplicit5() = test()
+  @Test def ockImplicit6() = test()
+  @Test def ockImplicit7() = test()
+  @Test def ockImplicit8() = test()
+  @Test def ockImplicit9() = test()
+  @Test def ockImplicit10() = test()
+  @Test def ockImplicit11() = test()
+  @Test def ockImplicit12() = test()
+  @Test def ockImplicit13() = test()
+  @Test def ockImplicit14() = test()
+  @Test def ockImplicit15() = test()
 
-  @Test def ockImplicit16 = test
-  @Test def ockImplicit17 = test
-  @Test def ockImplicit18 = test
-  @Test def ockImplicit19 = test
+  @Test def ockImplicit16() = test()
+  @Test def ockImplicit17() = test()
+  @Test def ockImplicit18() = test()
+  @Test def ockImplicit19() = test()
 
-  @Test def ockImplicit20 = test
-  @Test def ockImplicit21 = test
-  @Test def ockImplicit22 = test
-  @Test def ockImplicit23 = test
+  @Test def ockImplicit20() = test()
+  @Test def ockImplicit21() = test()
+  @Test def ockImplicit22() = test()
+  @Test def ockImplicit23() = test()
   // DFDL-1662
-  @Test def ockImplicit24 = test
+  @Test def ockImplicit24() = test()
 }
