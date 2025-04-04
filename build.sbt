@@ -58,14 +58,13 @@ lazy val daffodil = project
     commonSettings,
     nopublish,
     ratSettings,
-    unidocSettings,
+//    unidocSettings,
     genTunablesDocSettings,
     genCExamplesSettings
   )
 
 lazy val macroLib = Project("daffodil-macro-lib", file("daffodil-macro-lib"))
   .settings(commonSettings, nopublish)
-  .settings(libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value)
   .disablePlugins(OsgiCheckPlugin)
 
 lazy val propgen = Project("daffodil-propgen", file("daffodil-propgen"))
@@ -84,8 +83,8 @@ lazy val io = Project("daffodil-io", file("daffodil-io"))
   .settings(commonSettings, usesMacros)
 
 lazy val runtime1 = Project("daffodil-runtime1", file("daffodil-runtime1"))
-  .enablePlugins(GenJavadocPlugin)
-  .settings(Dependencies.genjavadocVersion) // converts scaladoc to javadoc
+//  .enablePlugins(GenJavadocPlugin)
+//  .settings(Dependencies.genjavadocVersion) // converts scaladoc to javadoc
   .dependsOn(
     io,
     lib % "compile-internal, test->test",
@@ -145,8 +144,8 @@ lazy val core = Project("daffodil-core", file("daffodil-core"))
   .settings(commonSettings)
 
 lazy val japi = Project("daffodil-japi", file("daffodil-japi"))
-  .enablePlugins(GenJavadocPlugin)
-  .settings(Dependencies.genjavadocVersion) // converts scaladoc to javadoc
+//  .enablePlugins(GenJavadocPlugin)
+//  .settings(Dependencies.genjavadocVersion) // converts scaladoc to javadoc
   .dependsOn(core, slf4jLogger % "test")
   .settings(commonSettings)
 
@@ -238,8 +237,8 @@ val minSupportedJavaVersion: String =
 lazy val commonSettings = Seq(
   organization := "org.apache.daffodil",
   version := IO.read((ThisBuild / baseDirectory).value / "VERSION").trim,
-  scalaVersion := "2.13.16",
-  crossScalaVersions := Seq("2.13.16"),
+  scalaVersion := "3.3.5",
+  crossScalaVersions := Seq("3.3.5", "2.13.16"),
   scalacOptions ++= buildScalacOptions(scalaVersion.value),
   Test / scalacOptions ++= buildTestScalacOptions(scalaVersion.value),
   Compile / compile / javacOptions ++= buildJavacOptions(),
@@ -264,7 +263,7 @@ lazy val commonSettings = Seq(
   unmanagedBase := baseDirectory.value / "lib" / "jars",
   sourceManaged := baseDirectory.value / "src_managed",
   resourceManaged := baseDirectory.value / "resource_managed",
-  libraryDependencies ++= Dependencies.common,
+  libraryDependencies ++= Dependencies.common(scalaVersion.value),
   testOptions += Tests.Argument(TestFrameworks.JUnit, "-q", "--verbosity=1"),
   Compile / packageDoc / publishArtifact := false
 )
@@ -274,21 +273,28 @@ def buildScalacOptions(scalaVersion: String) = {
     s"-release:$minSupportedJavaVersion", // scala 2.12 can only do Java 8, regardless of this setting.
     "-feature",
     "-deprecation",
-    "-language:experimental.macros",
-    "-unchecked",
-    "-Xfatal-warnings",
-    "-Xxml:-coalescing",
-    "-Ywarn-unused:imports"
+    "-unchecked"
   )
 
   val scalaVersionSpecificOptions = CrossVersion.partialVersion(scalaVersion) match {
     case Some((2, 13)) =>
       Seq(
+        "-language:experimental.macros",
+        "-Xfatal-warnings",
+        "-Xxml:-coalescing",
+        "-Ywarn-unused:imports",
         "-Xlint:inaccessible",
         "-Xlint:infer-any",
         "-Xlint:nullary-unit",
         // suppress nullary-unit warning in the specific trait
         "-Wconf:cat=lint-nullary-unit:silent,site=org.apache.daffodil.junit.tdml.TdmlTests:silent"
+      )
+    case Some((3, _)) =>
+      Seq(
+        "-source:3.0-migration",
+        "-no-indent",
+        "-Werror",
+        "-Wunused:imports"
       )
     case _ => Seq.empty
   }
