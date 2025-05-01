@@ -32,23 +32,30 @@ import org.apache.daffodil.lib.util.Misc
 abstract class ThinException protected (dummy: Int, cause: Throwable, fmt: String, args: Any*)
   extends Exception(null: String, cause, false, false) {
 
-  /*
-   * Scala 3 was getting internal compiler errors on this class
-   * due to msg_ being a private lazy val.
-   *
-   * Switched to this var + init method scheme, and now the
-   * compiler is happy.
-   */
-  private var msg_ : String = "Uninitialized."
+//  /*
+//   * Scala 3 was getting internal compiler errors on this class
+//   * due to msg_ being a private lazy val.
+//   *
+//   * Switched to this var + init method scheme, and now the
+//   * compiler is happy.
+//   */
+//  private var msg_ : String = "Uninitialized."
+//
+//  private def init: Unit = {
+//    msg_ =
+//      if (fmt ne null) fmt.format(args: _*)
+//      else if (cause ne null) cause.getMessage
+//      else Misc.getNameFromClass(this)
+//  }
+//
+//  override def getMessage: String = { init; msg_ }
 
-  private def init: Unit = {
-    msg_ =
-      if (fmt ne null) fmt.format(args: _*)
-      else if (cause ne null) cause.getMessage
-      else Misc.getNameFromClass(this)
-  }
+  private lazy val msg_ =
+    if (fmt ne null) fmt.format(args: _*)
+    else if (cause ne null) cause.getMessage()
+    else Misc.getNameFromClass(this)
 
-  override def getMessage: String = { init; msg_ }
+  override def getMessage() = msg_
 
   def this() = this(1, null, null)
   def this(msg: String) = this(1, null, msg)
