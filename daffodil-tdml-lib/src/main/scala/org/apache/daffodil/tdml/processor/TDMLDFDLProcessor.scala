@@ -17,12 +17,11 @@
 
 package org.apache.daffodil.tdml.processor
 
+import java.net.URI
 import java.nio.file.Path
 
 import org.apache.daffodil.api
 import org.apache.daffodil.lib.externalvars.Binding
-import org.apache.daffodil.lib.iapi.DaffodilSchemaSource
-import org.apache.daffodil.lib.iapi.Diagnostic
 
 object TDML {
   type CompileResult =
@@ -56,7 +55,7 @@ trait AbstractTDMLDFDLProcessorFactory {
   def withTunables(tunables: Map[String, String]): R
 
   def getProcessor(
-    schemaSource: DaffodilSchemaSource,
+    schemaSourceURI: URI,
     optRootName: Option[String] = None,
     optRootNamespace: Option[String] = None,
     tunables: Map[String, String]
@@ -99,7 +98,7 @@ trait TDMLResult {
 }
 
 trait TDMLParseResult extends TDMLResult {
-  def addDiagnostic(failure: Diagnostic): Unit
+  def addDiagnostic(failure: api.Diagnostic): Unit
   def getResult: scala.xml.Node
   def getBlobPaths: java.util.List[Path] = new java.util.LinkedList[Path]()
   def currentLocation: api.DataLocation

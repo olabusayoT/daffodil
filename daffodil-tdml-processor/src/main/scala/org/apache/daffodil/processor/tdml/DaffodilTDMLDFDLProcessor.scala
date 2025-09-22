@@ -101,8 +101,8 @@ final class TDMLDFDLProcessorFactory private (
    * it were being fetched from a file.
    */
   private def generateProcessor(
-    pf: DFDL.ProcessorFactory,
-    schemaSource: DaffodilSchemaSource
+    pf: api.ProcessorFactory,
+    schemaSourceURI: URI
   ): TDML.CompileResult = {
     val p = pf.onPath("/")
     val diags = p.getDiagnostics
@@ -116,41 +116,41 @@ final class TDMLDFDLProcessorFactory private (
         val is = new java.io.ByteArrayInputStream(os.toByteArray)
         compiler.reload(is)
       }
-      val processor = new DaffodilTDMLDFDLProcessor(dp, schemaSource.uriForLoading)
+      val processor = new DaffodilTDMLDFDLProcessor(dp, schemaSourceURI)
       Right(diags, processor)
     }
   }
 
   private def compileProcessor(
-    schemaSource: DaffodilSchemaSource,
+    schemaSourceURI: URI,
     optRootName: Option[String],
     optRootNamespace: Option[String]
   ): TDML.CompileResult = {
-    val pf = compiler.compileSource(schemaSource, optRootName, optRootNamespace)
+    val pf = compiler.compileSource(schemaSourceURI, optRootName, optRootNamespace)
     if (pf.isError) {
       val diags = pf.getDiagnostics
       Left(diags)
     } else {
-      val res = this.generateProcessor(pf, schemaSource)
+      val res = this.generateProcessor(pf, schemaSourceURI)
       res
     }
   }
 
   override def getProcessor(
-    schemaSource: DaffodilSchemaSource,
+    schemaSourceURI: URI,
     optRootName: Option[String],
     optRootNamespace: Option[String],
     tunables: Map[String, String]
   ): TDML.CompileResult = {
-    if (schemaSource.isXSD) {
+    if (schemaSourceURI.toString.endsWith(".xsd")) {
       val res =
-        compileProcessor(schemaSource, optRootName, optRootNamespace)
+        compileProcessor(schemaSourceURI, optRootName, optRootNamespace)
       res
     } else {
-      val dp = compiler.reload(schemaSource)
+      val dp = compiler.reload(schemaSourceURI)
       val diags = dp.getDiagnostics
       Assert.invariant(diags.asScala.forall { !_.isError })
-      val processor = new DaffodilTDMLDFDLProcessor(dp, schemaSource.uriForLoading)
+      val processor = new DaffodilTDMLDFDLProcessor(dp, schemaSourceURI)
       Right(diags, processor)
     }
   }
@@ -444,7 +444,7 @@ final class DaffodilTDMLParseResult(actual: ParseResult, outputter: TDMLInfosetO
 
   override def currentLocation: api.DataLocation = actual.resultState.currentLocation
 
-  override def addDiagnostic(diag: Diagnostic): Unit = actual.addDiagnostic(diag)
+  override def addDiagnostic(diag: api.Diagnostic): Unit = actual.addDiagnostic(diag)
 
   override def cleanUp(): Unit = getBlobPaths.forEach { Files.delete(_) }
 }

@@ -218,7 +218,7 @@ class TestDaffodilC {
     val optRootNamespace = None
     val tunables = Map.empty[String, String]
     val cr = processorFactory.getProcessor(
-      schemaSource,
+      schemaSource.uriForLoading,
       optRootName,
       optRootNamespace,
       tunables

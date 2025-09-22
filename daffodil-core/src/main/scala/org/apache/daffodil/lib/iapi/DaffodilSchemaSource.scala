@@ -177,7 +177,7 @@ protected sealed abstract class NodeSchemaSourceBase(
   tmpDir: Option[File],
   tempSchemaFileFromNode: File
 ) extends URISchemaSource(
-    tempSchemaFileFromNode,
+    XMLUtils.getOptTDMLFileFromNode(node).getOrElse(tempSchemaFileFromNode),
     tempSchemaFileFromNode.toURI
   ) {
 

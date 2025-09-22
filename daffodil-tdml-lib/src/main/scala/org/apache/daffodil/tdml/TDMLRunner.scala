@@ -3089,7 +3089,7 @@ case class TDMLCompileResultCache(entryExpireDurationSeconds: Option[Long]) {
         v
       } else {
         val compileResult = impl.getProcessor(
-          key.suppliedSchema,
+          key.suppliedSchema.uriForLoading,
           key.optRootName,
           key.optRootNamespace,
           key.tunables

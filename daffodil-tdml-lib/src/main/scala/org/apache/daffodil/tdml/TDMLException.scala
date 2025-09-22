@@ -17,8 +17,12 @@
 
 package org.apache.daffodil.tdml
 
-import org.apache.daffodil.lib.iapi.Diagnostic
-import org.apache.daffodil.lib.util.Maybe
+import java.util
+import java.util.Collections
+
+import org.apache.daffodil.api.DataLocation
+import org.apache.daffodil.api.Diagnostic
+import org.apache.daffodil.api.LocationInSchemaFile
 import org.apache.daffodil.lib.util.Misc
 
 object TDMLException {
@@ -91,13 +95,25 @@ class TDMLExceptionImpl(
  */
 class TDMLDiagnostic(diag: String, implementation: Option[String])
   extends Diagnostic(
-    Maybe.Nope,
-    Maybe.Nope,
-    Maybe.Nope,
-    Maybe(TDMLException.msgWithImpl(diag, implementation))
+    TDMLException.msgWithImpl(diag, implementation),
+    null,
+    false,
+    false
   ) {
   override def isError = true
-  override def modeName = "TDML"
+  override def getModeName = "TDML Error"
+
+  override def getMessage: String = TDMLException.msgWithImpl(diag, implementation)
+
+  override def isValidation: Boolean = false
+
+  override def getLocationsInSchemaFiles: util.List[? <: LocationInSchemaFile] =
+    Collections.emptyList()
+
+  override def getDataLocations: util.List[DataLocation] = Collections.emptyList()
+
+  override def toString(): String =
+    getModeName() + ": " + getMessage
 }
 
 /**

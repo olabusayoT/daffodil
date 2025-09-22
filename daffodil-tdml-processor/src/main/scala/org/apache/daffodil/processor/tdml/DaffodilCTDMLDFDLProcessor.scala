@@ -20,6 +20,7 @@ package org.apache.daffodil.processor.tdml
 import java.io.FileNotFoundException
 import java.io.InputStream
 import java.io.OutputStream
+import java.net.URI
 import scala.jdk.CollectionConverters.*
 import scala.xml.Node
 import scala.xml.XML
@@ -28,8 +29,6 @@ import org.apache.daffodil.api
 import org.apache.daffodil.api.DataLocation
 import org.apache.daffodil.core.compiler.Compiler
 import org.apache.daffodil.lib.externalvars.Binding
-import org.apache.daffodil.lib.iapi.DaffodilSchemaSource
-import org.apache.daffodil.lib.iapi.Diagnostic
 import org.apache.daffodil.lib.iapi.TDMLImplementation
 import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.Nope
@@ -71,14 +70,14 @@ final class DaffodilCTDMLDFDLProcessorFactory(compiler: Compiler)
   // Compiles the given schema and returns the result of compiling the
   // schema (only diagnostics on left, or processor too on right)
   override def getProcessor(
-    schemaSource: DaffodilSchemaSource,
+    schemaSourceURI: URI,
     optRootName: Option[String] = None,
     optRootNamespace: Option[String] = None,
     tunables: Map[String, String]
   ): TDML.CompileResult = {
 
     // Compile the DFDL schema into diagnostics and/or a processor factory
-    val pf = compiler.compileSource(schemaSource, optRootName, optRootNamespace)
+    val pf = compiler.compileSource(schemaSourceURI, optRootName, optRootNamespace)
     val res = if (pf.isError) {
       Left(pf.getDiagnostics) // DFDL schema compilation diagnostics
     } else {
@@ -233,7 +232,7 @@ final class DaffodilCTDMLParseResult(
     case Failure(cause) => List(cause)
   }
 
-  override def addDiagnostic(diagnostic: Diagnostic): Unit = {
+  override def addDiagnostic(diagnostic: api.Diagnostic): Unit = {
     diagnostics = diagnostic +: diagnostics
   }
 
