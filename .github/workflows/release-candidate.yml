@@ -44,17 +44,13 @@ jobs:
 
       - name: ASF Release Candidate
         id: rc
-        uses: apache/daffodil-infrastructure/actions/release-candidate@main
+        uses: olabusayoT/daffodil-infrastructure/actions/release-candidate@daf-3041-optional-credential-vars
         with:
           tlp_dir: 'daffodil'
           project_name: 'Apache Daffodil'
           project_id: 'daffodil'
           gpg_signing_key: ${{ secrets.DAFFODIL_GPG_SECRET_KEY }}
-          svn_username: ${{ secrets.DAFFODIL_SVN_DEV_USERNAME }}
-          svn_password: ${{ secrets.DAFFODIL_SVN_DEV_PASSWORD }}
-          nexus_username: ${{ secrets.NEXUS_STAGE_DEPLOYER_USER }}
-          nexus_password: ${{ secrets.NEXUS_STAGE_DEPLOYER_PW }}
-          publish: true
+          publish: false
 
       - name: Install Dependencies
         run: |
