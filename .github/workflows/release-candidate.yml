@@ -49,6 +49,7 @@ jobs:
           tlp_dir: 'daffodil'
           project_name: 'Apache Daffodil'
           project_id: 'daffodil'
+          gpg_signing_key: ${{ secrets.DAFFODIL_GPG_SECRET_KEY }}
           publish: true
 
       - name: Install Dependencies
