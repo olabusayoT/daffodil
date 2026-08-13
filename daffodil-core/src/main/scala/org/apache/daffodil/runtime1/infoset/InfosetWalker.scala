@@ -23,7 +23,87 @@ import org.apache.daffodil.lib.exceptions.ThrowsSDE
 import org.apache.daffodil.lib.util.MStackOf
 import org.apache.daffodil.lib.util.MStackOfInt
 
-object InfosetWalker {
+/**
+ * Walks Daffodil's internal infoset representation (DINodes) and emits
+ * start/end events to an [[api.infoset.InfosetOutputter]], which projects the
+ * infoset to the caller's desired format (XML, JSON, SAX, etc.).
+ *
+ * Two concrete implementations exist, selectable via the `infosetWalkerMode`
+ * tunable:
+ *
+ *  - [[StreamingInfosetWalker]] (`infosetWalkerMode = "streaming"`, default): emits
+ *    events incrementally as elements are finalized during parsing. Keeps memory
+ *    usage bounded for large or deeply-nested infosets, but incurs overhead from
+ *    repeated speculative walk attempts.
+ *
+ *  - [[NonStreamingInfosetWalker]] (`infosetWalkerMode = "nonStreaming"`): defers
+ *    all output until the entire infoset is available, then walks it in one pass.
+ *    Faster for schemas where the infoset fits comfortably in memory because it
+ *    avoids the overhead of incremental walk attempts. If you want potentially
+ *    better performance, set this tunable to "nonStreaming", but there may be
+ *    a significant memory impact.
+ *
+ * Callers invoke [[walk]] periodically during parsing. When `lastWalk = true`
+ * the walker must flush any remaining events before returning. [[isFinished]]
+ * returns `true` once the entire infoset has been walked.
+ */
+trait InfosetWalker {
+
+  /**
+   * The outputter to which events are written.
+   */
+  def outputter: api.infoset.InfosetOutputter
+
+  /**
+   * Returns `true` once the entire infoset has been walked and all events have
+   * been emitted. Calling [[walk]] after this is an error.
+   */
+  def isFinished: Boolean
+
+  /**
+   * Take zero or more steps in the infoset, emitting events to [[outputter]].
+   *
+   * A single call is not guaranteed to walk the entire infoset in some
+   * implementations, as the walker may pause (e.g. because parsing has
+   * not yet finalized the next element). In those instances, the caller should
+   * invoke this periodically and check [[isFinished]].
+   *
+   * @param lastWalk `true` if this is the final call; the walker must emit all
+   *                 remaining events before returning.
+   */
+  def walk(lastWalk: Boolean = false): Unit
+}
+
+/**
+ * An [[InfosetWalker]] that defers all output until the parse is complete,
+ * then walks the entire infoset in a single pass when `walk(lastWalk = true)`
+ * is called. Intermediate `walk()` calls are no-ops.
+ *
+ * If you want potentially better performance, set `infosetWalkerMode = "nonStreaming"`
+ * (which uses this walker), but there may be a significant memory impact. It is faster than
+ * [[StreamingInfosetWalker]] for most schemas because it avoids the overhead of
+ * repeated speculative walk attempts, at the cost of holding the full infoset in
+ * memory until parsing finishes.
+ *
+ * @param root      The root [[DIElement]] of the infoset to walk.
+ * @param outputter The [[api.infoset.InfosetOutputter]] that receives events.
+ */
+class NonStreamingInfosetWalker(root: DIElement, val outputter: api.infoset.InfosetOutputter)
+  extends InfosetWalker {
+
+  private var finished: Boolean = false
+
+  override def isFinished: Boolean = finished
+
+  def walk(lastWalk: Boolean = false): Unit = {
+    if (lastWalk) {
+      root.walk(outputter)
+      finished = true
+    }
+  }
+}
+
+object StreamingInfosetWalker {
 
   /**
    * Create an infoset walker starting with a specified DINode. If the caller
@@ -79,7 +159,7 @@ object InfosetWalker {
     releaseUnneededInfoset: Boolean,
     walkSkipMin: Int = 32,
     walkSkipMax: Int = 2048
-  ): InfosetWalker = {
+  ): StreamingInfosetWalker = {
 
     // Determine the container of the root node and the index in which it
     // appears in that node
@@ -99,7 +179,7 @@ object InfosetWalker {
         (container, container.indexOf(root))
       }
     }
-    new InfosetWalker(
+    new StreamingInfosetWalker(
       startingContainerNode,
       startingContainerIndex,
       outputter,
@@ -173,7 +253,7 @@ object InfosetWalker {
  *   and increases the number of walk() calls to skip before trying again. This
  *   defines the maximum number of skiped calls, even as this number increases.
  */
-class InfosetWalker private (
+class StreamingInfosetWalker private (
   startingContainerNode: DINode,
   startingContainerIndex: Int,
   val outputter: api.infoset.InfosetOutputter,
@@ -182,7 +262,7 @@ class InfosetWalker private (
   releaseUnneededInfoset: Boolean,
   walkSkipMin: Int,
   walkSkipMax: Int
-) {
+) extends InfosetWalker {
 
   /**
    * These two pieces of mutable state are all that is needed to keep track of
@@ -227,10 +307,7 @@ class InfosetWalker private (
 
   private var finished = false
 
-  /**
-   * Determine if the walker has finished walking.
-   */
-  def isFinished = finished
+  override def isFinished = finished
 
   /**
    * The following variables are used to determine when to skip the walk()
@@ -269,7 +346,7 @@ class InfosetWalker private (
    * walk() will be called, the lastWalk parameter should be set to true, which
    * will cause walk() to not skip any steps.
    */
-  def walk(lastWalk: Boolean = false): Unit = {
+  override def walk(lastWalk: Boolean = false): Unit = {
     Assert.usage(!finished)
 
     if (walkSkipRemaining > 0 && !lastWalk) {

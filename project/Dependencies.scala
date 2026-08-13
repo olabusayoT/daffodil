@@ -22,28 +22,28 @@ object Dependencies {
   lazy val common = core ++ infoset ++ test
 
   lazy val core = Seq(
-    "com.lihaoyi" %% "os-lib" % "0.11.7", // for writing/compiling C source files
+    "com.lihaoyi" %% "os-lib" % "0.11.8", // for writing/compiling C source files
     "org.scala-lang.modules" %% "scala-xml" % "2.4.0",
     "org.scala-lang.modules" %% "scala-parser-combinators" % "2.4.0",
-    "com.ibm.icu" % "icu4j" % "78.2",
+    "com.ibm.icu" % "icu4j" % "78.3",
     ("xerces" % "xercesImpl" % "2.12.2").exclude("xml-apis", "xml-apis"),
     "xml-resolver" % "xml-resolver" % "1.2",
-    "commons-io" % "commons-io" % "2.21.0",
+    "commons-io" % "commons-io" % "2.22.0",
     "com.typesafe.scala-logging" %% "scala-logging" % "3.9.6"
   )
 
   lazy val slf4jAPI = Seq(
-    "org.slf4j" % "slf4j-api" % "2.0.17"
+    "org.slf4j" % "slf4j-api" % "2.0.18"
   )
 
   lazy val infoset = Seq(
     "org.jdom" % "jdom2" % "2.0.6.1",
-    "com.fasterxml.woodstox" % "woodstox-core" % "7.1.1",
+    "com.fasterxml.woodstox" % "woodstox-core" % "7.2.1",
     "com.fasterxml.jackson.core" % "jackson-core" % "2.16.1"
   )
 
   lazy val cli = Seq(
-    "org.jline" % "jline" % "3.30.6",
+    "org.jline" % "jline" % "4.2.1",
     "org.rogach" %% "scallop" % "5.3.0",
     "net.sf.expectit" % "expectit-core" % "0.9.0" % "test"
   )
@@ -59,7 +59,7 @@ object Dependencies {
   )
 
   lazy val schematron = Seq(
-    "net.sf.saxon" % "Saxon-HE" % "12.9"
+    "net.sf.saxon" % "Saxon-HE" % "13.0"
   )
 
   lazy val exi = Seq(
