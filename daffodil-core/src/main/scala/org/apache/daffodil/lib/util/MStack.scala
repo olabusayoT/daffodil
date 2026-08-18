@@ -75,11 +75,11 @@ object MStackOfLong {
  * So we use an Array[AnyRef] as the representation here, and we
  * convert null to Nope, and an actual object reference to One(x)
  */
-final class MStackOfMaybe[T <: AnyRef] {
+final class MStackOfMaybe[T <: AnyRef](initialSize: Int = 32) {
 
   override def toString = delegate.toString
 
-  private val delegate = new MStackOf[T]
+  private val delegate = new MStackOf[T](initialSize)
   private val nullT = null.asInstanceOf[T]
 
   def copyFrom(other: MStackOfMaybe[T]) = delegate.copyFrom(other.delegate)
@@ -135,7 +135,7 @@ final class MStackOfMaybe[T <: AnyRef] {
  * an object reference or null, and call Maybe(thing) explicitly outside the
  * iteration. Maybe(null) is Nope, and Maybe(thing) is One(thing) if thing is not null.
  */
-final class MStackOf[T <: AnyRef] extends Serializable {
+final class MStackOf[T <: AnyRef](initialSize: Int = 32) extends Serializable {
 
   override def toString = delegate.toString
 
@@ -143,7 +143,7 @@ final class MStackOf[T <: AnyRef] extends Serializable {
 
   @inline final def length = delegate.length
 
-  private val delegate = MStackOfAnyRef()
+  private val delegate = MStackOfAnyRef(initialSize)
 
   @inline final def mark = delegate.mark
   @inline final def reset(m: MStack.Mark) = delegate.reset(m)
@@ -167,9 +167,9 @@ private[util] final class MStackOfAnyRef private ()
   extends MStack[AnyRef]((n: Int) => new Array[AnyRef](n), null.asInstanceOf[AnyRef])
 
 object MStackOfAnyRef {
-  def apply() = {
+  def apply(initialSize: Int = 32) = {
     val stk = new MStackOfAnyRef()
-    stk.init()
+    stk.init(initialSize)
     stk
   }
 }
@@ -190,9 +190,14 @@ protected abstract class MStack[@specialized T] private[util] (
   private var index = 0
   private var table: Array[T] = null
 
-  def init(): Unit = {
+  /**
+   * initialSize lets a caller that knows its element count up front (e.g.
+   * cloning another MStack of known depth, see UState.cloneForSuspension)
+   * avoid the default 32-slot allocation when that's more than needed.
+   */
+  def init(initialSize: Int = 32): Unit = {
     index = 0
-    table = arrayAllocator(32)
+    table = arrayAllocator(initialSize)
   }
 
   def copyFrom(other: MStack[T]): Unit = {

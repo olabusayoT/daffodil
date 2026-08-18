@@ -17,12 +17,81 @@
 
 package org.apache.daffodil.lib.util
 
+import org.apache.daffodil.lib.util.Maybe.*
+
+import org.junit.Assert.*
+import org.junit.Test
+
 /**
  * Compare MStack performance to ArrayStack. It should be faster for primitives
  */
 class TestMStack {
 
   var junk: Long = 0
+
+  /**
+   * Exercises UState.cloneForSuspension's sized-clone pattern: a
+   * destination constructed with initialSize equal to the source's depth,
+   * then copyFrom'd, must end up identical to one built with the old
+   * default (32).
+   */
+  @Test def testMStackOfCopyFromSizedDestinationMatchesDefault(): Unit = {
+    val source = new MStackOf[String]
+    source.push("a")
+    source.push("b")
+    source.push("c")
+
+    val sizedDest = new MStackOf[String](source.length)
+    sizedDest.copyFrom(source)
+
+    val defaultDest = new MStackOf[String]
+    defaultDest.copyFrom(source)
+
+    assertEquals(defaultDest.toList, sizedDest.toList)
+    assertEquals(3, sizedDest.length)
+    assertEquals("c", sizedDest.top)
+  }
+
+  /**
+   * A sized-to-exact-depth destination must still grow correctly if
+   * something pushes beyond its initial capacity - confirms right-sizing
+   * at clone time doesn't break future growth, even though nothing
+   * pushes onto a suspension's cloned stacks after cloning in practice.
+   */
+  @Test def testMStackOfSizedDestinationStillGrowsCorrectly(): Unit = {
+    val source = new MStackOf[String]
+    source.push("a")
+    source.push("b")
+
+    val sizedDest = new MStackOf[String](source.length)
+    sizedDest.copyFrom(source)
+
+    sizedDest.push("c")
+    sizedDest.push("d")
+    sizedDest.push("e")
+
+    assertEquals(5, sizedDest.length)
+    assertEquals("e", sizedDest.top)
+    assertEquals(List("e", "d", "c", "b", "a"), sizedDest.toList)
+  }
+
+  /** Same sized-clone pattern, but for MStackOfMaybe (escapeSchemeEVCache's type). */
+  @Test def testMStackOfMaybeCopyFromSizedDestinationMatchesDefault(): Unit = {
+    val source = new MStackOfMaybe[String]
+    source.push(One("x"))
+    source.push(Nope)
+    source.push(One("z"))
+
+    val sizedDest = new MStackOfMaybe[String](source.length)
+    sizedDest.copyFrom(source)
+
+    assertEquals(3, sizedDest.length)
+    assertEquals(One("z"), sizedDest.top)
+    assertEquals(One("z"), sizedDest.pop)
+    assertEquals(Nope, sizedDest.pop)
+    assertEquals(One("x"), sizedDest.pop)
+    assertTrue(sizedDest.isEmpty)
+  }
 
   /**
    * This test compares MStackOfLong to ArrayStack[Long].

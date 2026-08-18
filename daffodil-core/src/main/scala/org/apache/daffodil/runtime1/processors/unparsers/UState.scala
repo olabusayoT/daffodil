@@ -553,8 +553,10 @@ final class UStateMain private (
         // MStack, since the escape scheme cache logic requires an MStack. We
         // reallyjust need the top for cloning for suspensions, but that
         // requires changes to how the escape schema cache is accessed, which
-        // isn't a trivial change.
-        val esClone = new MStackOfMaybe[EscapeSchemeUnparserHelper]()
+        // isn't a trivial change. Sized to the source's actual depth
+        // (instead of MStack's default 32) since nothing ever pushes onto
+        // a suspension's cloned escapeSchemeEVCache after this point.
+        val esClone = new MStackOfMaybe[EscapeSchemeUnparserHelper](escapeSchemeEVCache.length)
         esClone.copyFrom(escapeSchemeEVCache)
         Maybe(esClone)
       } else {
@@ -563,8 +565,12 @@ final class UStateMain private (
     val ds =
       if (!delimiterStack.isEmpty) {
         // If there are any delimiters, then we need to clone them all since
-        // they may be needed for escaping
-        val dsClone = new MStackOf[DelimiterStackUnparseNode]()
+        // they may be needed for escaping. Sized to the source's actual
+        // depth (instead of MStack's default 32): UStateForSuspension's
+        // pushDelimiters/popDelimiters both die (see below), so this clone
+        // is read-only for the rest of the suspension's life and can never
+        // grow past this depth.
+        val dsClone = new MStackOf[DelimiterStackUnparseNode](delimiterStack.length)
         dsClone.copyFrom(delimiterStack)
         Maybe(dsClone)
       } else {

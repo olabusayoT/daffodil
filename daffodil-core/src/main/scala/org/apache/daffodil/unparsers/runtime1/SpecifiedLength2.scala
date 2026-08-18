@@ -268,6 +268,12 @@ class CaptureEndOfContentLengthUnparser(
     } else {
       elem.contentLength.setRelEndPos0bInBits(dos.relBitPos0b, dos)
     }
+    // May have made this element's content length computable; retry any
+    // waiting suspensions now rather than at the next periodic sweep. Not
+    // hooked from CaptureStartOfContentLengthUnparser: in document order
+    // the referencing OVC always blocks before this element's own end is
+    // captured, so a start-time notification could never resolve anything.
+    elem.contentLength.notifyWaiters()
   }
 }
 
@@ -300,6 +306,9 @@ class CaptureEndOfValueLengthUnparser(override val context: ElementRuntimeData)
     } else {
       elem.valueLength.setRelEndPos0bInBits(dos.relBitPos0b, dos)
     }
+    // See CaptureEndOfContentLengthUnparser's comment; same reasoning
+    // applies here for dfdl:valueLength waiters.
+    elem.valueLength.notifyWaiters()
   }
 }
 

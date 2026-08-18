@@ -75,6 +75,7 @@ import org.apache.daffodil.runtime1.processors.EvalCache
 import org.apache.daffodil.runtime1.processors.ParseOrUnparseState
 import org.apache.daffodil.runtime1.processors.ProcessingError
 import org.apache.daffodil.runtime1.processors.SimpleTypeRuntimeData
+import org.apache.daffodil.runtime1.processors.Suspension
 import org.apache.daffodil.runtime1.processors.TermRuntimeData
 import org.apache.daffodil.runtime1.processors.parsers.PState
 
@@ -571,6 +572,44 @@ sealed abstract class LengthState(ie: DIElement) {
   var maybeEndDataOutputStream: Maybe[DataOutputStream] = Nope
   var maybeEndPos0bInBits: MaybeULong = MaybeULong.Nope
   var maybeComputedLengthInBits: MaybeULong = MaybeULong.Nope
+
+  /**
+   * Suspensions blocked on this element's length being unknown
+   * (dfdl:contentLength/dfdl:valueLength), registered via registerWaiter
+   * and retried directly via notifyWaiters once this length becomes
+   * computable, instead of waiting for SuspensionTracker's next periodic
+   * sweep. Purely an optimization alongside that sweep, not a
+   * replacement: a suspension still sits in SuspensionTracker's own
+   * queues too, so requireFinal()'s deadlock detection is unaffected.
+   *
+   * Deduplicated by reference identity - a suspension that re-blocks
+   * here across multiple sweeps re-registers each time, and without
+   * dedup this list would grow without bound.
+   */
+  private var waiters: List[Suspension] = Nil
+
+  def registerWaiter(s: Suspension): Unit = {
+    if (!isRegisteredWaiter(s)) waiters = s :: waiters
+  }
+
+  /**
+   * Used by Suspension.registerLengthStateWaiter to deregister from
+   * whichever LengthState a suspension was previously registered
+   * against, when it re-blocks on a different one instead. Dedup is by
+   * reference identity, so removing an entry never here is a no-op.
+   */
+  def removeWaiter(s: Suspension): Unit = {
+    waiters = waiters.filterNot(_ eq s)
+  }
+
+  // private[infoset], not private, so tests in this package can assert on it directly.
+  private[infoset] def isRegisteredWaiter(s: Suspension): Boolean = waiters.exists(_ eq s)
+
+  def notifyWaiters(): Unit = {
+    val toRetry = waiters
+    waiters = Nil
+    toRetry.foreach { s => if (!s.isDone) s.runSuspension() }
+  }
 
   def copyFrom(other: LengthState): Unit = {
     this.maybeStartDataOutputStream = other.maybeStartDataOutputStream
