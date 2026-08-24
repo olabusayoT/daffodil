@@ -25,7 +25,7 @@ import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.*
 import org.apache.daffodil.lib.util.MaybeInt
 import org.apache.daffodil.lib.util.MaybeULong
-import org.apache.daffodil.runtime1.infoset.LengthState
+import org.apache.daffodil.runtime1.infoset.InfosetLengthUnknownException
 import org.apache.daffodil.runtime1.processors.unparsers.UState
 import org.apache.daffodil.runtime1.processors.unparsers.UStateMain
 import org.apache.daffodil.runtime1.processors.unparsers.UnparseError
@@ -52,20 +52,6 @@ trait Suspension extends Serializable {
    */
   val isReadOnly = false
 
-  /**
-   * True if this suspension's task might succeed without any bytes having
-   * been written yet (e.g. a plain value/variable read); false if it
-   * needs write-time-only information (e.g. a real DOS bit position, as
-   * dfdl:valueLength/dfdl:contentLength and most padding/fill/alignment
-   * operations do). Distinct from isReadOnly above: those length
-   * operations don't write DOS bytes (so they're isReadOnly) but DO read
-   * write-time-only bit-position state, so they're NOT
-   * canResolveWithoutWriting. Defaults to false; used by
-   * SuspensionTracker.evalBuildResolvableSuspensions to skip retrying a
-   * suspension from a discard-sink traversal that can never satisfy it.
-   */
-  def canResolveWithoutWriting: Boolean = false
-
   def UE(ustate: UState, s: String, args: Any*) = {
     UnparseError(One(rd.schemaFileLocation), One(ustate.currentLocation), s, args*)
   }
@@ -86,43 +72,25 @@ trait Suspension extends Serializable {
   protected def doTask(ustate: UState): Unit
 
   /**
-   * Guards against runSuspension re-entering for this same instance
-   * while already on-stack. Expected to never trip today (suspend()
-   * clones the ustate at block time, so runSuspension only touches an
-   * isolated per-suspension clone) - exists because LengthState's
-   * targeted wake-up (notifyWaiters) gives a second path into
-   * runSuspension alongside SuspensionTracker's periodic sweeps; if
-   * those two ever nest, this fails loudly instead of silently
-   * corrupting output.
-   */
-  private var isRunning_ : Boolean = false
-
-  /**
-   * After calling this, call isDone and if that's false call isMakingProgress to
-   * understand whether it is done, blocked on the exactly same situation, or blocked elsewhere.
-   *
-   * This status is needed to implement circular deadlock detection
+   * After calling this, call isDone and if that's false call isMakingProgress
+   * to understand whether it is done, blocked on the exactly same situation,
+   * or blocked elsewhere. Needed for circular deadlock detection.
+   * SuspensionTracker is the only caller - see moveFromParkedToYoung.
    */
   final def runSuspension(): Unit = {
-    Assert.invariant(!isRunning_, s"Suspension re-entered while already running: ${this}")
-    isRunning_ = true
-    try {
-      doTask(savedUstate)
-      if (isDone && !isReadOnly) {
-        try {
-          //
-          // We are done, and we're not readOnly, so the
-          // DOS needs to be set finished now.
-          //
-          savedUstate.getDataOutputStream.setFinished(savedUstate)
-        } catch {
-          case boc: BitOrderChangeException =>
-            savedUstate.SDE(boc)
-        }
-        Logger.log.debug(s"${this} finished ${savedUstate}.")
+    doTask(savedUstate)
+    if (isDone && !isReadOnly) {
+      try {
+        //
+        // We are done, and we're not readOnly, so the
+        // DOS needs to be set finished now.
+        //
+        savedUstate.getDataOutputStream.setFinished(savedUstate)
+      } catch {
+        case boc: BitOrderChangeException =>
+          savedUstate.SDE(boc)
       }
-    } finally {
-      isRunning_ = false
+      Logger.log.debug(s"${this} finished ${savedUstate}.")
     }
   }
 
@@ -136,20 +104,6 @@ trait Suspension extends Serializable {
       prepareToSuspend(ustate)
     }
   }
-
-  /**
-   * Public entry point to prepareToSuspend (private below), for callers
-   * that already know - from static information doTask can't see - that
-   * the first attempt is certain to block (e.g. an OVC referencing
-   * dfdl:valueLength/dfdl:contentLength from a discard-sink traversal
-   * that never writes real bytes). Only the wasted doTask attempt is
-   * skipped; prepareToSuspend still runs at this exact call site, so any
-   * caller-specific state-patching (e.g. a cloneForSuspension override)
-   * happens exactly as it would after a real blocked attempt - the
-   * suspension's freeze point isn't deferred to wherever the caller's
-   * result eventually gets used.
-   */
-  final def suspendWithoutAttempting(ustate: UState): Unit = prepareToSuspend(ustate)
 
   private def prepareToSuspend(ustate: UState): Unit = {
     val mkl = maybeKnownLengthInBits(ustate)
@@ -222,10 +176,10 @@ trait Suspension extends Serializable {
     //
     // clone the ustate for use when evaluating the expression
     //
-    // cloneForSuspension (UState.scala) is a targeted partial clone
-    // (shallow VariableMap copy, stack tops only), not a full deep copy;
-    // its escapeSchemeEVCache/delimiterStack clones are sized to actual
-    // depth instead of MStack's default 32 slots.
+    // This is a targeted partial clone (shallow VariableMap copy, stack
+    // tops only), not a full deep copy, but still copies the full
+    // escapeSchemeEVCache/delimiterStack contents unconditionally.
+    // TODO: Performance - a copy-on-write scheme could avoid that copy.
     //
     val didSplit = (ustate.getDataOutputStream ne original)
     val cloneUState = ustate.asInstanceOf[UStateMain].cloneForSuspension(original)
@@ -235,7 +189,29 @@ trait Suspension extends Serializable {
 
     savedUstate_ = cloneUState
 
-    ustate.asInstanceOf[UStateMain].addSuspension(this)
+    val mainUState = ustate.asInstanceOf[UStateMain]
+    maybeTracker = One(mainUState.suspensionTracker)
+    mainUState.addSuspension(this)
+  }
+
+  // Stashed at suspend() time so moveFromParkedToYoung can find its
+  // tracker later. Always defined by then: a suspension only becomes a
+  // LengthState waiter after its first blocked attempt, which suspend()
+  // always follows immediately.
+  private var maybeTracker: Maybe[SuspensionTracker] = Nope
+
+  /**
+   * Called by a SuspensionWaiter's notifySuspensions once it's confirmed
+   * this suspension is worth a real attempt again: hands it to its
+   * tracker for a real attempt (SuspensionTracker is the only caller of
+   * runSuspension), clearing isWaitingOnWaiter so it isn't immediately
+   * re-parked first.
+   */
+  final def moveFromParkedToYoung(): Unit = {
+    Assert.invariant(maybeTracker.isDefined)
+    Assert.invariant(maybeRegisteredWaiter.isDefined)
+    maybeRegisteredWaiter = Nope
+    maybeTracker.get.moveParkedToYoung(this)
   }
 
   final def explain(): Unit = {
@@ -277,50 +253,52 @@ trait Suspension extends Serializable {
 
   final def isMakingProgress = isMakingProgress_
 
-  /**
-   * True exactly when this suspension is blocked on
-   * InfosetLengthUnknownException with a targeted wake-up already
-   * registered against the relevant LengthState (set only from
-   * DPath.scala's InfosetLengthUnknownException catch clause, the one
-   * place that calls markWaitingOnLengthState). SuspensionTracker's
-   * periodic sweep uses this to skip re-running doTask until that
-   * wake-up fires. Not inferred from block()'s exc type
-   * (SuspendableOperation.scala also passes a RetryableException that
-   * could structurally match without a wake-up registered) - only the
-   * actual registration site sets this, so the two can't drift apart.
-   */
-  private var isWaitingOnLengthState_ : Boolean = false
+  // Which SuspensionWaiter (if any) this suspension is registered with.
+  // block() unconditionally deregisters this before any retry, so
+  // registerWaiter never finds one already set.
+  private var maybeRegisteredWaiter: Maybe[SuspensionWaiter] = Nope
 
-  final def markWaitingOnLengthState(): Unit = {
-    isWaitingOnLengthState_ = true
+  /**
+   * True exactly when a targeted wake-up is registered against some
+   * SuspensionWaiter (set only from registerWaiter). SuspensionTracker's
+   * periodic sweep uses this to skip re-running doTask until that
+   * wake-up fires.
+   */
+  final def isWaitingOnWaiter: Boolean = maybeRegisteredWaiter.isDefined
+
+  final def registerWaiter(w: SuspensionWaiter): Unit = {
+    Assert.invariant(maybeRegisteredWaiter.isEmpty)
+    maybeRegisteredWaiter = One(w)
+    w.registerSuspension(this)
   }
 
-  final def isWaitingOnLengthState: Boolean = isWaitingOnLengthState_
-
   /**
-   * Which LengthState (if any) this suspension is registered with as a
-   * waiter. A suspension's dependency can shift between retries (e.g. a
-   * length expression whose which-element branch changes), so it must be
-   * deregistered from the old LengthState before registering a new one,
-   * or the old one's notifyWaiters() would retry it pointlessly.
+   * Registers a targeted wake-up when exc (the reason this suspension
+   * just blocked, via block() immediately beforehand) has a known
+   * SuspensionWaiter to register with - a no-op otherwise. Shared by
+   * DPath.scala's expression evaluation and SuspendableOperation's
+   * retry loop.
    */
-  private var maybeRegisteredLengthState: Maybe[LengthState] = Nope
-
-  final def registerLengthStateWaiter(ls: LengthState): Unit = {
-    if (maybeRegisteredLengthState.isDefined && (maybeRegisteredLengthState.get ne ls))
-      maybeRegisteredLengthState.get.removeWaiter(this)
-    maybeRegisteredLengthState = One(ls)
-    ls.registerWaiter(this)
+  final def maybeRegisterWaiterFor(exc: AnyRef): Unit = exc match {
+    case noLength: InfosetLengthUnknownException =>
+      registerWaiter(noLength.lengthState.suspensionWaiter)
+    case noVar: VariableException =>
+      registerWaiter(noVar.variableInstance.suspensionWaiter)
+    case _ => // no targeted wake-up available for any other blocking reason
   }
 
   final def block(nodeOrVar: AnyRef, info: AnyRef, index: Long, exc: AnyRef): Unit = {
     Logger.log.debug(s"blocking ${this} due to ${exc}")
 
-    // Reset unconditionally; DPath.scala's InfosetLengthUnknownException
-    // handling re-sets this immediately via markWaitingOnLengthState when
-    // that's the actual blocking reason, so it never drifts out of sync
-    // with whether a real wake-up is registered.
-    isWaitingOnLengthState_ = false
+    // Deregister unconditionally; a re-block on the same reason
+    // re-registers right after via maybeRegisterWaiterFor, so this is a
+    // no-op then. For any other blocking reason, this suspension is no
+    // longer waiting on it - leaving the registration would keep it
+    // reachable, and isWaitingOnWaiter reads this same field.
+    if (maybeRegisteredWaiter.isDefined) {
+      maybeRegisteredWaiter.get.removeSuspension(this)
+      maybeRegisteredWaiter = Nope
+    }
 
     Assert.usage(nodeOrVar ne null)
     Assert.usage(info ne null)

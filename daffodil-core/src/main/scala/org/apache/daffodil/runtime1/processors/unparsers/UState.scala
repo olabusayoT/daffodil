@@ -553,9 +553,9 @@ final class UStateMain private (
         // MStack, since the escape scheme cache logic requires an MStack. We
         // reallyjust need the top for cloning for suspensions, but that
         // requires changes to how the escape schema cache is accessed, which
-        // isn't a trivial change. Sized to the source's actual depth
-        // (instead of MStack's default 32) since nothing ever pushes onto
-        // a suspension's cloned escapeSchemeEVCache after this point.
+        // isn't a trivial change. Sized to the source's actual depth since
+        // nothing ever pushes onto a suspension's cloned escapeSchemeEVCache
+        // after this point.
         val esClone = new MStackOfMaybe[EscapeSchemeUnparserHelper](escapeSchemeEVCache.length)
         esClone.copyFrom(escapeSchemeEVCache)
         Maybe(esClone)
@@ -566,10 +566,9 @@ final class UStateMain private (
       if (!delimiterStack.isEmpty) {
         // If there are any delimiters, then we need to clone them all since
         // they may be needed for escaping. Sized to the source's actual
-        // depth (instead of MStack's default 32): UStateForSuspension's
-        // pushDelimiters/popDelimiters both die (see below), so this clone
-        // is read-only for the rest of the suspension's life and can never
-        // grow past this depth.
+        // depth: pushDelimiters/popDelimiters both die on this clone (see
+        // below), so it's read-only for the rest of the suspension's life
+        // and can never grow past this depth.
         val dsClone = new MStackOf[DelimiterStackUnparseNode](delimiterStack.length)
         dsClone.copyFrom(delimiterStack)
         Maybe(dsClone)
@@ -713,7 +712,10 @@ final class UStateMain private (
    * All the other clones used for outputValueCalc, those never
    * need to add any.
    */
-  private val suspensionTracker =
+  // private[processors], not private: Suspension.suspend stashes this so
+  // notifyWaiters can hand a suspension back to its tracker instead of
+  // running it directly.
+  private[processors] val suspensionTracker =
     new SuspensionTracker(tunable.unparseSuspensionWaitYoung, tunable.unparseSuspensionWaitOld)
 
   def addSuspension(se: Suspension): Unit = {

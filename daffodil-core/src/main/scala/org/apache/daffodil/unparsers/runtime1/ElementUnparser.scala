@@ -360,29 +360,17 @@ class ElementOVCSpecifiedLengthUnparser(
   private def suspendableExpression =
     new ElementOVCSpecifiedLengthUnparserSuspendableExpression(this, expr)
 
-  // Negation of SuspendableExpression.canResolveWithoutWriting, computed
-  // once here since expr is already known at unparser-construction time.
-  // True when this OVC's expression can never succeed without a real
-  // written DOS bit position (e.g. references dfdl:valueLength/
-  // contentLength) - the first attempt is then guaranteed to block, no
-  // matter how many times retried.
-  private val requiresWriteTimeValue: Boolean =
-    !SuspendableExpression.canResolveWithoutWriting(expr)
-
   Assert.invariant(context.dpathElementCompileInfo.isOutputValueCalc)
 
   override def runContentUnparser(state: UState): Unit = {
     computeTargetLength(
       state
     ) // must happen before run() so that we can take advantage of knowing the length
-    // Skip the guaranteed-to-fail doTask attempt when requiresWriteTimeValue
-    // statically proves it's hopeless - see suspendWithoutAttempting's doc.
-    if (requiresWriteTimeValue) {
-      suspendableExpression.suspendWithoutAttempting(state)
-    } else {
-      // run the expression. It might or might not have a value.
-      suspendableExpression.run(state)
-    }
+    // Always try the expression first: whether the specific referenced
+    // occurrence (e.g. an already-finished earlier sibling) is already
+    // resolved is a run-time fact the expression's static shape alone
+    // can't tell us, even when it references valueLength/contentLength.
+    suspendableExpression.run(state)
     super.runContentUnparser(state) // setup unparsing, which will block for no valu
   }
 

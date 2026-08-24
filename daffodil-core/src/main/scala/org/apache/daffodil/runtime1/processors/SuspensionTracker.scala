@@ -17,6 +17,7 @@
 
 package org.apache.daffodil.runtime1.processors
 
+import scala.collection.mutable
 import scala.collection.mutable.Queue
 
 import org.apache.daffodil.lib.exceptions.Assert
@@ -29,58 +30,22 @@ class SuspensionTracker(suspensionWaitYoung: Int, suspensionWaitOld: Int) {
   private val suspensionsOld = new Queue[Suspension]
 
   /**
-   * Suspensions unable to make progress until something external
-   * changes (a targeted wake-up firing, or real bytes getting written);
-   * moved out of suspensionsYoung/suspensionsOld so the periodic sweep
-   * (evalSuspensionsThrottled) doesn't keep re-visiting them every tick -
-   * even a cheap per-item skip costs real time at scale.
-   *
-   * Only drained by foldParkedIntoOld, from the two "must attempt
-   * everything" methods below (evalSuspensionsUnthrottled, requireFinal);
-   * the targeted wake-up itself (LengthState.notifyWaiters) retries a
-   * suspension directly regardless of which bucket it's in, so parking
-   * never delays that path.
+   * Suspensions parked out of the per-young-tick rotation, each with a
+   * targeted wake-up already registered against whatever it's blocked on.
+   * Given a real retry only on the same reduced cadence as old suspensions
+   * (a registered wake-up usually fires first), plus requireFinal's final
+   * catch-all.
    */
-  private val suspensionsParked = new Queue[Suspension]
+  private val suspensionsParked = new mutable.HashSet[Suspension]
 
   /**
-   * Every still-tracked, not-yet-done suspension across all buckets.
-   * Must include suspensionsParked, or a suspension moving into that
-   * bucket would look like (incorrectly) resolved progress to a caller
-   * comparing this count before/after evalSuspensionsUnthrottled().
+   * Every still-tracked, not-yet-done suspension, for debugging use
+   * only: combining three buckets into one Seq allocates and copies, so
+   * nothing in the unparse hot path should call this. Must include
+   * suspensionsParked, or a parked suspension looks like resolved progress.
    */
   def suspensions: Seq[Suspension] =
     suspensionsYoung.toSeq ++ suspensionsOld.toSeq ++ suspensionsParked.toSeq
-
-  /**
-   * Count of suspensions currently parked (suspensionsParked above) -
-   * unable to progress until the real bytes their wake-up depends on
-   * actually get written (i.e. by a non-discard-sink sweep). Not a good
-   * backlog-sized throttle on its own (see pendingCount below): a
-   * suspension is only classified here once it's actually re-retried
-   * and re-blocks on InfosetLengthUnknownException. A discard-sink sweep
-   * (evalBuildResolvableSuspensions) never performs that retry - it
-   * always skip-and-requeues instead - so nothing parks purely from a
-   * discard-sink sweep before a real sweep (evalSuspensions) has run at
-   * least once.
-   */
-  def parkedCount: Int = suspensionsParked.length
-
-  /**
-   * Total not-yet-done suspensions across all three buckets, without
-   * allocating (unlike `suspensions` above - not safe to call once per
-   * node). Unlike parkedCount, grows the moment a suspension is created
-   * (trackSuspension), with no dependency on it having been retried yet
-   * - intended as a throttle signal for pacing a discard-sink traversal
-   * against the pending backlog. Still distinguishes the two workload
-   * shapes correctly: a canResolveWithoutWriting=true suspension
-   * resolves within a few ticks of its sibling being added to the tree
-   * (stays small/transient), while a length-dependent one (never
-   * resolvable without real bytes actually being written) accumulates
-   * here unboundedly.
-   */
-  def pendingCount: Int =
-    suspensionsYoung.length + suspensionsOld.length + suspensionsParked.length
 
   private var count: Int = 0
 
@@ -94,71 +59,20 @@ class SuspensionTracker(suspensionWaitYoung: Int, suspensionWaitOld: Int) {
 
   /**
    * Attempts to evaluate suspensions. Old suspensions are evaluated less
-   * frequently than young suspensions. Any young suspensions that fail to
-   * evaluate are moved to the old suspensions list. If we evaluate old
-   * suspensions, we attempt to evaluate them first, with the hope that their
-   * resolution might make the young suspensions more likely to evaluate.
-   *
-   * skipLengthStateWaiters = true here: a suspension with
-   * isWaitingOnLengthState true has a targeted wake-up already
-   * registered (fired from CaptureEndOf{Content,Value}LengthUnparsers
-   * once its length becomes computable) and can't progress until that
-   * fires - retrying it on the blind periodic schedule first is pure
-   * wasted DPath re-evaluation.
+   * frequently than young suspensions. A suspension with isWaitingOnWaiter
+   * true has a targeted wake-up already registered, so it's parked here
+   * instead of wasting a retry on it.
    */
-  def evalSuspensions(): Unit =
-    evalSuspensionsThrottled(filterToBuildResolvable = false, skipLengthStateWaiters = true)
+  def evalSuspensions(): Unit = evalSuspensionsThrottled()
 
-  /**
-   * A discard-sink sweep variant: same throttled cadence as
-   * evalSuspensions, but passes filterToBuildResolvable=true to
-   * evalSuspensionQueue. A suspension whose canResolveWithoutWriting is
-   * false can never be satisfied by a discard-sink traversal no matter
-   * how many retries, so it's skipped-and-requeued instead of really
-   * attempted - unless it's already isWaitingOnLengthState, in which
-   * case it's parked instead (parking only ever follows one of the real
-   * sweep's (evalSuspensions) own unfiltered attempts having set that
-   * flag; this filtered sweep never sets it itself). Either way the
-   * suspension stays pending for that real sweep's later, unfiltered
-   * attempts once real bytes exist for it to depend on.
-   *
-   * Eliminates the wasted doTask cost of this discard-sink sweep for
-   * these suspensions; doesn't eliminate the smaller per-tick
-   * dequeue/requeue cost for suspensions with no targeted wake-up at all
-   * (e.g. padding/target-length SuspendableOperations), which must stay
-   * on the skip-and-requeue path so the real sweep still finds them.
-   *
-   * skipLengthStateWaiters is left false here: canResolveWithoutWriting
-   * already excludes every length-state-blocked suspension from this
-   * sweep's retries, and more completely (it also covers non-length
-   * forward references), so a second filter would be redundant.
-   */
-  def evalBuildResolvableSuspensions(): Unit =
-    evalSuspensionsThrottled(filterToBuildResolvable = true)
-
-  private def evalSuspensionsThrottled(
-    filterToBuildResolvable: Boolean,
-    skipLengthStateWaiters: Boolean = false
-  ): Unit = {
+  private def evalSuspensionsThrottled(): Unit = {
     if (count % suspensionWaitOld == 0) {
-      evalSuspensionQueue(suspensionsOld, filterToBuildResolvable, skipLengthStateWaiters)
+      evalSuspensionQueue(suspensionsOld, skipWaiters = true)
+      evalParkedSuspensions()
     }
     if (count % suspensionWaitYoung == 0) {
-      evalSuspensionQueue(suspensionsYoung, filterToBuildResolvable, skipLengthStateWaiters)
-      while (suspensionsYoung.nonEmpty) {
-        suspensionsOld.enqueue(suspensionsYoung.dequeue())
-      }
-      // suspensionsParked is excluded from the periodic sweep above
-      // (the whole point of parking), but that means nothing else
-      // removes an entry once it resolves out-of-band via a targeted
-      // wake-up - only foldParkedIntoOld does, once at the very end of
-      // the document. Without this prune, a resolved-but-parked
-      // suspension (and everything it retains) stays reachable for the
-      // rest of the document. A plain isDone check is far cheaper than
-      // the real doTask attempts this cadence already performs above,
-      // so reusing suspensionWaitYoung here is safe and doesn't
-      // reintroduce the wasted-re-attempt cost parking avoids.
-      suspensionsParked.dequeueAll(_.isDone)
+      evalSuspensionQueue(suspensionsYoung, skipWaiters = true)
+      foldYoungIntoOld()
     }
 
     if (count == suspensionWaitOld) {
@@ -168,47 +82,58 @@ class SuspensionTracker(suspensionWaitYoung: Int, suspensionWaitOld: Int) {
     }
   }
 
-  /**
-   * Attempts every currently-tracked suspension once, bypassing the
-   * normal throttling, without treating remaining blocks as an error.
-   * Intended for a caller whose own traversal has fully finished and
-   * needs a blocked suspension to resolve before it can continue - e.g.
-   * a value-only OVC referencing an already-added sibling that just
-   * hadn't been retried since that sibling appeared. Suspensions still
-   * legitimately blocked (e.g. needing real bytes to be written first)
-   * are simply left pending for a later call here or `requireFinal`.
-   *
-   * Folds suspensionsParked back in first: since this pass is already a
-   * one-time, unfiltered sweep of the whole backlog, giving parked
-   * entries their first real attempt here is free.
-   */
-  def evalSuspensionsUnthrottled(): Unit = {
-    foldParkedIntoOld()
-    evalSuspensionQueue(suspensionsOld)
-    evalSuspensionQueue(suspensionsYoung)
-    while (suspensionsYoung.nonEmpty) {
-      suspensionsOld.enqueue(suspensionsYoung.dequeue())
+  // Some suspensions only ever resolve through a real, unconditional
+  // retry rather than their own registered wake-up actually firing (a
+  // length that only becomes computable through the DOS-splitting
+  // machinery's cumulative progress, not one identifiable event). This
+  // bounds how long such a suspension waits to requireFinal.
+  private def evalParkedSuspensions(): Unit = {
+    if (suspensionsParked.isEmpty) return
+    val toRetry = new Queue[Suspension]
+    toRetry ++= suspensionsParked
+    suspensionsParked.clear()
+    evalSuspensionQueue(toRetry)
+    // Re-park only what's still waiting on a registered waiter; anything
+    // else left over blocked on something unrelated, so it belongs back
+    // in the normal rotation to get real retries again, not skip-parked
+    // forever.
+    toRetry.foreach { s =>
+      if (s.isWaitingOnWaiter) suspensionsParked.add(s) else suspensionsOld.enqueue(s)
     }
   }
 
   private def foldParkedIntoOld(): Unit = {
-    while (suspensionsParked.nonEmpty) {
-      suspensionsOld.enqueue(suspensionsParked.dequeue())
+    suspensionsParked.foreach(suspensionsOld.enqueue(_))
+    suspensionsParked.clear()
+  }
+
+  private def foldYoungIntoOld(): Unit = {
+    while (suspensionsYoung.nonEmpty) {
+      suspensionsOld.enqueue(suspensionsYoung.dequeue())
     }
   }
 
   /**
-   * Evaluates all suspensions until either they are all evaluated or a
-   * deadlock is detected. This moves all young suspensions to the old queue,
-   * and evaluates all old suspensions. If the old queue is non-empty, that
-   * means some suspensions are blocked, likely due to a circular deadlock, and
-   * we output diagnostics.
+   * Called once a suspension's targeted wake-up actually fires. s may not
+   * be parked yet (still in young/old) - then there's nothing to move,
+   * since clearing isWaitingOnWaiter already keeps it from being
+   * re-parked next time it's visited.
+   */
+  def moveParkedToYoung(s: Suspension): Unit = {
+    if (suspensionsParked.remove(s)) {
+      suspensionsYoung.enqueue(s)
+    }
+  }
+
+  /**
+   * Evaluates all suspensions until deadlocked, folding parked and young
+   * into old for one final unconditional attempt each - other unrelated
+   * preconditions may have resolved by now even if this suspension's own
+   * registered wake-up never fired. Still-stuck ones are reported deadlocked.
    */
   def requireFinal(): Unit = {
     foldParkedIntoOld()
-    while (suspensionsYoung.nonEmpty) {
-      suspensionsOld.enqueue(suspensionsYoung.dequeue())
-    }
+    foldYoungIntoOld()
 
     evalSuspensionQueue(suspensionsOld)
 
@@ -227,51 +152,14 @@ class SuspensionTracker(suspensionWaitYoung: Int, suspensionWaitOld: Int) {
   }
 
   /**
-   * Attempt to evaluate suspensions on the provie queue. Keep repeating the
-   * evaluates as long as some progress is being made. Suspensions that
-   * evaluate sucessfully are removed from the queue. Once suspensions make no
-   * further progress and are all blocked, we return. Blocked suspensions put
-   * back on the same queue.
-   *
-   * filterToBuildResolvable distinguishes a discard-sink sweep (true,
-   * only passed by evalBuildResolvableSuspensions - can never write real
-   * bytes) from every other caller (false, the default): when true, a
-   * suspension whose canResolveWithoutWriting is false is diverted away
-   * from the real doTask/runSuspension attempt - skipped and requeued in
-   * place, or parked if isWaitingOnLengthState - since a discard-sink
-   * traversal could never satisfy it anyway. When false, every
-   * not-yet-done suspension gets a real attempt, since only these
-   * callers can actually write the bytes it depends on.
-   *
-   * A suspension is parked (moved to suspensionsParked instead of back
-   * onto this queue) only when isWaitingOnLengthState is true AND this
-   * is one of the two throttled callers (filterToBuildResolvable or
-   * skipLengthStateWaiters) - a guaranteed external retry already
-   * exists for it, so re-examining it on the next periodic tick is
-   * pure waste. This is narrower than "anything a throttled caller
-   * would otherwise skip": suspensions with no targeted wake-up at all
-   * (e.g. padding/target-length SuspendableOperations) stay on the
-   * skip-and-requeue path instead, so a later, unfiltered (real) sweep
-   * still finds them.
-   *
-   * Parking removes a suspension from the per-tick rotation entirely;
-   * only the targeted wake-up itself or foldParkedIntoOld (the two
-   * must-attempt-everything paths) ever revisits it. A parked
-   * suspension is dequeued and never re-enqueued, so `queue.length`
-   * shrinks correctly for the loop's termination bound.
-   *
-   * A suspension already `isDone` when dequeued is dropped without
-   * calling runSuspension again: a queued suspension can now resolve
-   * out-of-band via a targeted wake-up while still sitting in this
-   * queue (impossible before wake-ups existed) - without this check,
-   * dequeuing straight into another runSuspension call would re-run
-   * doTask on an already-done suspension, double-applying its side
-   * effect and tripping LengthState's "set once" invariants.
+   * Repeatedly attempts suspensions on queue until no progress is made;
+   * still-blocked ones go back on the queue. A suspension with
+   * isWaitingOnWaiter true is parked instead of really attempted: a
+   * guaranteed external wake-up already exists for it.
    */
   private def evalSuspensionQueue(
     queue: Queue[Suspension],
-    filterToBuildResolvable: Boolean = false,
-    skipLengthStateWaiters: Boolean = false
+    skipWaiters: Boolean = false
   ): Unit = {
     var countOfNotMakingProgress = 0
     while (!queue.isEmpty && countOfNotMakingProgress < queue.length) {
@@ -280,23 +168,13 @@ class SuspensionTracker(suspensionWaitYoung: Int, suspensionWaitOld: Int) {
         // resolved out of band; queue got smaller for free, so this
         // counts as progress the same as a successful run below.
         countOfNotMakingProgress = 0
-      } else if (
-        (filterToBuildResolvable || skipLengthStateWaiters) && s.isWaitingOnLengthState
-      ) {
+      } else if (skipWaiters && s.isWaitingOnWaiter) {
         // Guaranteed external wake-up exists (see the doc comment above):
         // park it, removing it from the rotation entirely. Same
         // dequeue-without-re-enqueue shrink as the isDone branch, so it
         // resets the counter the same way.
-        suspensionsParked.enqueue(s)
+        suspensionsParked.add(s)
         countOfNotMakingProgress = 0
-      } else if (filterToBuildResolvable && !s.canResolveWithoutWriting) {
-        // Discard-sink-only, not length-state-blocked (e.g. padding/
-        // SuspendableOperation, no external wake-up): skip-and-requeue
-        // instead of parking, so a later, real sweep can pick it up
-        // promptly - parking would strand it until the one-time final
-        // fold, since nothing else retries it.
-        queue.enqueue(s)
-        countOfNotMakingProgress += 1
       } else {
         suspensionStatRuns += 1
         s.runSuspension()

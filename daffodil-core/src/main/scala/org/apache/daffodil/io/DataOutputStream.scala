@@ -35,6 +35,16 @@ object ZeroLengthStatus {
 }
 
 /**
+ * Callback for code outside daffodil-io that wants to know when a
+ * DataOutputStream becomes finished, without polling isFinished. Letting
+ * daffodil-io depend only on this trait, not on whoever implements it,
+ * keeps the dependency one-directional.
+ */
+trait FinishedListener {
+  def notifyFinished(): Unit
+}
+
+/**
  * There is an asymmetry between DataInputStream and DataOutputStream with respect to the
  * positions and limits in the bit stream.
  *

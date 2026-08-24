@@ -21,6 +21,7 @@ import java.io.File
 import java.io.OutputStream
 import java.nio.file.Path
 import scala.annotation.tailrec
+import scala.collection.mutable
 
 import org.apache.daffodil.lib.equality.*
 import org.apache.daffodil.lib.exceptions.Assert
@@ -576,6 +577,35 @@ class DirectOrBufferedDataOutputStream private[io] (
         val f = _following.get
         f.maybeAbsBitPos0b // requesting this pulls the absolute position info forward.
       }
+
+      notifyFinishedListeners()
+    }
+  }
+
+  // Lazily allocated - most DOS instances never have anyone waiting on
+  // their isFinished transition, so this stays unallocated for those.
+  private var maybeFinishedListeners: Maybe[mutable.HashSet[FinishedListener]] = Nope
+
+  def registerFinishedListener(fl: FinishedListener): Unit = {
+    if (maybeFinishedListeners.isEmpty) {
+      maybeFinishedListeners = One(mutable.HashSet.empty)
+    }
+    maybeFinishedListeners.get.add(fl)
+  }
+
+  def removeFinishedListener(fl: FinishedListener): Unit = {
+    if (maybeFinishedListeners.isDefined) {
+      maybeFinishedListeners.get.remove(fl)
+    }
+  }
+
+  // setFinished() is one-shot per DOS (Assert.usage(!isFinished) at its
+  // top), so there's no need to keep this registration around afterward.
+  private def notifyFinishedListeners(): Unit = {
+    if (maybeFinishedListeners.isDefined) {
+      val toNotify = maybeFinishedListeners.get.toArray
+      maybeFinishedListeners.get.clear()
+      toNotify.foreach(_.notifyFinished())
     }
   }
 

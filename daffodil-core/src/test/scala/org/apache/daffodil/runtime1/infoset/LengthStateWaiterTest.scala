@@ -27,18 +27,20 @@ import org.junit.Assert.*
 import org.junit.Test
 
 /**
- * Regression guard for Suspension.registerLengthStateWaiter /
- * LengthState.removeWaiter: a suspension whose length dependency shifts
- * from element A to element B between retries must be deregistered from
- * A's waiters list once it registers with B's - otherwise A's eventual
- * notifyWaiters() would retry it pointlessly even though it now depends
- * on B, not A.
+ * Regression guard for block()/Suspension.registerWaiter/SuspensionWaiter.
+ * removeSuspension: a suspension whose length dependency shifts from
+ * element A to element B between retries must be deregistered from A's
+ * waiter once it registers with B's - otherwise A's eventual
+ * notifySuspensions() would retry it pointlessly even though it now
+ * depends on B, not A. block() always precedes registerWaiter on a real
+ * retry, so this drives that same sequence directly.
  *
  * Drives LengthState/Suspension directly with a minimal Suspension double
- * (registerWaiter/removeWaiter only compare by reference identity, never
- * call any method on it) rather than through a full DFDL schema: reliably
- * forcing a real dependency shift via schema+tunable timing isn't
- * deterministic, while this exercises the exact bookkeeping that changed.
+ * (registerSuspension/removeSuspension only compare by reference
+ * identity, never call any method on it) rather than through a full DFDL
+ * schema: reliably forcing a real dependency shift via schema+tunable
+ * timing isn't deterministic, while this exercises the exact bookkeeping
+ * that changed.
  */
 class LengthStateWaiterTest {
 
@@ -73,23 +75,37 @@ class LengthStateWaiterTest {
     val lengthStateA = new ContentLengthState(elementA)
     val lengthStateB = new ContentLengthState(elementB)
 
-    // registerWaiter/removeWaiter only ever compare by reference identity;
-    // neither doTask nor rd is ever actually invoked by the code under
-    // test here.
+    // registerSuspension/removeSuspension only ever compare by reference
+    // identity; neither doTask nor rd is ever actually invoked by the
+    // code under test here.
     val suspension = new Suspension {
       override def rd = elementA.erd
       override protected def doTask(ustate: UState): Unit = ()
     }
 
-    suspension.registerLengthStateWaiter(lengthStateA)
+    val exc = new RuntimeException("test")
+
+    suspension.block(elementA, elementA.erd, 0, exc)
+    suspension.registerWaiter(lengthStateA.suspensionWaiter)
     assertTrue(
       "expected the suspension to be registered on A right after registering",
       lengthStateA.isRegisteredWaiter(suspension)
     )
 
+    // A subsequent re-block on the same reason must still deregister from
+    // whatever it was previously registered on before it re-registers -
+    // here, that happens to be the same LengthState (A again).
+    suspension.block(elementA, elementA.erd, 0, exc)
+    suspension.registerWaiter(lengthStateA.suspensionWaiter)
+    assertTrue(
+      "expected the suspension to remain registered on A after a re-block/re-register cycle",
+      lengthStateA.isRegisteredWaiter(suspension)
+    )
+
     // The suspension's dependency shifts to B on a later retry, without A
     // ever having resolved (A.notifyWaiters was never called).
-    suspension.registerLengthStateWaiter(lengthStateB)
+    suspension.block(elementB, elementB.erd, 0, exc)
+    suspension.registerWaiter(lengthStateB.suspensionWaiter)
 
     assertFalse(
       "expected the suspension to be deregistered from A once it registered with B instead",
@@ -97,15 +113,6 @@ class LengthStateWaiterTest {
     )
     assertTrue(
       "expected the suspension to be registered on B",
-      lengthStateB.isRegisteredWaiter(suspension)
-    )
-
-    // Re-registering with the SAME LengthState it's already on must stay
-    // a no-op removal/re-add (dedup by reference identity), not spuriously
-    // drop it.
-    suspension.registerLengthStateWaiter(lengthStateB)
-    assertTrue(
-      "expected re-registering with the same LengthState to remain a no-op",
       lengthStateB.isRegisteredWaiter(suspension)
     )
   }

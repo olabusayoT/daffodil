@@ -30,10 +30,8 @@ class TestMStack {
   var junk: Long = 0
 
   /**
-   * Exercises UState.cloneForSuspension's sized-clone pattern: a
-   * destination constructed with initialSize equal to the source's depth,
-   * then copyFrom'd, must end up identical to one built with the old
-   * default (32).
+   * A destination sized to a source's actual depth, then copyFrom'd, must
+   * end up identical to one constructed without specifying a size.
    */
   @Test def testMStackOfCopyFromSizedDestinationMatchesDefault(): Unit = {
     val source = new MStackOf[String]
@@ -54,9 +52,7 @@ class TestMStack {
 
   /**
    * A sized-to-exact-depth destination must still grow correctly if
-   * something pushes beyond its initial capacity - confirms right-sizing
-   * at clone time doesn't break future growth, even though nothing
-   * pushes onto a suspension's cloned stacks after cloning in practice.
+   * something pushes beyond its initial capacity.
    */
   @Test def testMStackOfSizedDestinationStillGrowsCorrectly(): Unit = {
     val source = new MStackOf[String]
@@ -75,7 +71,7 @@ class TestMStack {
     assertEquals(List("e", "d", "c", "b", "a"), sizedDest.toList)
   }
 
-  /** Same sized-clone pattern, but for MStackOfMaybe (escapeSchemeEVCache's type). */
+  /** Same sized-clone pattern, but for MStackOfMaybe. */
   @Test def testMStackOfMaybeCopyFromSizedDestinationMatchesDefault(): Unit = {
     val source = new MStackOfMaybe[String]
     source.push(One("x"))
@@ -91,6 +87,38 @@ class TestMStack {
     assertEquals(Nope, sizedDest.pop)
     assertEquals(One("x"), sizedDest.pop)
     assertTrue(sizedDest.isEmpty)
+  }
+
+  /** Same sized-construction pattern, for the primitive-specialized variants. */
+  @Test def testMStackOfBooleanSizedConstructionWorks(): Unit = {
+    val stk = MStackOfBoolean(3)
+    stk.push(true)
+    stk.push(false)
+    stk.push(true)
+    assertEquals(3, stk.length)
+    assertEquals(true, stk.pop())
+    assertEquals(false, stk.pop())
+    assertEquals(true, stk.pop())
+  }
+
+  @Test def testMStackOfIntSizedConstructionWorks(): Unit = {
+    val stk = MStackOfInt(2)
+    stk.push(1)
+    stk.push(2)
+    stk.push(3)
+    assertEquals(3, stk.length)
+    assertEquals(3, stk.pop())
+    assertEquals(2, stk.pop())
+    assertEquals(1, stk.pop())
+  }
+
+  @Test def testMStackOfLongSizedConstructionWorks(): Unit = {
+    val stk = MStackOfLong(1)
+    stk.push(10L)
+    stk.push(20L)
+    assertEquals(2, stk.length)
+    assertEquals(20L, stk.pop())
+    assertEquals(10L, stk.pop())
   }
 
   /**

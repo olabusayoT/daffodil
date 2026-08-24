@@ -79,6 +79,10 @@ trait SuspendableOperation extends Suspension {
             if (ustate.currentInfosetNodeMaybe.isDefined) ustate.currentInfosetNodeMaybe.get
             else "No Node"
           block(nodeOpt, ustate.getDataOutputStream, 0, e)
+          // Registers the same targeted wake-up DPath.scala's expression
+          // evaluation does, if e has a known SuspensionWaiter to
+          // register with; a no-op for any other RetryableException.
+          maybeRegisterWaiterFor(e)
         }
       }
       if (!isDone) {

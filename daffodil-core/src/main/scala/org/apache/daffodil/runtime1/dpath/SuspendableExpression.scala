@@ -32,34 +32,11 @@ import org.apache.daffodil.runtime1.processors.unparsers.UState
  * dfdl:setVariable expressions (which variables are in-turn used by
  * dfdl:outputValueCalc.
  */
-object SuspendableExpression {
-
-  /**
-   * A plain value/variable read can resolve as soon as the referenced
-   * value is known, regardless of whether anything has been written yet
-   * (the forward-reference case this speeds up during build). A
-   * dfdl:valueLength/contentLength call always needs a real written DOS
-   * bit-position, no matter how early the value became known;
-   * value/contentReferencedElementInfos (baked in at schema-compile time)
-   * is non-empty exactly when the expression contains such a call, so its
-   * absence is the "safe to retry before anything is written" signal.
-   * A companion function, not just a trait method, so callers without a
-   * live Suspension instance (e.g. ElementOVCSpecifiedLengthUnparser's
-   * requiresWriteTimeValue, a one-time schema-compile-time check) can
-   * share the same rule instead of duplicating it.
-   */
-  def canResolveWithoutWriting(expr: CompiledExpression[AnyRef]): Boolean =
-    expr.valueReferencedElementInfos.isEmpty && expr.contentReferencedElementInfos.isEmpty
-}
-
 trait SuspendableExpression extends Suspension {
 
   override val isReadOnly = true
 
   protected def expr: CompiledExpression[AnyRef]
-
-  override def canResolveWithoutWriting: Boolean =
-    SuspendableExpression.canResolveWithoutWriting(expr)
 
   override def toString =
     "SuspendableExpression(" + rd.diagnosticDebugName + ", expr=" + expr.prettyExpr + ")"

@@ -45,6 +45,7 @@ import org.apache.daffodil.api.metadata.ElementMetadata
 import org.apache.daffodil.api.metadata.SimpleElementMetadata
 import org.apache.daffodil.io.DataOutputStream
 import org.apache.daffodil.io.DirectOrBufferedDataOutputStream
+import org.apache.daffodil.io.FinishedListener
 import org.apache.daffodil.lib.calendar.DFDLCalendar
 import org.apache.daffodil.lib.equality.TypeEqual
 import org.apache.daffodil.lib.equality.ViewEqual
@@ -76,6 +77,7 @@ import org.apache.daffodil.runtime1.processors.ParseOrUnparseState
 import org.apache.daffodil.runtime1.processors.ProcessingError
 import org.apache.daffodil.runtime1.processors.SimpleTypeRuntimeData
 import org.apache.daffodil.runtime1.processors.Suspension
+import org.apache.daffodil.runtime1.processors.SuspensionWaiter
 import org.apache.daffodil.runtime1.processors.TermRuntimeData
 import org.apache.daffodil.runtime1.processors.parsers.PState
 
@@ -438,7 +440,7 @@ case class InfosetNoParentException(val diElement: DIElement, val erd: ElementRu
   with InfosetException
 
 sealed abstract class InfosetLengthUnknownException(
-  lengthState: LengthState,
+  val lengthState: LengthState,
   kind: String,
   val diElement: DIElement,
   val erd: ElementRuntimeData
@@ -454,13 +456,13 @@ sealed abstract class InfosetLengthUnknownException(
   with RetryableException
 
 case class InfosetContentLengthUnknownException(
-  lengthState: LengthState,
+  override val lengthState: LengthState,
   override val diElement: DIElement,
   override val erd: ElementRuntimeData
 ) extends InfosetLengthUnknownException(lengthState, "Content", diElement, erd)
 
 case class InfosetValueLengthUnknownException(
-  lengthState: LengthState,
+  override val lengthState: LengthState,
   override val diElement: DIElement,
   override val erd: ElementRuntimeData
 ) extends InfosetLengthUnknownException(lengthState, "Value", diElement, erd)
@@ -534,7 +536,7 @@ sealed trait DITerm {
  * are defined, then that start pos is a relative start pos, and we'll need to compute the
  * absolute start pos once we find out the absolute start pos of the data output stream.
  */
-sealed abstract class LengthState(ie: DIElement) {
+sealed abstract class LengthState(ie: DIElement) extends FinishedListener {
 
   protected def flavor: String
 
@@ -574,41 +576,48 @@ sealed abstract class LengthState(ie: DIElement) {
   var maybeComputedLengthInBits: MaybeULong = MaybeULong.Nope
 
   /**
-   * Suspensions blocked on this element's length being unknown
-   * (dfdl:contentLength/dfdl:valueLength), registered via registerWaiter
-   * and retried directly via notifyWaiters once this length becomes
-   * computable, instead of waiting for SuspensionTracker's next periodic
-   * sweep. Purely an optimization alongside that sweep, not a
-   * replacement: a suspension still sits in SuspensionTracker's own
-   * queues too, so requireFinal()'s deadlock detection is unaffected.
-   *
-   * Deduplicated by reference identity - a suspension that re-blocks
-   * here across multiple sweeps re-registers each time, and without
-   * dedup this list would grow without bound.
+   * Suspensions blocked specifically on this element's length, registered
+   * via suspensionWaiter and given a real retry once the length becomes
+   * computable. A separate SuspensionWaiter per waiter kind (were one
+   * ever added) so each can be notified on its own trigger.
    */
-  private var waiters: List[Suspension] = Nil
-
-  def registerWaiter(s: Suspension): Unit = {
-    if (!isRegisteredWaiter(s)) waiters = s :: waiters
-  }
-
-  /**
-   * Used by Suspension.registerLengthStateWaiter to deregister from
-   * whichever LengthState a suspension was previously registered
-   * against, when it re-blocks on a different one instead. Dedup is by
-   * reference identity, so removing an entry never here is a no-op.
-   */
-  def removeWaiter(s: Suspension): Unit = {
-    waiters = waiters.filterNot(_ eq s)
+  val suspensionWaiter: SuspensionWaiter = new SuspensionWaiter {
+    // A notify (from a position setter, recheckStreams, or a DOS
+    // finishing) is only ever a hint that the length might be known now,
+    // never a guarantee - re-verify before waking anything up.
+    override def notifySuspensions(): Unit = {
+      if (maybeLengthInBits().isDefined) super.notifySuspensions()
+    }
   }
 
   // private[infoset], not private, so tests in this package can assert on it directly.
-  private[infoset] def isRegisteredWaiter(s: Suspension): Boolean = waiters.exists(_ eq s)
+  private[infoset] def isRegisteredWaiter(s: Suspension): Boolean =
+    suspensionWaiter.isRegisteredSuspension(s)
 
-  def notifyWaiters(): Unit = {
-    val toRetry = waiters
-    waiters = Nil
-    toRetry.foreach { s => if (!s.isDone) s.runSuspension() }
+  override def notifyFinished(): Unit = suspensionWaiter.notifySuspensions()
+
+  // The one DirectOrBufferedDataOutputStream (if any) that maybeLengthInBits
+  // is currently waiting to finish - discovered while computing it, not a
+  // fixed reference like maybeStartDataOutputStream/maybeEndDataOutputStream.
+  private var maybeBlockingDos: Maybe[DirectOrBufferedDataOutputStream] = Nope
+
+  // No-op when nobody is registered to care (suspensionWaiter empty) or
+  // dos is already the one we're registered on.
+  private def registerBlockingDos(dos: DirectOrBufferedDataOutputStream): Unit = {
+    if (
+      suspensionWaiter.isEmpty || (maybeBlockingDos.isDefined && (maybeBlockingDos.get eq dos))
+    )
+      return
+    clearBlockingDos()
+    dos.registerFinishedListener(this)
+    maybeBlockingDos = One(dos)
+  }
+
+  private def clearBlockingDos(): Unit = {
+    if (maybeBlockingDos.isDefined) {
+      maybeBlockingDos.get.removeFinishedListener(this)
+      maybeBlockingDos = Nope
+    }
   }
 
   def copyFrom(other: LengthState): Unit = {
@@ -617,6 +626,8 @@ sealed abstract class LengthState(ie: DIElement) {
     this.maybeEndDataOutputStream = other.maybeEndDataOutputStream
     this.maybeEndPos0bInBits = other.maybeEndPos0bInBits
     this.maybeComputedLengthInBits = other.maybeComputedLengthInBits
+    this.suspensionWaiter.clear()
+    this.clearBlockingDos()
   }
 
   def clear(): Unit = {
@@ -625,6 +636,8 @@ sealed abstract class LengthState(ie: DIElement) {
     maybeEndDataOutputStream = Nope
     maybeEndPos0bInBits = MaybeULong.Nope
     maybeComputedLengthInBits = MaybeULong.Nope
+    suspensionWaiter.clear()
+    clearBlockingDos()
   }
 
   protected def throwUnknown: Nothing
@@ -651,6 +664,10 @@ sealed abstract class LengthState(ie: DIElement) {
         )
         this.maybeStartDataOutputStream = Nope
         this.maybeStartPos0bInBits = MaybeULong(newStartBitPos0b.longValue)
+        // A DOS resolving its own absolute position is a separate trigger
+        // from the setters below - this migration can make the length
+        // computable with no setter ever having been called.
+        suspensionWaiter.notifySuspensions()
       }
     }
     if (maybeEndDataOutputStream.isDefined) {
@@ -665,6 +682,7 @@ sealed abstract class LengthState(ie: DIElement) {
         Logger.log.debug(s"${flavor}gth for ${ie.name} new absolute end pos: ${newEndBitPos0b}")
         this.maybeEndDataOutputStream = Nope
         this.maybeEndPos0bInBits = MaybeULong(newEndBitPos0b.longValue)
+        suspensionWaiter.notifySuspensions()
       }
     }
   }
@@ -778,6 +796,7 @@ sealed abstract class LengthState(ie: DIElement) {
           Logger.log.debug(
             s"${flavor}gth of ${ie.name} is unknown due to unfinished output stream. ${toString}"
           )
+          registerBlockingDos(dos)
           MaybeULong.Nope
         } else {
           Logger.log.debug(
@@ -787,8 +806,19 @@ sealed abstract class LengthState(ie: DIElement) {
         }
       } else {
         Logger.log.debug(s"${flavor}gth of ${ie.name} is unknown still. ${toString}")
+        if (isStartRelative && isEndRelative) {
+          // Both start and end are DOS-relative, but not the same DOS,
+          // and the start DOS isn't finished either - so its finishing
+          // is the one remaining fact this is waiting on.
+          registerBlockingDos(
+            maybeStartDataOutputStream.get.asInstanceOf[DirectOrBufferedDataOutputStream]
+          )
+        }
         MaybeULong.Nope
       }
+    }
+    if (computed.isDefined) {
+      clearBlockingDos()
     }
     maybeComputedLengthInBits = computed
     computed
@@ -828,11 +858,13 @@ sealed abstract class LengthState(ie: DIElement) {
     )
     maybeStartPos0bInBits = MaybeULong(absPosInBits0b.longValue)
     maybeStartDataOutputStream = Nope
+    suspensionWaiter.notifySuspensions()
   }
 
   def setRelStartPos0bInBits(relPosInBits0b: ULong, dos: DataOutputStream): Unit = {
     maybeStartPos0bInBits = MaybeULong(relPosInBits0b.longValue)
     maybeStartDataOutputStream = One(dos)
+    suspensionWaiter.notifySuspensions()
   }
 
   def setAbsEndPos0bInBits(absPosInBits0b: ULong): Unit = {
@@ -842,11 +874,13 @@ sealed abstract class LengthState(ie: DIElement) {
     )
     maybeEndPos0bInBits = MaybeULong(absPosInBits0b.longValue)
     maybeEndDataOutputStream = Nope
+    suspensionWaiter.notifySuspensions()
   }
 
   def setRelEndPos0bInBits(relPosInBits0b: ULong, dos: DataOutputStream): Unit = {
     maybeEndPos0bInBits = MaybeULong(relPosInBits0b.longValue)
     maybeEndDataOutputStream = One(dos)
+    suspensionWaiter.notifySuspensions()
   }
 
   /**

@@ -33,35 +33,25 @@ object MStack {
  * catches improper initialization. These were not initializing properly,
  * so the idiom evolved to use the scala initializers.
  */
-final class MStackOfBoolean private ()
-  extends MStack[Boolean]((n: Int) => new Array[Boolean](n), false)
+final class MStackOfBoolean private (initialSize: Int)
+  extends MStack[Boolean]((n: Int) => new Array[Boolean](n), false, initialSize)
 
 object MStackOfBoolean {
-  def apply() = {
-    val stk = new MStackOfBoolean()
-    stk.init()
-    stk
-  }
+  def apply(initialSize: Int = 32) = new MStackOfBoolean(initialSize)
 }
 
-final class MStackOfInt extends MStack[Int]((n: Int) => new Array[Int](n), 0)
+final class MStackOfInt(initialSize: Int)
+  extends MStack[Int]((n: Int) => new Array[Int](n), 0, initialSize)
 
 object MStackOfInt {
-  def apply() = {
-    val stk = new MStackOfInt()
-    stk.init()
-    stk
-  }
+  def apply(initialSize: Int = 32) = new MStackOfInt(initialSize)
 }
 
-final class MStackOfLong extends MStack[Long]((n: Int) => new Array[Long](n), 0L)
+final class MStackOfLong(initialSize: Int)
+  extends MStack[Long]((n: Int) => new Array[Long](n), 0L, initialSize)
 
 object MStackOfLong {
-  def apply() = {
-    val stk = new MStackOfLong()
-    stk.init()
-    stk
-  }
+  def apply(initialSize: Int = 32) = new MStackOfLong(initialSize)
 }
 
 /**
@@ -163,15 +153,15 @@ final class MStackOf[T <: AnyRef](initialSize: Int = 32) extends Serializable {
 
 }
 
-private[util] final class MStackOfAnyRef private ()
-  extends MStack[AnyRef]((n: Int) => new Array[AnyRef](n), null.asInstanceOf[AnyRef])
+private[util] final class MStackOfAnyRef private (initialSize: Int)
+  extends MStack[AnyRef](
+    (n: Int) => new Array[AnyRef](n),
+    null.asInstanceOf[AnyRef],
+    initialSize
+  )
 
 object MStackOfAnyRef {
-  def apply(initialSize: Int = 32) = {
-    val stk = new MStackOfAnyRef()
-    stk.init(initialSize)
-    stk
-  }
+  def apply(initialSize: Int = 32) = new MStackOfAnyRef(initialSize)
 }
 
 /**
@@ -184,21 +174,12 @@ object MStackOfAnyRef {
  */
 protected abstract class MStack[@specialized T] private[util] (
   arrayAllocator: (Int) => Array[T],
-  nullValue: T
+  nullValue: T,
+  initialSize: Int = 32
 ) {
 
   private var index = 0
-  private var table: Array[T] = null
-
-  /**
-   * initialSize lets a caller that knows its element count up front (e.g.
-   * cloning another MStack of known depth, see UState.cloneForSuspension)
-   * avoid the default 32-slot allocation when that's more than needed.
-   */
-  def init(initialSize: Int = 32): Unit = {
-    index = 0
-    table = arrayAllocator(initialSize)
-  }
+  private var table: Array[T] = arrayAllocator(initialSize)
 
   def copyFrom(other: MStack[T]): Unit = {
     this.index = other.index
