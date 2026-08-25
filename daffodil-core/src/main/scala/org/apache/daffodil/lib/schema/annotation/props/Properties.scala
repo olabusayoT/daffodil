@@ -125,8 +125,8 @@ trait EnumValue extends EnumValueBase {
   }
 }
 
-trait EnumValueSimple extends EnumValueBase {
-  override def toString = getNameFromClass(this)
+trait EnumValueLiteral extends EnumValueBase {
+  override lazy val toString = getNameFromClass(this)
 }
 
 /**

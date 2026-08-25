@@ -36,7 +36,7 @@ class PropertyGenerator(arg: Node) {
 
   val dfdlSchema = arg
 
-  val enumSimpleTypes = List(
+  val enumLiteralTypes = List(
     "CalendarFirstDayOfWeek"
   )
 
@@ -77,7 +77,7 @@ class PropertyGenerator(arg: Node) {
   }
 
   def replaceEnumClass(name: String) = {
-    enumSimpleTypes.exists { _.toUpperCase == name.toUpperCase() }
+    enumLiteralTypes.exists { _.toUpperCase == name.toUpperCase() }
   }
 
   def generate() = {
@@ -488,7 +488,7 @@ trait CurrencyMixin extends PropertyMixin {
     val values = pvalueIDs.mkString("  override lazy val values = Array(", ", ", ")\n")
     val start0 = templateStart.replaceAll("Currency", traitName)
     val start = if (replaceEnumClass(traitName)) {
-      start0.replace("EnumValue", "EnumValueSimple")
+      start0.replace("EnumValue", "EnumValueLiteral")
     } else {
       start0
     }
