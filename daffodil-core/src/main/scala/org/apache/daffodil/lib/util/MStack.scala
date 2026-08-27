@@ -24,6 +24,13 @@ import Maybe.*
 object MStack {
   final case class Mark(val v: Int) extends AnyVal
   val nullMark = Mark(0)
+
+  /**
+   * Off by default: growing past initialSize isn't itself wrong, so paying
+   * this bookkeeping cost on every push isn't worth it normally; flip to
+   * true only while profiling to check a use's initialSize choice.
+   */
+  var trackMaxSizeReached: Boolean = false
 }
 
 /**
@@ -110,6 +117,7 @@ final class MStackOfMaybe[T <: AnyRef](initialSize: Int = 32) {
   def toListMaybe = delegate.toList.map { (x: AnyRef) =>
     Maybe(x) // Scala compiler bug without this cast
   }
+  def maxSizeReached = delegate.maxSizeReached
 }
 
 /**
@@ -146,6 +154,7 @@ final class MStackOf[T <: AnyRef](initialSize: Int = 32) extends Serializable {
   @inline final def isEmpty = delegate.isEmpty
   def clear() = delegate.clear()
   def toList = delegate.toList
+  def maxSizeReached = delegate.maxSizeReached
 
   def iterator = delegate.iterator.asInstanceOf[ResettableIterator[T]]
 
@@ -181,6 +190,17 @@ protected abstract class MStack[@specialized T] private[util] (
   private var index = 0
   private var table: Array[T] = arrayAllocator(initialSize)
 
+  private var maxSizeReached_ = 0
+
+  /**
+   * The largest this stack's length has ever grown to, across its
+   * whole lifetime (not just its current length; pops don't reduce
+   * this). Diagnostic only: useful for profiling to check whether a
+   * particular use's initialSize is well-chosen, not for any runtime
+   * decision. Always 0 unless MStack.trackMaxSizeReached is enabled.
+   */
+  final def maxSizeReached: Int = maxSizeReached_
+
   def copyFrom(other: MStack[T]): Unit = {
     this.index = other.index
     if (this.table.length < other.index) {
@@ -197,6 +217,9 @@ protected abstract class MStack[@specialized T] private[util] (
         i += 1
       }
 
+    }
+    if (MStack.trackMaxSizeReached && other.maxSizeReached_ > this.maxSizeReached_) {
+      this.maxSizeReached_ = other.maxSizeReached_
     }
   }
   // private var currentIteratorIndex = -1
@@ -240,6 +263,9 @@ protected abstract class MStack[@specialized T] private[util] (
     if (index == table.length) table = growArray(table)
     table(index) = x
     index += 1
+    if (MStack.trackMaxSizeReached && index > maxSizeReached_) {
+      maxSizeReached_ = index
+    }
   }
 
   /**

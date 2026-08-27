@@ -250,15 +250,8 @@ final class RuntimeExpressionDPath[T <: AnyRef](
       }
       case ve: VariableException =>
         whereBlockedInfo.block(ve.qname, ve.context, 0, ve)
-        // Registers a targeted wake-up for when the variable is set,
-        // alongside the periodic-sweep blocking above.
-        whereBlockedInfo.maybeRegisterWaiterFor(ve)
       case noLength: InfosetLengthUnknownException =>
         whereBlockedInfo.block(noLength.diElement, noLength.erd, 0, noLength)
-        // Registers a targeted wake-up alongside the periodic-sweep
-        // blocking above, and skips this suspension's periodic sweep
-        // until that wake-up fires (Suspension.isWaitingOnWaiter).
-        whereBlockedInfo.maybeRegisterWaiterFor(noLength)
       case th: Throwable => handleThrow(th, state)
     }
     validateType(value, state)

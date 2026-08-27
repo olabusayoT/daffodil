@@ -21,7 +21,6 @@ import java.io.File
 import java.io.OutputStream
 import java.nio.file.Path
 import scala.annotation.tailrec
-import scala.collection.mutable
 
 import org.apache.daffodil.lib.equality.*
 import org.apache.daffodil.lib.exceptions.Assert
@@ -32,6 +31,7 @@ import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.*
 import org.apache.daffodil.lib.util.MaybeULong
 import org.apache.daffodil.lib.util.Misc
+import org.apache.daffodil.runtime1.processors.SuspensionWaiter
 
 import passera.unsigned.ULong
 
@@ -240,9 +240,12 @@ class DirectOrBufferedDataOutputStream private[io] (
    * Two of these are equal if they are eq.
    * This matters because we compare them to see if we are making forward progress
    */
-  override def equals(other: Any): Boolean = AnyRef.equals(other)
+  override def equals(other: Any): Boolean = other match {
+    case that: AnyRef => this.eq(that)
+    case _ => false
+  }
 
-  override def hashCode(): Int = AnyRef.hashCode()
+  override def hashCode(): Int = System.identityHashCode(this)
 
   override def toString: String = {
     lazy val buf = bufferingJOS.getBuf
@@ -510,6 +513,10 @@ class DirectOrBufferedDataOutputStream private[io] (
         // so now the first one is an EMPTY not necessarily a finished buffered DOS
         first.convertToDirect(directStream) // first is now the direct stream
         directStream.setDOSState(Uninitialized) // old direct stream is now dead
+        // Dead, not finished, but its own position/content is just as
+        // permanent. Anyone waiting on this specific DOS via
+        // registerFinishedListener needs to hear about it too.
+        directStream.notifyFinishedListeners()
         directStream = first // long live the new direct stream!
         Logger.log.debug(s"New direct DOS $directStream")
 
@@ -549,6 +556,7 @@ class DirectOrBufferedDataOutputStream private[io] (
             jos.close()
           }
           directStream.setDOSState(Uninitialized) // not just finished. We're dead now.
+          directStream.notifyFinishedListeners()
         } else {
           // the last stream we merged forward into was not finished.
           Assert.invariant(directStream.isActive)
@@ -582,31 +590,28 @@ class DirectOrBufferedDataOutputStream private[io] (
     }
   }
 
-  // Lazily allocated - most DOS instances never have anyone waiting on
-  // their isFinished transition, so this stays unallocated for those.
-  private var maybeFinishedListeners: Maybe[mutable.HashSet[FinishedListener]] = Nope
+  // Registers SuspensionWaiters directly rather than through
+  // DataOutputStreamEventListener: this event only ever has a
+  // SuspensionWaiter as a registrant, so depending on
+  // runtime1.processors.SuspensionWaiter here is an accepted exception.
+  private val finishedListeners = new DataOutputStreamListenerRegistry[SuspensionWaiter](
+    this,
+    (w, _) => w.notifySuspensions()
+  )
 
-  def registerFinishedListener(fl: FinishedListener): Unit = {
-    if (maybeFinishedListeners.isEmpty) {
-      maybeFinishedListeners = One(mutable.HashSet.empty)
-    }
-    maybeFinishedListeners.get.add(fl)
-  }
+  def registerFinishedListener(w: SuspensionWaiter): Unit =
+    finishedListeners.register(w)
 
-  def removeFinishedListener(fl: FinishedListener): Unit = {
-    if (maybeFinishedListeners.isDefined) {
-      maybeFinishedListeners.get.remove(fl)
-    }
-  }
+  def removeFinishedListener(w: SuspensionWaiter): Unit =
+    finishedListeners.remove(w)
 
-  // setFinished() is one-shot per DOS (Assert.usage(!isFinished) at its
-  // top), so there's no need to keep this registration around afterward.
+  // setFinished() is one-shot per DOS, so there's no need to keep this
+  // registration around afterward. Finishing/dying is also the only event
+  // that can resolve a still-Unknown zeroLengthStatus to Zero; querying
+  // the getter forces that check rather than duplicating it here.
   private def notifyFinishedListeners(): Unit = {
-    if (maybeFinishedListeners.isDefined) {
-      val toNotify = maybeFinishedListeners.get.toArray
-      maybeFinishedListeners.get.clear()
-      toNotify.foreach(_.notifyFinished())
-    }
+    finishedListeners.clearAndNotifyAll()
+    val _ = zeroLengthStatus
   }
 
   /**

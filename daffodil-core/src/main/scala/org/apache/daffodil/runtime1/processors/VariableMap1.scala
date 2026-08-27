@@ -103,27 +103,6 @@ class VariableInstance private (val rd: VariableRuntimeData) extends Serializabl
   // either the defaultValue expression or by an external binding
   var firstInstanceInitialValue: DataValuePrimitiveNullable = DataValue.NoValue
 
-  // Suspensions blocked reading this variable before it had a value
-  // (VariableHasNoValue/VariableSuspended), given a real retry once it's
-  // set. A variable is only ever set once, so unlike a length this never
-  // needs a re-verify override - by the time notifySuspensions() is
-  // called below, the value truly is available.
-  //
-  // transient: VariableInstance is part of the compiled schema's
-  // serialized state (saved/reloaded via DataProcessor.save), but a
-  // waiter only ever holds transient in-progress suspensions, never
-  // anything meaningful to persist across a save/reload. A plain var
-  // reinitialized in readObject rather than a lazy val: setVariable and
-  // setDefaultValue read this on every call, and a lazy val's
-  // thread-safe access check would be paid on every one of those even
-  // though a VariableInstance is never shared across threads.
-  @transient var suspensionWaiter: SuspensionWaiter = new SuspensionWaiter
-
-  private def readObject(in: java.io.ObjectInputStream): Unit = {
-    in.defaultReadObject()
-    suspensionWaiter = new SuspensionWaiter
-  }
-
   def setState(s: VariableState): Unit = {
     this.state = s
   }
@@ -139,7 +118,6 @@ class VariableInstance private (val rd: VariableRuntimeData) extends Serializabl
     )
     this.state = VariableDefined
     this.value = v
-    suspensionWaiter.notifySuspensions()
   }
 
   override def toString: String =
@@ -175,7 +153,6 @@ object VariableUtils {
 abstract class VariableException(
   val qname: NamedQName,
   val context: VariableRuntimeData,
-  val variableInstance: VariableInstance,
   msg: String
 ) extends ThinDiagnostic(Maybe(context.schemaFileLocation), Nope, Nope, Maybe(msg)) {
   def isError = true
@@ -183,26 +160,18 @@ abstract class VariableException(
   def modeName = "Variable"
 }
 
-class VariableHasNoValue(
-  qname: NamedQName,
-  context: VariableRuntimeData,
-  variableInstance: VariableInstance
-) extends VariableException(
+class VariableHasNoValue(qname: NamedQName, context: VariableRuntimeData)
+  extends VariableException(
     qname,
     context,
-    variableInstance,
     s"Variable map (runtime): variable $qname has no value. It was not set, and has no default value."
   )
   with RetryableException
 
-class VariableSuspended(
-  qname: NamedQName,
-  context: VariableRuntimeData,
-  variableInstance: VariableInstance
-) extends VariableException(
+class VariableSuspended(qname: NamedQName, context: VariableRuntimeData)
+  extends VariableException(
     qname,
     context,
-    variableInstance,
     s"Variable map (runtime): variable $qname is currently suspended"
   )
   with RetryableException
@@ -212,14 +181,10 @@ class VariableSuspended(
  * expressions in a defineVariable are circular, or later during parsing if
  * newVariableInstance contains a circular expression
  */
-class VariableCircularDefinition(
-  qname: NamedQName,
-  context: VariableRuntimeData,
-  variableInstance: VariableInstance
-) extends VariableException(
+class VariableCircularDefinition(qname: NamedQName, context: VariableRuntimeData)
+  extends VariableException(
     qname,
     context,
-    variableInstance,
     s"Variable map (runtime): variable $qname is part of a circular definition with other variables"
   )
 
@@ -449,10 +414,10 @@ class VariableMap private (
 
         res
       }
-      case VariableBeingDefined => throw new VariableCircularDefinition(varQName, vrd, variable)
-      case VariableInProcess => throw new VariableSuspended(varQName, vrd, variable)
+      case VariableBeingDefined => throw new VariableCircularDefinition(varQName, vrd)
+      case VariableInProcess => throw new VariableSuspended(varQName, vrd)
       case _ =>
-        throw new VariableHasNoValue(varQName, vrd, variable)
+        throw new VariableHasNoValue(varQName, vrd)
     }
   }
 
@@ -494,7 +459,6 @@ class VariableMap private (
 
         variable.setValue(newValue)
         variable.setState(VariableSet)
-        variable.suspensionWaiter.notifySuspensions()
       }
 
       case _ => {
@@ -519,7 +483,6 @@ class VariableMap private (
         }
         variable.setValue(newValue)
         variable.setState(VariableSet)
-        variable.suspensionWaiter.notifySuspensions()
       }
     }
   }

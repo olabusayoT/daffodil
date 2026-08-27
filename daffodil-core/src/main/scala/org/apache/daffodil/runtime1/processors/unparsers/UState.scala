@@ -407,6 +407,11 @@ abstract class UState(
   final val releaseUnneededInfoset: Boolean = !areDebugging && tunable.releaseUnneededInfoset
 
   def delimitedParseResult = Nope
+
+  // UStateMain owns the real one; UStateForSuspension delegates to its
+  // mainUState so that a Suspension can always reach its tracker via
+  // savedUstate, even after it's been cloned off for suspension.
+  def suspensionTracker: SuspensionTracker
 }
 
 /**
@@ -443,6 +448,7 @@ final class UStateForSuspension(
   override def getEncoder(cs: BitsCharset): BitsCharsetEncoder = mainUState.getEncoder(cs)
 
   override def suspensions = mainUState.suspensions
+  override val suspensionTracker = mainUState.suspensionTracker
 
   // override def charBufferDataOutputStream = mainUState.charBufferDataOutputStream
   override def withUnparserDataInputStream = mainUState.withUnparserDataInputStream
@@ -712,10 +718,7 @@ final class UStateMain private (
    * All the other clones used for outputValueCalc, those never
    * need to add any.
    */
-  // private[processors], not private: Suspension.suspend stashes this so
-  // notifyWaiters can hand a suspension back to its tracker instead of
-  // running it directly.
-  private[processors] val suspensionTracker =
+  override val suspensionTracker =
     new SuspensionTracker(tunable.unparseSuspensionWaitYoung, tunable.unparseSuspensionWaitOld)
 
   def addSuspension(se: Suspension): Unit = {

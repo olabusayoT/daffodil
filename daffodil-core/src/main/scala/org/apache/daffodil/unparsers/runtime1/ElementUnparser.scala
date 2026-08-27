@@ -366,11 +366,7 @@ class ElementOVCSpecifiedLengthUnparser(
     computeTargetLength(
       state
     ) // must happen before run() so that we can take advantage of knowing the length
-    // Always try the expression first: whether the specific referenced
-    // occurrence (e.g. an already-finished earlier sibling) is already
-    // resolved is a run-time fact the expression's static shape alone
-    // can't tell us, even when it references valueLength/contentLength.
-    suspendableExpression.run(state)
+    suspendableExpression.run(state) // run the expression. It might or might not have a value.
     super.runContentUnparser(state) // setup unparsing, which will block for no valu
   }
 

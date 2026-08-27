@@ -81,6 +81,10 @@ class TestMStack {
     val sizedDest = new MStackOfMaybe[String](source.length)
     sizedDest.copyFrom(source)
 
+    val defaultDest = new MStackOfMaybe[String]
+    defaultDest.copyFrom(source)
+
+    assertEquals(defaultDest.toListMaybe, sizedDest.toListMaybe)
     assertEquals(3, sizedDest.length)
     assertEquals(One("z"), sizedDest.top)
     assertEquals(One("z"), sizedDest.pop)
@@ -119,6 +123,75 @@ class TestMStack {
     assertEquals(2, stk.length)
     assertEquals(20L, stk.pop())
     assertEquals(10L, stk.pop())
+  }
+
+  /**
+   * maxSizeReached is diagnostic only (for deciding whether a type's
+   * default initialSize is well-chosen), but it must actually track the
+   * high-water mark across pushes/pops, not just the current length.
+   */
+  @Test def testMaxSizeReachedTracksHighWaterMark(): Unit = {
+    val prior = MStack.trackMaxSizeReached
+    MStack.trackMaxSizeReached = true
+    try {
+      val stk = new MStackOf[String]
+      assertEquals(0, stk.maxSizeReached)
+
+      stk.push("a")
+      stk.push("b")
+      stk.push("c")
+      assertEquals(3, stk.maxSizeReached)
+
+      stk.pop
+      stk.pop
+      assertEquals(1, stk.length)
+      assertEquals(
+        "popping must not reduce maxSizeReached - it's a high-water mark, not the current length",
+        3,
+        stk.maxSizeReached
+      )
+
+      stk.push("d")
+      assertEquals(3, stk.maxSizeReached)
+    } finally {
+      MStack.trackMaxSizeReached = prior
+    }
+  }
+
+  /** copyFrom must preserve the source's high-water mark, not just its current contents. */
+  @Test def testMaxSizeReachedPropagatesThroughCopyFrom(): Unit = {
+    val prior = MStack.trackMaxSizeReached
+    MStack.trackMaxSizeReached = true
+    try {
+      val source = new MStackOf[String]
+      source.push("a")
+      source.push("b")
+      source.push("c")
+      source.pop
+      assertEquals(2, source.length)
+      assertEquals(3, source.maxSizeReached)
+
+      val dest = new MStackOf[String]
+      dest.copyFrom(source)
+      assertEquals(2, dest.length)
+      assertEquals(
+        "expected copyFrom to carry over the source's high-water mark, not just its current contents",
+        3,
+        dest.maxSizeReached
+      )
+    } finally {
+      MStack.trackMaxSizeReached = prior
+    }
+  }
+
+  /** Off by default: pushes must not update maxSizeReached unless tracking is explicitly enabled. */
+  @Test def testMaxSizeReachedDisabledByDefault(): Unit = {
+    assertEquals(false, MStack.trackMaxSizeReached)
+    val stk = new MStackOf[String]
+    stk.push("a")
+    stk.push("b")
+    stk.push("c")
+    assertEquals(0, stk.maxSizeReached)
   }
 
   /**
