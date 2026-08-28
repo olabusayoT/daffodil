@@ -17,15 +17,22 @@
 
 package org.apache.daffodil.runtime1.processors
 
+import org.apache.daffodil.lib.util.Maybe
+import org.apache.daffodil.lib.util.Maybe.Nope
+
 /**
  * Mixed into any object a Suspension can register a targeted wake-up
  * against: lazily allocates its SuspensionWaiter, since most instances of
- * any such host are never suspended on, and exposes the notify/clear
- * operations without forcing that allocation just to find it unneeded.
+ * any such host are never suspended on, and exposes the notify/clear/
+ * force-retry operations without forcing that allocation just to find it
+ * unneeded. transient: for a host that is itself Serializable (part of
+ * the compiled schema's saved state, e.g. VariableInstance), none of that
+ * saved state should carry a waiter, which only ever holds transient
+ * in-progress suspensions; harmless on a host that isn't Serializable.
  */
 trait HasSuspensionWaiter {
 
-  private var _suspensionWaiter: SuspensionWaiter = null
+  @transient private var _suspensionWaiter: SuspensionWaiter = null
 
   def suspensionWaiter: SuspensionWaiter = {
     if (_suspensionWaiter eq null) {
@@ -34,15 +41,23 @@ trait HasSuspensionWaiter {
     _suspensionWaiter
   }
 
-  protected def notifySuspensionWaiterIfAllocated(): Unit = {
+  protected def notifySuspensionWaiterIfAllocated(
+    changedSubTarget: Maybe[AnyRef] = Nope
+  ): Unit = {
     if (_suspensionWaiter ne null) {
-      _suspensionWaiter.notifySuspensions()
+      _suspensionWaiter.notifySuspensions(changedSubTarget)
     }
   }
 
   protected def clearSuspensionWaiterIfAllocated(): Unit = {
     if (_suspensionWaiter ne null) {
       _suspensionWaiter.clear()
+    }
+  }
+
+  protected def forceRetryAllSuspensionsIfAllocated(): Unit = {
+    if (_suspensionWaiter ne null) {
+      _suspensionWaiter.forceRetryAll()
     }
   }
 }

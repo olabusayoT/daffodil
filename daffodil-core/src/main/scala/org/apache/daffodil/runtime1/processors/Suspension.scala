@@ -27,7 +27,14 @@ import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.*
 import org.apache.daffodil.lib.util.MaybeInt
 import org.apache.daffodil.lib.util.MaybeULong
+import org.apache.daffodil.runtime1.infoset.DISimple
+import org.apache.daffodil.runtime1.infoset.InfosetArrayIndexOutOfBoundsException
 import org.apache.daffodil.runtime1.infoset.InfosetLengthUnknownException
+import org.apache.daffodil.runtime1.infoset.InfosetNoNextSiblingException
+import org.apache.daffodil.runtime1.infoset.InfosetNoSuchChildElementException
+import org.apache.daffodil.runtime1.infoset.InfosetNodeNotFinalException
+import org.apache.daffodil.runtime1.infoset.OutputValueCalcEvaluationException
+import org.apache.daffodil.runtime1.infoset.RetryableException
 import org.apache.daffodil.runtime1.processors.unparsers.UState
 import org.apache.daffodil.runtime1.processors.unparsers.UStateMain
 import org.apache.daffodil.runtime1.processors.unparsers.UnparseError
@@ -297,6 +304,14 @@ trait Suspension extends Serializable with DataOutputStreamEventListener {
   // correctly set.
   private var maybeRegisteredWaiter: Maybe[SuspensionWaiter] = Nope
 
+  // For a maybeRegisterWaiterFor case whose condition depends on more
+  // than just the waiter's identity (a specific child name or array
+  // index sharing one DIComplex/DIArray's waiter with other possible
+  // targets): the specific sub-target that must also match for a
+  // re-block to count as already correctly registered, Nope when the
+  // waiter identity alone is enough.
+  private var maybeRegisteredSubTarget: Maybe[AnyRef] = Nope
+
   // Tracks this suspension's direct registrations against DataOutputStreams
   // for one of their facts settling into its final value; not a shared
   // per-element waiter like maybeRegisteredWaiter. Each suspension may be
@@ -363,10 +378,14 @@ trait Suspension extends Serializable with DataOutputStreamEventListener {
   final def isParked: Boolean =
     maybeRegisteredWaiter.isDefined || ((_dosListeners ne null) && _dosListeners.nonEmpty)
 
-  final def registerWaiter(w: SuspensionWaiter, cond: () => Boolean = () => true): Unit = {
+  final def registerWaiter(
+    w: SuspensionWaiter,
+    cond: () => Boolean = () => true,
+    subTarget: Maybe[AnyRef] = Nope
+  ): Unit = {
     Assert.invariant(maybeRegisteredWaiter.isEmpty)
     maybeRegisteredWaiter = One(w)
-    w.registerSuspension(this, cond)
+    w.registerSuspension(this, cond, subTarget)
   }
 
   // DataOutputStreamEventListener's callback: some registered fact about
@@ -386,50 +405,115 @@ trait Suspension extends Serializable with DataOutputStreamEventListener {
     maybeRegisteredWaiter = Nope
   }
 
+  private def isAlreadyRegisteredOn(
+    waiter: SuspensionWaiter,
+    subTarget: Maybe[AnyRef]
+  ): Boolean =
+    maybeRegisteredWaiter.isDefined &&
+      (maybeRegisteredWaiter.get eq waiter) &&
+      (maybeRegisteredSubTarget == subTarget)
+
+  private def reregister(
+    waiter: SuspensionWaiter,
+    subTarget: Maybe[AnyRef],
+    cond: () => Boolean
+  ): Unit = {
+    clearAllRegistrations()
+    registerWaiter(waiter, cond, subTarget)
+    maybeRegisteredSubTarget = subTarget
+  }
+
   /**
-   * Registers a targeted wake-up for exc: a re-block on the same
-   * target as the current registration is left untouched. Anything but
-   * InfosetLengthUnknownException has no target to compare against, so
-   * it always clears then re-registers (a no-op absent a prior one).
+   * Registers a targeted wake-up for exc: a re-block on the same target
+   * as the current registration is left untouched, for every exception
+   * type below, since each one's condition closes over a stable
+   * underlying object (the LengthState/VariableInstance/element/array),
+   * not the exception instance itself, so an unchanged target implies an
+   * unchanged condition too. Each case checks that cheaply before
+   * building its condition closure, since a re-block on the same target
+   * is the common case.
    */
   private def maybeRegisterWaiterFor(exc: AnyRef): Unit = {
-    val neededWaiter: Maybe[SuspensionWaiter] = exc match {
-      case noLength: InfosetLengthUnknownException => One(noLength.lengthState.suspensionWaiter)
-      case _ => Nope
-    }
-
-    val alreadyOnNeededWaiter =
-      maybeRegisteredWaiter.isDefined && neededWaiter.isDefined &&
-        (maybeRegisteredWaiter.get eq neededWaiter.get)
-
-    if (!alreadyOnNeededWaiter) {
-      // Switching waiters, or no targeted wake-up for this reason: drop
-      // the stale registration and any dosListeners with it.
-      if (maybeRegisteredWaiter.isDefined) {
-        maybeRegisteredWaiter.get.removeSuspension(this)
-        maybeRegisteredWaiter = Nope
-      }
-      if (_dosListeners ne null) {
-        _dosListeners.clear()
-      }
-    }
-
     exc match {
       case noLength: InfosetLengthUnknownException =>
-        if (!alreadyOnNeededWaiter) {
-          val w = neededWaiter.get
-          maybeRegisteredWaiter = One(w)
-          w.registerSuspension(this, () => noLength.lengthState.maybeLengthInBits().isDefined)
-        }
-        // When already registered, its condition closure still reads
-        // the same unchanged lengthState. May also be blocked on
-        // specific DOSs' absolute positions; registerFor is idempotent
-        // and the DOS target set only shrinks, so leave one alone here.
+        val waiter = noLength.lengthState.suspensionWaiter
+        if (!isAlreadyRegisteredOn(waiter, Nope))
+          reregister(waiter, Nope, () => noLength.lengthState.maybeLengthInBits().isDefined)
+      // VariableCircularDefinition deliberately excluded: its own
+      // evaluation never completes, so nothing will ever notify its
+      // suspensionWaiter; registering here would permanently park this
+      // suspension instead of letting the periodic sweep keep retrying it.
+      case noVar: HasVariableInstance with RetryableException =>
+        val variableInstance = noVar.variableInstance
+        val waiter = variableInstance.suspensionWaiter
+        if (!isAlreadyRegisteredOn(waiter, Nope))
+          reregister(waiter, Nope, () => variableInstance.value.isDefined)
+      case ovc: OutputValueCalcEvaluationException =>
+        // dfdl:outputValueCalc is only ever valid on a simple-type element,
+        // so this cast is safe.
+        val e = ovc.diElement.asInstanceOf[DISimple]
+        val waiter = e.suspensionWaiter
+        if (!isAlreadyRegisteredOn(waiter, Nope))
+          reregister(waiter, Nope, () => e.hasValue || e.isNilled)
+      case unfin: InfosetNodeNotFinalException =>
+        val node = unfin.node
+        val waiter = node.suspensionWaiter
+        if (!isAlreadyRegisteredOn(waiter, Nope))
+          reregister(waiter, Nope, () => node.isFinal)
+      case noChild: InfosetNoSuchChildElementException =>
+        // diComplex's waiter is shared by whatever other child name a
+        // different retry of this same suspension might have blocked on
+        // before, so nqn must also match for the old registration to
+        // still be the right one.
+        val diComplex = noChild.diComplex
+        val nqn = noChild.nqn
+        val waiter = diComplex.suspensionWaiter
+        val subTarget: Maybe[AnyRef] = One(nqn)
+        if (!isAlreadyRegisteredOn(waiter, subTarget))
+          reregister(waiter, subTarget, () => diComplex.hasNamedChild(nqn))
+      case noSibling: InfosetNoNextSiblingException =>
+        // If diSimple is an array occurrence, another occurrence being
+        // appended to that same array is what resolves this the common
+        // way, and only the array's own waiter is notified for that;
+        // parent's waiter would only fire for a scalar child, or if the
+        // parent itself later gains a child after diSimple's array.
+        val diSimple = noSibling.diSimple
+        val parent = diSimple.diParent
+        val maybeArray = diSimple.maybeArray
+        val waiter =
+          if (maybeArray.isDefined) maybeArray.get.suspensionWaiter
+          else parent.suspensionWaiter
+        val subTarget: Maybe[AnyRef] = One(diSimple)
+        if (!isAlreadyRegisteredOn(waiter, subTarget))
+          reregister(waiter, subTarget, () => parent.hasNextSibling(diSimple))
+      case noIndex: InfosetArrayIndexOutOfBoundsException =>
+        // The index is available once length reaches it, not only once
+        // length exceeds it. diArray's waiter is shared by whatever other
+        // index a different retry of this same suspension might have
+        // blocked on before, so index must also match.
+        val diArray = noIndex.diArray
+        val index = noIndex.index
+        val waiter = diArray.suspensionWaiter
+        val subTarget: Maybe[AnyRef] = One(java.lang.Long.valueOf(index))
+        if (!isAlreadyRegisteredOn(waiter, subTarget))
+          reregister(waiter, subTarget, () => diArray.length >= index)
+      case _ =>
+        // no targeted wake-up available for any other blocking reason
+        clearAllRegistrations()
+        maybeRegisteredSubTarget = Nope
+    }
+
+    // May also be blocked on specific DOSs' absolute positions. registerFor
+    // is idempotent per-DOS, so this runs unconditionally rather than only
+    // when the waiter changed: a stale extra registration is harmless,
+    // since the condition re-verifies on notify either way.
+    exc match {
+      case noLength: InfosetLengthUnknownException =>
         val absBitPosDoses = noLength.lengthState.maybeAbsBitPosDoses
         if (absBitPosDoses.nonEmpty) {
           absBitPosDoses.foreach(dosListeners.registerFor)
         }
-      case _ => // no targeted wake-up available for any other blocking reason
+      case _ =>
     }
   }
 

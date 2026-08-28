@@ -198,6 +198,11 @@ class SimpleTypeRetryUnparserSuspendableOperation(
     state.currentInfosetNode.asSimple.hasValue
   }
 
+  override protected def maybeRegisterWaiterOnBlock(ustate: UState): Unit = {
+    val e = ustate.currentInfosetNode.asSimple
+    registerWaiter(e.suspensionWaiter, () => e.hasValue)
+  }
+
   protected def continuation(state: UState): Unit = {
     vUnparser.unparse1(state)
   }
@@ -338,6 +343,11 @@ class TargetLengthOperation(
     ) // can we successfully evaluate without blocking (blocking would throw)
     true
   }
+
+  // test() either succeeds or throws, and never returns false, so this
+  // non-exceptional path is never actually reached.
+  override protected def maybeRegisterWaiterOnBlock(ustate: UState): Unit =
+    Assert.invariantFailed("test() never returns false; block() should not run")
 
   override def continuation(state: UState): Unit = {
     // once we have evaluated the targetLengthEv, nothing else to do
@@ -742,6 +752,13 @@ class NilLiteralCharacterUnparserSuspendableOperation(
       val isNilled = e.isNilled
       isNilled
     }
+
+  // test() blocks on isNilled here, not on valueLength, so registers
+  // against the element's own suspensionWaiter.
+  override protected def maybeRegisterWaiterOnBlock(ustate: UState): Unit = {
+    val e = ustate.currentInfosetNode.asSimple
+    registerWaiter(e.suspensionWaiter, () => e.isNilled)
+  }
 
   override protected def getSkipBits(ustate: UState): Long = {
     val mtl = targetLengthEv.evaluate(ustate)

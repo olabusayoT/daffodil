@@ -112,6 +112,10 @@ final class RegionSplitSuspendableOperation(override val rd: TermRuntimeData)
     }
   }
 
+  // Blocks unconditionally once, not on any external condition, so there's
+  // nothing to register a targeted wake-up against.
+  override protected def maybeRegisterWaiterOnBlock(ustate: UState): Unit = ()
+
   override def continuation(ustate: UState): Unit = {
     // do nothing.
     //

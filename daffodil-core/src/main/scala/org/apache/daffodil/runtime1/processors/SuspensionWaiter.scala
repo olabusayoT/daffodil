@@ -19,6 +19,18 @@ package org.apache.daffodil.runtime1.processors
 
 import scala.collection.mutable
 
+import org.apache.daffodil.lib.util.Maybe
+import org.apache.daffodil.lib.util.Maybe.*
+
+// A single overflow registrant. Mutable so re-registering the same
+// suspension (the common re-block case) updates cond/subTarget in
+// place instead of removing and reinserting.
+private[processors] final class SuspensionWaiterRegistration(
+  val suspension: Suspension,
+  var cond: () => Boolean,
+  var subTarget: AnyRef
+)
+
 /**
  * Tracks suspensions parked waiting on some state change that might make
  * them resolvable (a LengthState's length becoming known, a variable
@@ -31,56 +43,93 @@ import scala.collection.mutable
  * registration carries its own condition, re-verified here before that
  * one registrant is woken; the default (registerSuspension's cond
  * defaults to always-true) wakes unconditionally, correct when every
- * registrant on a waiter wants the same already-resolved fact.
+ * registrant on a waiter wants the same already-resolved fact. A
+ * registration may also carry a sub-target identifying the specific
+ * child name or array index its condition depends on, letting a notify
+ * that itself names the sub-target that just changed
+ * (notifySuspensions(changedSubTarget)) skip re-verifying any registrant
+ * whose own sub-target provably can't be the one that changed.
  */
 class SuspensionWaiter {
 
   // A given waiter (one per LengthState/variable instance) overwhelmingly
   // has at most one registrant across its whole lifetime, held directly
-  // here with no Map at all. overflow is allocated only for a second,
-  // distinct registrant, and stays allocated even if it later shrinks
-  // back to one, since this waiter's own lifetime is already bounded.
+  // here with no collection at all. overflow is allocated only for a
+  // second, distinct registrant, and stays allocated even if it later
+  // shrinks back to one, since this waiter's own lifetime is already
+  // bounded. overflow is a linear-scan buffer rather than a hash map:
+  // profiling asterix_cat48 found that of the waiters that ever grow
+  // past the sole slot, almost none ever gain a third registrant, so a
+  // hash table's own entry-object overhead buys nothing here.
+  //
+  // A registrant's sub-target is stored as a raw, possibly-null AnyRef
+  // (via Maybe's own orNull/apply round-trip) rather than as a
+  // Maybe[AnyRef]: a Maybe value stored as a field of a non-value class
+  // needs an actual boxed instance, unlike a Maybe held directly in a
+  // local or a top-level var - confirmed via allocation profiling on
+  // asterix_cat48, where this was a measurable share of
+  // registerSuspension's own allocation.
   private var soleSuspension: Suspension = null
   private var soleCond: () => Boolean = null
-  private var overflow: mutable.LinkedHashMap[Suspension, () => Boolean] = null
+  private var soleSubTarget: AnyRef = null
+  private var overflow: mutable.ArrayBuffer[SuspensionWaiterRegistration] = null
 
   private[processors] def registerSuspension(
     s: Suspension,
-    cond: () => Boolean = () => true
+    cond: () => Boolean = () => true,
+    subTarget: Maybe[AnyRef] = Nope
   ): Unit = {
+    val rawSubTarget = subTarget.orNull
     if (overflow ne null) {
-      overflow.put(s, cond)
+      val idx = overflow.indexWhere(_.suspension eq s)
+      if (idx >= 0) {
+        // Re-registering an existing overflow registrant is a plain
+        // field update, no allocation - same rationale as the sole-slot
+        // update case below.
+        val reg = overflow(idx)
+        reg.cond = cond
+        reg.subTarget = rawSubTarget
+      } else {
+        overflow += new SuspensionWaiterRegistration(s, cond, rawSubTarget)
+      }
     } else if (soleSuspension eq null) {
       soleSuspension = s
       soleCond = cond
+      soleSubTarget = rawSubTarget
     } else if (soleSuspension eq s) {
       // Re-registering the suspension already holding the sole slot is a
       // plain field update, no allocation; this is what makes a caller
       // that calls registerWaiter unconditionally on every retry (e.g.
       // SuspendableOperation's maybeRegisterWaiterOnBlock) cheap here.
       soleCond = cond
+      soleSubTarget = rawSubTarget
     } else {
-      // A second, distinct registrant: promote to the map, preserving
+      // A second, distinct registrant: promote to overflow, preserving
       // insertion order (the sole registrant was registered first).
-      overflow = mutable.LinkedHashMap.empty
-      overflow.put(soleSuspension, soleCond)
-      overflow.put(s, cond)
+      overflow = new mutable.ArrayBuffer[SuspensionWaiterRegistration](2)
+      overflow += new SuspensionWaiterRegistration(soleSuspension, soleCond, soleSubTarget)
+      overflow += new SuspensionWaiterRegistration(s, cond, rawSubTarget)
       soleSuspension = null
       soleCond = null
+      soleSubTarget = null
     }
   }
 
   private[processors] def removeSuspension(s: Suspension): Unit = {
     if (overflow ne null) {
-      overflow.remove(s)
+      val idx = overflow.indexWhere(_.suspension eq s)
+      if (idx >= 0) {
+        overflow.remove(idx)
+      }
     } else if (soleSuspension eq s) {
       soleSuspension = null
       soleCond = null
+      soleSubTarget = null
     }
   }
 
   def isRegisteredSuspension(s: Suspension): Boolean =
-    if (overflow ne null) overflow.contains(s)
+    if (overflow ne null) overflow.exists(_.suspension eq s)
     else soleSuspension eq s
 
   def isEmpty: Boolean =
@@ -92,48 +141,72 @@ class SuspensionWaiter {
   // so none is left believing it still has a wake-up armed here.
   def clear(): Unit = {
     if (overflow ne null) {
-      overflow.keysIterator.foreach(_.clearRegisteredWaiter())
+      overflow.foreach(_.suspension.clearRegisteredWaiter())
       overflow.clear()
     } else if (soleSuspension ne null) {
       soleSuspension.clearRegisteredWaiter()
       soleSuspension = null
       soleCond = null
+      soleSubTarget = null
     }
   }
+
+  // A registrant with no sub-target of its own can't be ruled out by a
+  // sub-target-specific notify (it isn't tracking any particular
+  // sub-target); such a notify can only rule out a registrant whose own
+  // sub-target is both present and different from the one that changed.
+  private def subTargetMightMatch(
+    registrantSubTarget: AnyRef,
+    changedSubTarget: Maybe[AnyRef]
+  ): Boolean =
+    (registrantSubTarget eq null) || changedSubTarget.isEmpty ||
+      (registrantSubTarget == changedSubTarget.get)
 
   // Hands every registrant whose own condition now holds to its tracker
   // (Suspension.moveFromParkedToYoung) for a real attempt; one whose
   // condition doesn't hold yet stays registered for a later notify. A
   // done suspension is dropped either way: it's already resolved.
-  def notifySuspensions(): Unit = {
-    // Once allocated, overflow stays allocated even after every
-    // registrant resolves, so the nonEmpty check guards every later
-    // notify on a waiter that's done suspending for good from paying
-    // for nothing.
+  // changedSubTarget, when given, identifies the specific sub-target this
+  // notify is about; a registrant tracking a different sub-target can't
+  // have just become ready, so its condition isn't even evaluated.
+  def notifySuspensions(changedSubTarget: Maybe[AnyRef] = Nope): Unit = {
     if ((overflow ne null) && overflow.nonEmpty) {
       // Materialized fully before any removal below: moveFromParkedToYoung
-      // can reach back into this same map's register/removeSuspension,
+      // can reach back into this same buffer's register/removeSuspension,
       // so mutating overflow while still iterating a live view over it
       // isn't safe.
-      val handled = overflow.iterator.collect {
-        case (s, cond) if s.isDone || cond() => s
-      }.toList
-      handled.foreach(overflow.remove)
-      handled.foreach { s =>
-        if (!s.isDone) {
-          s.moveFromParkedToYoung()
+      val handled = new mutable.ArrayBuffer[Suspension](overflow.size)
+      var i = 0
+      while (i < overflow.length) {
+        val reg = overflow(i)
+        if (
+          reg.suspension.isDone || (subTargetMightMatch(reg.subTarget, changedSubTarget)
+            && reg.cond())
+        ) {
+          handled += reg.suspension
+        }
+        i += 1
+      }
+      if (handled.nonEmpty) {
+        overflow.filterInPlace(reg => !handled.exists(_ eq reg.suspension))
+        handled.foreach { s =>
+          if (!s.isDone) {
+            s.moveFromParkedToYoung()
+          }
         }
       }
     } else if (soleSuspension ne null) {
       val s = soleSuspension
       val cond = soleCond
+      val subTarget = soleSubTarget
       // s.isDone || cond() can reenter this same notifySuspensions() call
       // before this line returns (e.g. cond() migrates a position that
       // notifies this same waiter); moveFromParkedToYoung's own
       // !isParked guard makes the resulting duplicate call a no-op.
-      if (s.isDone || cond()) {
+      if (s.isDone || (subTargetMightMatch(subTarget, changedSubTarget) && cond())) {
         soleSuspension = null
         soleCond = null
+        soleSubTarget = null
         if (!s.isDone) {
           s.moveFromParkedToYoung()
         }
@@ -147,7 +220,7 @@ class SuspensionWaiter {
   // whatever's current instead of waiting forever on a stale one.
   def forceRetryAll(): Unit = {
     if ((overflow ne null) && overflow.nonEmpty) {
-      val toRetry = overflow.keysIterator.toList
+      val toRetry = overflow.map(_.suspension)
       overflow.clear()
       toRetry.foreach { s =>
         if (!s.isDone) {
@@ -158,6 +231,7 @@ class SuspensionWaiter {
       val s = soleSuspension
       soleSuspension = null
       soleCond = null
+      soleSubTarget = null
       if (!s.isDone) {
         s.moveFromParkedToYoung()
       }

@@ -182,7 +182,8 @@ class TestDirectOrBufferedDataOutputStream {
 
     var notified = false
     val waiter = new SuspensionWaiter {
-      override def notifySuspensions(): Unit = notified = true
+      override def notifySuspensions(changedSubTarget: Maybe[AnyRef] = Maybe.Nope): Unit =
+        notified = true
     }
     layered.registerFinishedListener(waiter)
 
@@ -210,7 +211,8 @@ class TestDirectOrBufferedDataOutputStream {
 
     var notified = false
     val waiter = new SuspensionWaiter {
-      override def notifySuspensions(): Unit = notified = true
+      override def notifySuspensions(changedSubTarget: Maybe[AnyRef] = Maybe.Nope): Unit =
+        notified = true
     }
     layered.registerFinishedListener(waiter)
 

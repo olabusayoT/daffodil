@@ -94,7 +94,9 @@ object VariableInstance {
 /**
  * See documentation for object VariableInstance
  */
-class VariableInstance private (val rd: VariableRuntimeData) extends Serializable {
+class VariableInstance private (val rd: VariableRuntimeData)
+  extends Serializable
+  with HasSuspensionWaiter {
 
   var state: VariableState = VariableUndefined
   var value: DataValuePrimitiveNullable = DataValue.NoValue
@@ -103,12 +105,23 @@ class VariableInstance private (val rd: VariableRuntimeData) extends Serializabl
   // either the defaultValue expression or by an external binding
   var firstInstanceInitialValue: DataValuePrimitiveNullable = DataValue.NoValue
 
+  // For when this instance is about to become permanently unreachable:
+  // a plain notify can't wake a registrant whose condition checks this
+  // specific instance's value, which will never change again. A real
+  // retry instead re-resolves and re-registers against whatever's live.
+  private[processors] def forceRetryAllIfAllocated(): Unit =
+    forceRetryAllSuspensionsIfAllocated()
+
   def setState(s: VariableState): Unit = {
     this.state = s
   }
 
+  // Single choke point for every value assignment on a live instance, so
+  // nothing can forget to notify a suspension blocked reading this
+  // variable.
   def setValue(v: DataValuePrimitiveNullable): Unit = {
     this.value = v
+    notifySuspensionWaiterIfAllocated()
   }
 
   /* This is used to set a default value with the appropriate state */
@@ -117,12 +130,20 @@ class VariableInstance private (val rd: VariableRuntimeData) extends Serializabl
       (this.state == VariableUndefined || this.state == VariableInProcess) && v.isDefined
     )
     this.state = VariableDefined
-    this.value = v
+    setValue(v)
   }
 
   override def toString: String =
     s"VariableInstance($state,$value,$rd,${rd.maybeDefaultValueExpr})"
 
+  // A full, deep copy: firstInstanceInitialValue carries over so a
+  // dfdl:newVariableInstance still inherits it post-copy. The copy gets its
+  // own (initially unallocated) suspensionWaiter rather than sharing the
+  // original's: a suspension's registered condition closure always closes
+  // over the specific VariableInstance it blocked on, so nothing is ever
+  // looking for a wake-up through the copy, and sharing would let a value
+  // set on one object silently notify a registrant that reads the other,
+  // still-unchanged object.
   def copy(
     state: VariableState = state,
     value: DataValuePrimitiveNullable = value,
@@ -131,6 +152,7 @@ class VariableInstance private (val rd: VariableRuntimeData) extends Serializabl
     val inst = new VariableInstance(rd)
     inst.state = state
     inst.value = value
+    inst.firstInstanceInitialValue = firstInstanceInitialValue
     inst
   }
 
@@ -160,29 +182,50 @@ abstract class VariableException(
   def modeName = "Variable"
 }
 
-class VariableHasNoValue(qname: NamedQName, context: VariableRuntimeData)
-  extends VariableException(
+/**
+ * Mixed into the two VariableException subtypes whose blocking condition
+ * is specific to one VariableInstance (Suspension.maybeRegisterWaiterFor
+ * registers a targeted wake-up against it). VariableCircularDefinition
+ * doesn't mix this in: its own evaluation never completes, so there's no
+ * instance whose eventual value would ever resolve it.
+ */
+trait HasVariableInstance {
+  def variableInstance: VariableInstance
+}
+
+class VariableHasNoValue(
+  qname: NamedQName,
+  context: VariableRuntimeData,
+  val variableInstance: VariableInstance
+) extends VariableException(
     qname,
     context,
     s"Variable map (runtime): variable $qname has no value. It was not set, and has no default value."
   )
   with RetryableException
+  with HasVariableInstance
 
-class VariableSuspended(qname: NamedQName, context: VariableRuntimeData)
-  extends VariableException(
+class VariableSuspended(
+  qname: NamedQName,
+  context: VariableRuntimeData,
+  val variableInstance: VariableInstance
+) extends VariableException(
     qname,
     context,
     s"Variable map (runtime): variable $qname is currently suspended"
   )
   with RetryableException
+  with HasVariableInstance
 
 /**
  * This expression can be thrown either at the start of parsing is the
  * expressions in a defineVariable are circular, or later during parsing if
  * newVariableInstance contains a circular expression
  */
-class VariableCircularDefinition(qname: NamedQName, context: VariableRuntimeData)
-  extends VariableException(
+class VariableCircularDefinition(
+  qname: NamedQName,
+  context: VariableRuntimeData
+) extends VariableException(
     qname,
     context,
     s"Variable map (runtime): variable $qname is part of a circular definition with other variables"
@@ -415,9 +458,9 @@ class VariableMap private (
         res
       }
       case VariableBeingDefined => throw new VariableCircularDefinition(varQName, vrd)
-      case VariableInProcess => throw new VariableSuspended(varQName, vrd)
+      case VariableInProcess => throw new VariableSuspended(varQName, vrd, variable)
       case _ =>
-        throw new VariableHasNoValue(varQName, vrd)
+        throw new VariableHasNoValue(varQName, vrd, variable)
     }
   }
 
@@ -492,8 +535,10 @@ class VariableMap private (
    */
   def newVariableInstance(vrd: VariableRuntimeData): VariableInstance = {
     val variableInstances = vTable(vrd.vmapIndex)
+    val shadowed = variableInstances.head
     val nvi = vrd.createVariableInstance()
-    nvi.firstInstanceInitialValue = variableInstances.head.firstInstanceInitialValue
+    nvi.firstInstanceInitialValue = shadowed.firstInstanceInitialValue
+    shadowed.forceRetryAllIfAllocated()
     vTable(vrd.vmapIndex) = nvi +: variableInstances
     nvi
   }
@@ -501,7 +546,9 @@ class VariableMap private (
   def removeVariableInstance(vrd: VariableRuntimeData): Unit = {
     val variableInstances = vTable(vrd.vmapIndex)
     Assert.invariant(variableInstances.nonEmpty)
+    val removed = variableInstances.head
     vTable(vrd.vmapIndex) = variableInstances.tail
+    removed.forceRetryAllIfAllocated()
   }
 
   /**

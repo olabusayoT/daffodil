@@ -39,6 +39,7 @@ import org.apache.daffodil.runtime1.processors.ParseOrUnparseState
 import org.apache.daffodil.runtime1.processors.ProcessingError
 import org.apache.daffodil.runtime1.processors.VariableException
 import org.apache.daffodil.runtime1.processors.VariableHasNoValue
+import org.apache.daffodil.runtime1.processors.VariableInstance
 import org.apache.daffodil.runtime1.processors.VariableRuntimeData
 
 class CompiledDPath(val ops: Array[RecipeOp]) extends Serializable {
@@ -204,8 +205,13 @@ abstract class RecipeOpWithSubRecipes(recipes: List[CompiledDPath]) extends Reci
 case class VRef(vrd: VariableRuntimeData, context: ThrowsSDE) extends RecipeOp {
 
   override def run(dstate: DState): Unit = {
-    if (dstate.parseOrUnparseState.isEmpty)
-      throw new VariableHasNoValue(vrd.globalQName, vrd)
+    if (dstate.parseOrUnparseState.isEmpty) {
+      // No live parse/unparse state here (only true during schema-compile
+      // time constant folding), so there's no real VariableInstance to
+      // look up; a fresh, disconnected one is harmless since nothing ever
+      // attaches a wake-up to it in that case.
+      throw new VariableHasNoValue(vrd.globalQName, vrd, VariableInstance(vrd))
+    }
     val value = dstate.parseOrUnparseState.get.getVariable(vrd, context)
     dstate.setCurrentValue(value)
   }

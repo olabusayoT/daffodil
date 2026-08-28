@@ -83,7 +83,7 @@ import org.apache.daffodil.runtime1.processors.parsers.PState
 import com.ibm.icu.util.Calendar
 import passera.unsigned.ULong
 
-sealed trait DINode {
+sealed trait DINode extends HasSuspensionWaiter {
 
   def diParent: DINode
 
@@ -141,6 +141,33 @@ sealed trait DINode {
   def numChildren: Int
 
   /**
+   * True if item, a direct child or an occurrence inside a direct DIArray
+   * child, is followed by another child of this node. indexOf(item) alone
+   * can't answer this for an array occurrence, since it only searches this
+   * node's own children collection, which holds the array itself, not each
+   * of its individual occurrences. item must actually be a child of this
+   * node, directly or via one of its DIArray children; violating that is
+   * a caller bug, not a case this returns a value for.
+   */
+  final def hasNextSibling(item: DIElement): Boolean = {
+    val direct = indexOf(item)
+    if (direct >= 0) {
+      direct < numChildren - 1
+    } else {
+      // freeChildIfNoLongerNeeded only nulls an array slot when its erd
+      // is !isReferencedByExpressions, but a suspension calling this at
+      // all means some expression does reference item, so the slot
+      // holding it can never have been freed out from under it.
+      val arr = item.maybeArray
+      Assert.invariant(arr.isDefined) // see item's requirement above
+      val array = arr.get
+      val arrayPos = indexOf(array)
+      Assert.invariant(arrayPos >= 0)
+      (array.indexOf(item) < array.numChildren - 1) || (arrayPos < numChildren - 1)
+    }
+  }
+
+  /**
    * If there are any children, returns the last child as a One(lastChild).
    * Otherwise returns Nope. Note that because Daffodil may set children to
    * null when it determines they are no longer needed, and One(null) is not
@@ -178,17 +205,15 @@ sealed trait DINode {
   private var _isFinal: Boolean = false
 
   /**
-  * Use to mark a node as final, indicating that its value will not change or have
-  * any children added to it. Setting an element as final does not preclude it from
-  * being discarded by backtracking, i.e. it is only locally final, but might still
-  * be inside an enclosing PoU.
-  *
-  * This cannot be called if an element is already marked as final to help ensure
-  * correct use.
+  * Marks a node as final: its value won't change or gain children. Only
+  * locally final; a PoU restore can still discard it. PoU restore/capture
+  * bypasses this method's own notify by writing _isFinal directly, safe
+  * today only because that path is parse-only.
    */
   def setFinal(): Unit = {
     Assert.invariant(!_isFinal)
     _isFinal = true
+    notifySuspensionWaiterIfAllocated()
   }
 
   def isFinal: Boolean = _isFinal
@@ -482,7 +507,7 @@ case class InfosetMultipleScalarError(val erd: ElementRuntimeData)
  */
 final class FakeDINode extends DISimple(null) {
   override def dataValue: DataValuePrimitiveNullable = _value
-  override def setDataValue(s: DataValuePrimitiveNullable): Unit = { _value = s }
+  override def setDataValue(s: DataValuePrimitiveNullable): Unit = setValueField(s)
   override def dataValueAsString: String = _value.toString
   // $COVERAGE-OFF$
   private def die = throw new InfosetNoInfosetException(Nope)
@@ -1276,6 +1301,7 @@ sealed trait DIElement
   def setNilled(): Unit = {
     Assert.invariant(erd.isNillable && !isFinal)
     _isNilled = true
+    notifySuspensionWaiterIfAllocated()
   }
 
   /**
@@ -1403,6 +1429,9 @@ final class DIArray(
     Assert.invariant(!isFinal)
     _contents += ie
     ie.setArray(this)
+    // A waiter blocked on a specific index can become satisfiable right
+    // here, well before the array is final.
+    notifySuspensionWaiterIfAllocated()
   }
 
   def concat(array: DIArray): Unit = {
@@ -1449,7 +1478,10 @@ final class DIArray(
  * This should be caught in contexts that want to undertake on-demand
  * evaluation of the OVC expression.
  */
-case class OutputValueCalcEvaluationException(cause: Exception) extends ThinException(cause)
+case class OutputValueCalcEvaluationException(cause: InfosetNoDataExceptionBase)
+  extends ThinException(cause) {
+  def diElement: DIElement = cause.diElement
+}
 
 sealed class DISimple(override val erd: ElementRuntimeData)
   extends DIElement
@@ -1537,7 +1569,7 @@ sealed class DISimple(override val erd: ElementRuntimeData)
         if (nodeKind.isInstanceOf[NodeInfo.String.Kind]) {
           // the value is a string, and the type of the node is string.
           // so we set the value and stringRep to the same thing.
-          _value = x
+          setValueField(x)
           _stringRep = xs
         } else {
           //
@@ -1566,7 +1598,7 @@ sealed class DISimple(override val erd: ElementRuntimeData)
         //
         _stringRep = null
         _bdRep = null
-        _value = x.getAnyRef match {
+        setValueField(x.getAnyRef match {
           case dc: DFDLCalendar => dc
           case arb: Array[Byte] => arb
           case b: JBoolean => b
@@ -1580,7 +1612,7 @@ sealed class DISimple(override val erd: ElementRuntimeData)
             Assert.invariantFailed(
               "Unsupported type. %s of type %s.".format(x, Misc.getNameFromClass(x))
             )
-        }
+        })
       }
     }
     _isDefaulted = false
@@ -1612,42 +1644,56 @@ sealed class DISimple(override val erd: ElementRuntimeData)
 
   def hasValue: Boolean = !_isNilled && _value.isDefined
 
+  // Single choke point for every _value assignment that can transition
+  // hasValue from false to true, so nothing can forget to notify a
+  // suspension waiting on hasValue.
+  protected def setValueField(v: DataValuePrimitiveNullable): Unit = {
+    val wasKnown = hasValue
+    _value = v
+    if (!wasKnown && hasValue) {
+      notifySuspensionWaiterIfAllocated()
+    }
+  }
+
+  // Applies erd's default value, if it has one: nilling for
+  // UseNilForDefault, or setting _value otherwise. Returns whether a
+  // default was applied.
+  private def applyDefaultValue(): Boolean = {
+    erd.optDefaultValue.isDefined && {
+      val defaultVal = erd.optDefaultValue
+      if (defaultVal == DataValue.UseNilForDefault) {
+        this.setNilled()
+      } else {
+        setValueField(defaultVal.getNullablePrimitive)
+      }
+      _isDefaulted = true
+      true
+    }
+  }
+
   /**
    * Obtain the data value. Implements default
    * values, and outputValueCalc for unparsing.
    */
   def dataValue: DataValuePrimitiveNullable = {
-    if (_value.isEmpty)
-      if (erd.optDefaultValue.isDefined) {
-        val defaultVal = erd.optDefaultValue
-        if (defaultVal == DataValue.UseNilForDefault) {
-          this.setNilled()
-        } else {
-          _value = defaultVal.getNullablePrimitive
-        }
-        _isDefaulted = true
-      } else {
-        erd.toss(new InfosetNoDataException(this, erd))
-      }
+    if (_value.isEmpty && !applyDefaultValue()) {
+      erd.toss(new InfosetNoDataException(this, erd))
+    }
     if (_value.isEmpty) {
       this.erd.schemaDefinitionError("Value has not been set.")
     }
     _value.getNonNullable
   }
 
+  // A UseNilForDefault default leaves _value at NoValue (setNilled sets
+  // only _isNilled), so this returns NoValue for that case too, the same
+  // as when there's no default at all; a caller needing to tell "nilled
+  // via default" apart from "genuinely has no value" must check isNilled
+  // itself, since this method's return type can't carry that distinction.
   final def maybeDataValue: DataValuePrimitiveNullable = {
-    val mv =
-      if (_value.isDefined)
-        _value
-      else if (erd.optDefaultValue.isDefined) {
-        val defaultVal = erd.optDefaultValue
-        _value = defaultVal.getNullablePrimitive
-        _isDefaulted = true
-        _value
-      } else {
-        DataValue.NoValue
-      }
-    mv
+    if (_value.isDefined) _value
+    else if (applyDefaultValue()) _value
+    else DataValue.NoValue
   }
 
   def dataValueAsString: JString = {
@@ -2032,6 +2078,13 @@ sealed class DIComplex(override val erd: ElementRuntimeData)
         addChildToFastLookup(ia)
         childNodes += ia
         _numChildren = childNodes.length
+        // A new named child slot was added; the trailing append below
+        // only grows the array's own contents, not childNodes or
+        // nameToChildNodeLookup, so it doesn't need this notify too.
+        // e's own name is the one that just became findable, so a
+        // suspension blocked on any other name can't have just been
+        // resolved by this.
+        notifySuspensionWaiterIfAllocated(One(e.namedQName))
       }
       // Array is now always last, add the new child to it
       childNodes.last.asInstanceOf[DIArray].append(e)
@@ -2039,6 +2092,7 @@ sealed class DIComplex(override val erd: ElementRuntimeData)
       addChildToFastLookup(e.asInstanceOf[DINode])
       childNodes += e.asInstanceOf[DINode]
       _numChildren = childNodes.length
+      notifySuspensionWaiterIfAllocated(One(e.namedQName))
     }
     e.setParent(this)
   }
@@ -2060,6 +2114,11 @@ sealed class DIComplex(override val erd: ElementRuntimeData)
   def findChild(qname: NamedQName, tunable: DaffodilTunables): Maybe[DINode] = {
     findChild(qname, tunable.allowExternalPathExpressions)
   }
+
+  // Cheap existence check for a targeted wake-up condition: never falls
+  // back to a linear search, since this may be re-evaluated on every
+  // notify.
+  final def hasNamedChild(nqn: NamedQName): Boolean = nameToChildNodeLookup.containsKey(nqn)
 
   /**
    * Find a child, using the preferred hash lookup, with an optional

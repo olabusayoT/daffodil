@@ -56,12 +56,11 @@ trait SuspendableOperation extends Suspension {
 
   /**
    * Registers a targeted wake-up for the non-exceptional blocking path
-   * (test() returning false, rather than throwing). No-op by default;
-   * override when this operation's test() blocks on a specific, known
-   * SuspensionWaiter or DataOutputStream rather than on a
-   * RetryableException.
+   * (test() returning false, rather than throwing); a no-op override
+   * when there's no such target. Abstract, not a no-op default, so a
+   * new subtype must consciously decide rather than silently inherit it.
    */
-  protected def maybeRegisterWaiterOnBlock(ustate: UState): Unit = ()
+  protected def maybeRegisterWaiterOnBlock(ustate: UState): Unit
 
   override protected final def doTask(ustate: UState): Unit = {
     if (isBlocked) {
