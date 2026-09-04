@@ -227,6 +227,41 @@ final class PState private (
    */
   val pointsOfUncertainty = new MStackOf[PState.Mark]()
 
+  /**
+   * Counts calls to resetToPointOfUncertainty, i.e. how many times a
+   * speculative parse has been backed out after failing without resolving
+   * its point of uncertainty. Lets a net-zero-bits result that genuinely
+   * found nothing be told apart from one reached only by discarding content.
+   */
+  var pointOfUncertaintyResetCount: Long = 0
+
+  private val pointOfUncertaintyResetCountMarks = MStackOfLong()
+
+  /**
+   * Push a mark capturing pointOfUncertaintyResetCount, to be paired with a
+   * later popPointOfUncertaintyResetCountMark call. Marks nest correctly
+   * across recursive sequence child parses, unlike a single shared snapshot.
+   */
+  def pushPointOfUncertaintyResetCountMark(): Unit = {
+    pointOfUncertaintyResetCountMarks.push(pointOfUncertaintyResetCount)
+  }
+
+  /**
+   * Set by popPointOfUncertaintyResetCountMark; valid only until the next
+   * push/pop call, so read it immediately after popping.
+   */
+  var hadPointOfUncertaintyResetSinceMark: Boolean = false
+
+  /**
+   * Pop the mark pushed by pushPointOfUncertaintyResetCountMark and record,
+   * in hadPointOfUncertaintyResetSinceMark, whether any point of uncertainty
+   * was reset since that mark was pushed.
+   */
+  def popPointOfUncertaintyResetCountMark(): Unit = {
+    val mark = pointOfUncertaintyResetCountMarks.pop()
+    hadPointOfUncertaintyResetSinceMark = pointOfUncertaintyResetCount != mark
+  }
+
   override def dataStream = One(dataInputStream)
 
   def saveDelimitedParseResult(result: Maybe[dfa.ParseResult]): Unit = {
@@ -429,7 +464,14 @@ final class PState private (
     Assert.usage(!isPointOfUncertaintyResolved(pou))
     val pouPop = pointsOfUncertainty.pop
     Assert.invariant(pou == pouPop)
+    // A reset here doesn't always mean real content was backed out. A nested
+    // choice's discriminator can resolve only its own inner PoU, leaving an
+    // outer, still-unresolved PoU to be reset here too even though nothing
+    // beyond it ever advanced the bit position; only count resets that
+    // actually undo bit position movement.
+    val hadRealProgress = bitPos0b != pouPop.bitPos0b
     reset(pouPop)
+    if (hadRealProgress) pointOfUncertaintyResetCount += 1
   }
 
   /**

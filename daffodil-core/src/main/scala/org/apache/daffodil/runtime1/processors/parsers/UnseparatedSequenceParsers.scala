@@ -30,7 +30,9 @@ trait Unseparated { self: SequenceChildParser =>
     requiredOptional: RequiredOptionalStatus
   ): ParseAttemptStatus = {
     val prevBitPosBeforeChild = pstate.bitPos0b
+    pstate.pushPointOfUncertaintyResetCountMark()
     self.childParser.parse1(pstate)
+    pstate.popPointOfUncertaintyResetCountMark()
     val res = parseResultHelper.computeParseAttemptStatus(
       self,
       prevBitPosBeforeChild,

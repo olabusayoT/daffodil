@@ -146,10 +146,12 @@ trait InfixPrefixSeparatorHelperMixin { self: SeparatorParseHelper =>
         SeparatorParseStatus.SeparatorNotNeeded
 
     val prevBitPosBeforeChild = pstate.bitPos0b
+    pstate.pushPointOfUncertaintyResetCountMark()
 
     sepStatus match {
       case _: SeparatorParseStatus.SeparatorSuccess => {
         childParser.parse1(pstate)
+        pstate.popPointOfUncertaintyResetCountMark()
         val pas =
           scParser.parseResultHelper.computeParseAttemptStatus(
             scParser,
@@ -160,6 +162,7 @@ trait InfixPrefixSeparatorHelperMixin { self: SeparatorParseHelper =>
         pas
       }
       case _ => {
+        pstate.popPointOfUncertaintyResetCountMark()
         requiredOptional match {
           case _: RequiredOptionalStatus.Required => {
             failedSeparator(pstate, kind)
@@ -193,9 +196,11 @@ final class PostfixSeparatorHelper(
   ): ParseAttemptStatus = {
 
     val prevBitPosBeforeChild = pstate.bitPos0b
+    pstate.pushPointOfUncertaintyResetCountMark()
 
     pstate.withPointOfUncertainty("PostfixSeparatorHelper", childParser.context) { pou =>
       childParser.parse1(pstate)
+      pstate.popPointOfUncertaintyResetCountMark()
       val childSuccessful = pstate.processorStatus eq Success
       val childFailure = !childSuccessful // just makes later logic easier to read
       val bitPosAfterChildAttempt = pstate.bitPos0b
