@@ -112,6 +112,13 @@ class SuspensionTracker(suspensionWaitYoung: Int, suspensionWaitOld: Int) {
     }
     evaluatingParked = true
     try {
+      // A parked suspension can resolve out-of-band (neither its own
+      // registered wake-up nor this method's own retry), leaving it done
+      // but still a member here; prune those first; feeding one to
+      // evalSuspensionQueue would trip its never-already-done invariant.
+      val alreadyDone = suspensionsParked.filter(_.isDone)
+      suspensionsParked --= alreadyDone
+
       val toRetry = new Queue[Suspension]
       toRetry ++= suspensionsParked
       // Suspensions that resolve during this pass, collected via
