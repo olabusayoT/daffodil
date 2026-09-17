@@ -155,6 +155,7 @@ trait InfixPrefixSeparatorHelperMixin { self: SeparatorParseHelper =>
         SeparatorParseStatus.SeparatorNotNeeded
 
     val prevBitPosBeforeChild = pstate.bitPos0b
+    val separatorWasFound = sepStatus eq SeparatorParseStatus.SeparatorFound
 
     sepStatus match {
       case _: SeparatorParseStatus.SeparatorSuccess => {
@@ -164,10 +165,25 @@ trait InfixPrefixSeparatorHelperMixin { self: SeparatorParseHelper =>
             scParser,
             prevBitPosBeforeChild,
             pstate,
-            requiredOptional
+            requiredOptional,
+            separatorWasFound
           )
-        pstate.lastSeparatorWasFound = sepStatus eq SeparatorParseStatus.SeparatorFound
-        pas
+        val anotherSeparatorFollows = pstate.probeNonDestructively(sep)
+        pas match {
+          case ParseAttemptStatus.AbsentRep
+              if pstate.isFailure && 
+                separatorWasFound &&
+                (scParser.parseResultHelper.separatedSequenceChildBehavior eq
+                  SeparatedSequenceChildBehavior.NonPositional) &&
+                !anotherSeparatorFollows =>
+              // Only for NonPositional (anyEmpty): a failed, zero-length
+              // attempt whose separator isn't followed by another one isn't
+              // a genuine zero-length occurrence of this item; release it
+              // (via the usual MissingItem backtrack) for the next item to
+              // claim instead.
+              ParseAttemptStatus.MissingItem
+          case _ => pas
+        }
       }
       case _ => {
         requiredOptional match {
@@ -176,7 +192,6 @@ trait InfixPrefixSeparatorHelperMixin { self: SeparatorParseHelper =>
           }
           case _ => // No action
         }
-        pstate.lastSeparatorWasFound = false
         scParser.parseResultHelper.computeFailedSeparatorParseAttemptStatus(
           scParser,
           prevBitPosBeforeChild,
@@ -222,13 +237,13 @@ final class PostfixSeparatorHelper(
             scParser,
             prevBitPosBeforeChild,
             pstate,
-            requiredOptional
+            requiredOptional,
+            separatorWasFound = false // separator not parsed yet at this point
           )
         sep.parse1(pstate)
         if (pstate.processorStatus eq Success) {
           // we got the postfix sep after successful parse of the data item
           // so whatever the status of the item was, that's the status overall.
-          pstate.lastSeparatorWasFound = true
           dataOnlyRep
         } else {
           // child successful, but
@@ -244,7 +259,6 @@ final class PostfixSeparatorHelper(
 
           pstate.setFailed(failure.cause)
           failedSeparator(pstate, "postfix")
-          pstate.lastSeparatorWasFound = false
           prh.computeFailedSeparatorParseAttemptStatus(
             scParser,
             prevBitPosBeforeChild,
@@ -287,7 +301,8 @@ final class PostfixSeparatorHelper(
                 scParser,
                 prevBitPosBeforeChild,
                 pstate,
-                requiredOptional
+                requiredOptional,
+                separatorWasFound = true
               )
             val res = pas match {
               case AbsentRep => {
@@ -296,13 +311,11 @@ final class PostfixSeparatorHelper(
               }
               case _ => pas
             }
-            pstate.lastSeparatorWasFound = true
             res
           } else {
             // the separator failed on ZL data
             // so no chance on a ZL representation here.
             val isZL = false
-            pstate.lastSeparatorWasFound = false
             prh.computeFailedSeparatorParseAttemptStatus(
               scParser,
               prevBitPosBeforeChild,
@@ -317,13 +330,13 @@ final class PostfixSeparatorHelper(
           // (ex: the child could be failing because it is fixed length, with asserts that check the value
           // that fail.)
           val isZL = false
-          pstate.lastSeparatorWasFound = false
           prh.computeFailedParseAttemptStatus(
             scParser,
             prevBitPosBeforeChild,
             pstate,
             isZL,
-            requiredOptional
+            requiredOptional,
+            separatorWasFound = false
           )
         }
       }
