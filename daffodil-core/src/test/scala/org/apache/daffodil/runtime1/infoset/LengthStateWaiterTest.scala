@@ -17,7 +17,7 @@
 
 package org.apache.daffodil.runtime1.infoset
 
-import org.apache.daffodil.core.compiler.Compiler
+import org.apache.daffodil.core.util.TestUtils
 import org.apache.daffodil.io.DirectOrBufferedDataOutputStream
 import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.MaybeULong
@@ -62,9 +62,7 @@ class LengthStateWaiterTest {
       </xs:element>,
       elementFormDefault = "unqualified"
     )
-    val pf = Compiler().compileNode(sch)
-    assertFalse(pf.getDiagnostics.toString, pf.isError)
-    pf.onPath("/").asInstanceOf[DataProcessor]
+    TestUtils.compileSchema(sch)
   }
 
   @Test def testDeregistersFromPriorLengthStateOnShift(): Unit = {
@@ -342,7 +340,7 @@ class LengthStateWaiterTest {
     // Resolving only dosA's absolute position (directly, with no
     // Suspension actually registered to be notified: LengthState
     // itself never listens for this event, only a Suspension that
-    // registered via dosListeners would) isn't enough by
+    // registered via registeredDoses would) isn't enough by
     // itself to compute the length. A subsequent retry (standing in
     // for the real one a properly-registered Suspension's notification
     // would trigger) must find it still unresolved, and re-register,

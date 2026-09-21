@@ -123,7 +123,7 @@ trait Suspension extends Serializable with DataOutputStreamEventListener {
       //
       // As written, we have a bunch of suspensions that occur, but have
       // specifically known length of zero bits. So nothing being written out.
-      // In that case, why do we need to split at all?
+      // TODO: In that case, why do we need to split at all?
       //
       val original = ustate.getDataOutputStream
       if (mkl.isEmpty || (mkl.isDefined && mkl.get > 0)) {
@@ -331,37 +331,37 @@ trait Suspension extends Serializable with DataOutputStreamEventListener {
   // registerWaiter alone, or before ever blocking on a DOS fact) never
   // register a DOS listener, so building this and its two closures for
   // every suspension would be wasted work.
-  private var _dosListeners: DosRegistrations = null
+  private var _registeredDoses: DosRegistrations = null
 
-  final def dosListeners: DosRegistrations = {
-    if (_dosListeners eq null) {
-      _dosListeners = new DosRegistrations(_.registerListener(this), _.removeListener(this))
+  final def registeredDoses: DosRegistrations = {
+    if (_registeredDoses eq null) {
+      _registeredDoses = new DosRegistrations(_.registerListener(this), _.removeListener(this))
     }
-    _dosListeners
+    _registeredDoses
   }
 
   // Deregisters from the SuspensionWaiter (if any) and every DOS
   // registration, without resolving or moving this suspension. Checks
-  // the backing field directly, not the dosListeners accessor, so a
+  // the backing field directly, not the registeredDoses accessor, so a
   // suspension that's never needed one doesn't force the allocation.
   private[processors] def clearAllRegistrations(): Unit = {
     if (maybeRegisteredWaiter.isDefined) {
       maybeRegisteredWaiter.get.removeSuspension(this)
       maybeRegisteredWaiter = Nope
     }
-    if (_dosListeners ne null) {
-      _dosListeners.clear()
+    if (_registeredDoses ne null) {
+      _registeredDoses.clear()
     }
   }
 
   /**
    * True exactly when a targeted wake-up is registered against some
-   * SuspensionWaiter (registerWaiter) or DataOutputStream (dosListeners).
+   * SuspensionWaiter (registerWaiter) or DataOutputStream (registeredDoses).
    * SuspensionTracker parks a suspension with this true instead of
    * attempting it.
    */
   final def isParked: Boolean =
-    maybeRegisteredWaiter.isDefined || ((_dosListeners ne null) && _dosListeners.nonEmpty)
+    maybeRegisteredWaiter.isDefined || ((_registeredDoses ne null) && _registeredDoses.nonEmpty)
 
   final def registerWaiter(w: SuspensionWaiter, cond: () => Boolean = () => true): Unit = {
     Assert.invariant(maybeRegisteredWaiter.isEmpty)
@@ -370,7 +370,7 @@ trait Suspension extends Serializable with DataOutputStreamEventListener {
   }
 
   // DataOutputStreamEventListener's callback: some registered fact about
-  // dos (via dosListeners) is now known, so this suspension is worth a
+  // dos (via registeredDoses) is now known, so this suspension is worth a
   // real attempt again.
   final def notifyKnown(dos: DataOutputStream): Unit = {
     if (!isDone) {
@@ -404,13 +404,13 @@ trait Suspension extends Serializable with DataOutputStreamEventListener {
 
     if (!alreadyOnNeededWaiter) {
       // Switching waiters, or no targeted wake-up for this reason: drop
-      // the stale registration and any dosListeners with it.
+      // the stale registration and any registeredDoses with it.
       if (maybeRegisteredWaiter.isDefined) {
         maybeRegisteredWaiter.get.removeSuspension(this)
         maybeRegisteredWaiter = Nope
       }
-      if (_dosListeners ne null) {
-        _dosListeners.clear()
+      if (_registeredDoses ne null) {
+        _registeredDoses.clear()
       }
     }
 
@@ -427,7 +427,7 @@ trait Suspension extends Serializable with DataOutputStreamEventListener {
         // and the DOS target set only shrinks, so leave one alone here.
         val absBitPosDoses = noLength.lengthState.maybeAbsBitPosDoses
         if (absBitPosDoses.nonEmpty) {
-          absBitPosDoses.foreach(dosListeners.registerFor)
+          absBitPosDoses.foreach(registeredDoses.registerFor)
         }
       case _ => // no targeted wake-up available for any other blocking reason
     }
@@ -436,9 +436,6 @@ trait Suspension extends Serializable with DataOutputStreamEventListener {
   final def block(nodeOrVar: AnyRef, info: AnyRef, index: Long, exc: AnyRef): Unit = {
     Logger.log.debug(s"blocking ${this} due to ${exc}")
 
-    // maybeRegisterWaiterFor, below, reconciles the registration
-    // against what this block needs, touching nothing when a re-block
-    // on the same reason is already correctly registered.
     Assert.usage(nodeOrVar ne null)
     Assert.usage(info ne null)
     Assert.usage(exc ne null)

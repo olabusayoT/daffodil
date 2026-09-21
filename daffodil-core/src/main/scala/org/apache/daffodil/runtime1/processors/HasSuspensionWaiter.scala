@@ -34,13 +34,15 @@ trait HasSuspensionWaiter {
     _suspensionWaiter
   }
 
-  protected def notifySuspensionWaiterIfAllocated(): Unit = {
+  /** No-op when nothing has ever called suspensionWaiter to allocate one. */
+  protected def notifySuspensionWaiter(): Unit = {
     if (_suspensionWaiter ne null) {
       _suspensionWaiter.notifySuspensions()
     }
   }
 
-  protected def clearSuspensionWaiterIfAllocated(): Unit = {
+  /** No-op when nothing has ever called suspensionWaiter to allocate one. */
+  protected def clearSuspensionWaiter(): Unit = {
     if (_suspensionWaiter ne null) {
       _suspensionWaiter.clear()
     }

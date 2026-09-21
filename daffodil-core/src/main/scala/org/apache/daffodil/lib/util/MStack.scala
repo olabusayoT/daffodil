@@ -27,10 +27,9 @@ object MStack {
 
   /**
    * Off by default: growing past initialSize isn't itself wrong, so paying
-   * this bookkeeping cost on every push isn't worth it normally; flip to
-   * true only while profiling to check a use's initialSize choice.
+   * this bookkeeping cost on every push isn't worth it normally.
    */
-  var trackMaxSizeReached: Boolean = false
+  final val trackMaxSizeReached: Boolean = false
 }
 
 /**

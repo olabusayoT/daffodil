@@ -579,7 +579,7 @@ sealed abstract class LengthState(ie: DIElement) extends HasSuspensionWaiter {
     suspensionWaiter.isRegisteredSuspension(s)
 
   // The DOSs (if any) whose finishing (or dying) might make this length
-  // computable: one for each unresolved start/end/middle-of-chain fact.
+  // computable: one for each unresolved start/end fact.
   private var registeredFinishedDoses: Set[DirectOrBufferedDataOutputStream] = Set.empty
 
   // Diffs against the current registrations rather than blindly
@@ -606,7 +606,7 @@ sealed abstract class LengthState(ie: DIElement) extends HasSuspensionWaiter {
     this.maybeEndDataOutputStream = other.maybeEndDataOutputStream
     this.maybeEndPos0bInBits = other.maybeEndPos0bInBits
     this.maybeComputedLengthInBits = other.maybeComputedLengthInBits
-    this.clearSuspensionWaiterIfAllocated()
+    this.clearSuspensionWaiter()
     this.setFinishedRegistrations(Set.empty)
     this.registeredAbsBitPosDoses = Set.empty
   }
@@ -617,7 +617,7 @@ sealed abstract class LengthState(ie: DIElement) extends HasSuspensionWaiter {
     maybeEndDataOutputStream = Nope
     maybeEndPos0bInBits = MaybeULong.Nope
     maybeComputedLengthInBits = MaybeULong.Nope
-    clearSuspensionWaiterIfAllocated()
+    clearSuspensionWaiter()
     setFinishedRegistrations(Set.empty)
     registeredAbsBitPosDoses = Set.empty
   }
@@ -649,7 +649,7 @@ sealed abstract class LengthState(ie: DIElement) extends HasSuspensionWaiter {
         // A DOS resolving its own absolute position is a separate trigger
         // from the setters below; this migration can make the length
         // computable with no setter ever having been called.
-        notifySuspensionWaiterIfAllocated()
+        notifySuspensionWaiter()
       }
     }
     if (maybeEndDataOutputStream.isDefined) {
@@ -664,7 +664,7 @@ sealed abstract class LengthState(ie: DIElement) extends HasSuspensionWaiter {
         Logger.log.debug(s"${flavor}gth for ${ie.name} new absolute end pos: ${newEndBitPos0b}")
         this.maybeEndDataOutputStream = Nope
         this.maybeEndPos0bInBits = MaybeULong(newEndBitPos0b.longValue)
-        notifySuspensionWaiterIfAllocated()
+        notifySuspensionWaiter()
       }
     }
   }
@@ -716,10 +716,6 @@ sealed abstract class LengthState(ie: DIElement) extends HasSuspensionWaiter {
    */
   def maybeLengthInBits(): MaybeULong = {
     recheckStreams()
-    // Set by the chain-walk branch below when it finds a specific
-    // middle-of-chain DOS still unresolved, for the broad-registration
-    // step after this block to include alongside start/end.
-    var maybeMiddleDos: Maybe[DirectOrBufferedDataOutputStream] = Nope
     val computed: MaybeULong = {
       if (maybeComputedLengthInBits.isDefined) {
         val len = maybeComputedLengthInBits.get
@@ -784,7 +780,6 @@ sealed abstract class LengthState(ie: DIElement) extends HasSuspensionWaiter {
           Logger.log.debug(
             s"${flavor}gth of ${ie.name} is unknown due to unfinished output stream. ${toString}"
           )
-          maybeMiddleDos = One(dos)
           MaybeULong.Nope
         } else {
           Logger.log.debug(
@@ -805,25 +800,22 @@ sealed abstract class LengthState(ie: DIElement) extends HasSuspensionWaiter {
       // one to trust: resolution can come via any of several independent
       // paths, and notifySuspensions()'s own re-verify (maybeLengthInBits
       // above) makes a registration that turns out unnecessary harmless.
-      var finishedTargets = Set.empty[DirectOrBufferedDataOutputStream]
-      var absBitPosTargets = Set.empty[DataOutputStream]
+      // Both the finished and abs-bit-pos registrations always target the
+      // same DOS set (start/end), so one set covers both.
+      var targets = Set.empty[DirectOrBufferedDataOutputStream]
       if (isStartRelative) {
-        val dos = maybeStartDataOutputStream.get.asInstanceOf[DirectOrBufferedDataOutputStream]
-        finishedTargets = finishedTargets + dos
-        absBitPosTargets = absBitPosTargets + dos
+        targets = targets + maybeStartDataOutputStream.get
+          .asInstanceOf[DirectOrBufferedDataOutputStream]
       }
       if (isEndRelative) {
-        val dos = maybeEndDataOutputStream.get.asInstanceOf[DirectOrBufferedDataOutputStream]
-        finishedTargets = finishedTargets + dos
-        absBitPosTargets = absBitPosTargets + dos
+        targets = targets + maybeEndDataOutputStream.get
+          .asInstanceOf[DirectOrBufferedDataOutputStream]
       }
-      // A middle-of-chain DOS only needs to finish; its own absolute
-      // position isn't used by the chain-walk calculation.
-      if (maybeMiddleDos.isDefined) {
-        finishedTargets = finishedTargets + maybeMiddleDos.get
-      }
-      setFinishedRegistrations(finishedTargets)
-      registeredAbsBitPosDoses = absBitPosTargets
+      setFinishedRegistrations(targets)
+      // Set is invariant, so widen explicitly: registeredAbsBitPosDoses is
+      // typed Set[DataOutputStream], while targets is the narrower concrete
+      // type setFinishedRegistrations itself requires.
+      registeredAbsBitPosDoses = targets.toSet[DataOutputStream]
     }
     maybeComputedLengthInBits = computed
     computed
@@ -863,13 +855,13 @@ sealed abstract class LengthState(ie: DIElement) extends HasSuspensionWaiter {
     )
     maybeStartPos0bInBits = MaybeULong(absPosInBits0b.longValue)
     maybeStartDataOutputStream = Nope
-    notifySuspensionWaiterIfAllocated()
+    notifySuspensionWaiter()
   }
 
   def setRelStartPos0bInBits(relPosInBits0b: ULong, dos: DataOutputStream): Unit = {
     maybeStartPos0bInBits = MaybeULong(relPosInBits0b.longValue)
     maybeStartDataOutputStream = One(dos)
-    notifySuspensionWaiterIfAllocated()
+    notifySuspensionWaiter()
   }
 
   def setAbsEndPos0bInBits(absPosInBits0b: ULong): Unit = {
@@ -879,13 +871,13 @@ sealed abstract class LengthState(ie: DIElement) extends HasSuspensionWaiter {
     )
     maybeEndPos0bInBits = MaybeULong(absPosInBits0b.longValue)
     maybeEndDataOutputStream = Nope
-    notifySuspensionWaiterIfAllocated()
+    notifySuspensionWaiter()
   }
 
   def setRelEndPos0bInBits(relPosInBits0b: ULong, dos: DataOutputStream): Unit = {
     maybeEndPos0bInBits = MaybeULong(relPosInBits0b.longValue)
     maybeEndDataOutputStream = One(dos)
-    notifySuspensionWaiterIfAllocated()
+    notifySuspensionWaiter()
   }
 
   /**

@@ -381,10 +381,10 @@ sealed trait NeedValueAndTargetLengthMixin { self: SuspendableOperation =>
     )
     // May also be blocked on one or more DOSs' absolute positions, not
     // just suspensionWaiter's usual triggers. Guarded on nonEmpty so the
-    // common no-such-DOS case doesn't force dosListeners' lazy allocation.
+    // common no-such-DOS case doesn't force registeredDoses' lazy allocation.
     val absBitPosDoses = e.valueLength.maybeAbsBitPosDoses
     if (absBitPosDoses.nonEmpty) {
-      absBitPosDoses.foreach(dosListeners.registerFor)
+      absBitPosDoses.foreach(registeredDoses.registerFor)
     }
   }
 
@@ -578,7 +578,7 @@ class ChoiceUnusedUnparserSuspendableOperation(
   // Unknown; once it's decided either way, test() always returns true.
   override protected def maybeRegisterWaiterOnBlock(ustate: UState): Unit = {
     if (maybeDOSStart.isDefined) {
-      dosToCheck_.foreach(dosListeners.registerFor)
+      dosToCheck_.foreach(registeredDoses.registerFor)
     }
   }
 
@@ -967,10 +967,10 @@ class PrefixLengthSuspendableOperation(
     )
     // May also be blocked on one or more DOSs' absolute positions, not
     // just suspensionWaiter's usual triggers. Guarded on nonEmpty so the
-    // common no-such-DOS case doesn't force dosListeners' lazy allocation.
+    // common no-such-DOS case doesn't force registeredDoses' lazy allocation.
     val absBitPosDoses = elem.contentLength.maybeAbsBitPosDoses
     if (absBitPosDoses.nonEmpty) {
-      absBitPosDoses.foreach(dosListeners.registerFor)
+      absBitPosDoses.foreach(registeredDoses.registerFor)
     }
   }
 

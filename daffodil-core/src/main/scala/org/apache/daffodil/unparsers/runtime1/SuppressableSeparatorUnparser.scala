@@ -167,7 +167,7 @@ final class SuppressableSeparatorUnparserSuspendableOperation(
     zlStatus_ match {
       case ZeroLengthStatus.Unknown =>
         if (maybeDOSAfterSeparatorRegion.isDefined) {
-          dosToCheck_.foreach(dosListeners.registerFor)
+          dosToCheck_.foreach(registeredDoses.registerFor)
         }
       case ZeroLengthStatus.NonZero =>
         super.maybeRegisterWaiterOnBlock(ustate)

@@ -50,7 +50,7 @@ trait AlignmentFillUnparserSuspendableMixin { this: SuspendableOperation =>
   }
 
   override def maybeRegisterWaiterOnBlock(ustate: UState): Unit = {
-    dosListeners.registerFor(ustate.getDataOutputStream)
+    registeredDoses.registerFor(ustate.getDataOutputStream)
   }
 
   def continuation(state: UState): Unit = {

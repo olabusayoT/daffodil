@@ -17,15 +17,10 @@
 
 package org.apache.daffodil.core.outputValueCalc
 
-import java.nio.channels.Channels
-
-import org.apache.daffodil.core.compiler.Compiler
+import org.apache.daffodil.core.util.TestUtils
 import org.apache.daffodil.lib.util.SchemaUtils
 import org.apache.daffodil.lib.xml.XMLUtils
-import org.apache.daffodil.runtime1.infoset.ScalaXMLInfosetInputter
-import org.apache.daffodil.runtime1.processors.DataProcessor
 
-import org.junit.Assert.*
 import org.junit.Test
 
 /**
@@ -111,36 +106,21 @@ class TestOutputValueCalcParkedSuspensionRetry {
     </ex:root>
   }
 
-  private def compile(tunables: Map[String, String]): DataProcessor = {
-    val compiler = Compiler().withTunables(tunables)
-    val pf = compiler.compileNode(schema)
-    if (pf.isError) fail(pf.getDiagnostics.toString)
-    val dp = pf.onPath("/").asInstanceOf[DataProcessor]
-    if (dp.isError) fail(dp.getDiagnostics.toString)
-    dp
+  // Every len field is a fixed-length "data" element (8 bytes), so all
+  // four should compute to 8 regardless of which record they target.
+  private def expectedOutput = {
+    val header = "   8   8   8   8"
+    val records = (1 to N).map(i => f"T$i%03d" + f"data$i%04d").mkString
+    header + records
   }
 
   @Test def testManyForceRetryCyclesResolveCorrectly(): Unit = {
-    val dp = compile(
-      Map("unparseSuspensionWaitOld" -> "1", "unparseSuspensionWaitYoung" -> "1")
+    TestUtils.testUnparsing(
+      schema,
+      infoset,
+      expectedOutput,
+      tunables = Map("unparseSuspensionWaitOld" -> "1", "unparseSuspensionWaitYoung" -> "1")
     )
-
-    val outputStream = new java.io.ByteArrayOutputStream()
-    val out = Channels.newChannel(outputStream)
-    val inputter = new ScalaXMLInfosetInputter(infoset)
-    val actual = dp.unparse(inputter, out)
-    out.close()
-    assertFalse(actual.getDiagnostics.toString, actual.isProcessingError)
-
-    val unparsed = outputStream.toString
-    val header = unparsed.substring(0, 16)
-    // Every len field is a fixed-length "data" element (8 bytes), so all
-    // four should compute to 8 regardless of which record they target.
-    assertEquals("   8   8   8   8", header)
-
-    val recordsPart = unparsed.substring(16)
-    val expectedRecords = (1 to N).map(i => f"T$i%03d" + f"data$i%04d").mkString
-    assertEquals(expectedRecords, recordsPart)
   }
 
   @Test def testManyForceRetryCyclesDefaultTunablesStillMatch(): Unit = {
@@ -148,18 +128,6 @@ class TestOutputValueCalcParkedSuspensionRetry {
     // (100/5): confirms the aggressive-tunable test above isn't passing
     // for a reason unrelated to the tunable (e.g. a schema mistake), by
     // producing byte-identical output under ordinary throttling.
-    val dp = compile(Map.empty)
-
-    val outputStream = new java.io.ByteArrayOutputStream()
-    val out = Channels.newChannel(outputStream)
-    val inputter = new ScalaXMLInfosetInputter(infoset)
-    val actual = dp.unparse(inputter, out)
-    out.close()
-    assertFalse(actual.getDiagnostics.toString, actual.isProcessingError)
-
-    val unparsed = outputStream.toString
-    assertEquals("   8   8   8   8", unparsed.substring(0, 16))
-    val expectedRecords = (1 to N).map(i => f"T$i%03d" + f"data$i%04d").mkString
-    assertEquals(expectedRecords, unparsed.substring(16))
+    TestUtils.testUnparsing(schema, infoset, expectedOutput)
   }
 }
