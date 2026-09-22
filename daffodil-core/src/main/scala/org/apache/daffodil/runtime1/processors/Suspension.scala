@@ -18,8 +18,6 @@
 package org.apache.daffodil.runtime1.processors
 
 import org.apache.daffodil.io.BitOrderChangeException
-import org.apache.daffodil.io.DataOutputStream
-import org.apache.daffodil.io.DataOutputStreamEventListener
 import org.apache.daffodil.io.DirectOrBufferedDataOutputStream
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.util.Logger
@@ -41,7 +39,7 @@ import org.apache.daffodil.runtime1.processors.unparsers.UnparseError
  * Running the suspension again tries again and will either block or complete.
  *
  */
-trait Suspension extends Serializable with DataOutputStreamEventListener {
+trait Suspension extends Serializable {
 
   /**
    * Specifies that this suspension does not write to the data output stream.
@@ -211,10 +209,9 @@ trait Suspension extends Serializable with DataOutputStreamEventListener {
   }
 
   /**
-   * Called once a registered wake-up (a SuspensionWaiter's
-   * notifySuspensions, or this suspension's own notifyKnown) confirms a
-   * real attempt is worth trying again: hands it to its tracker, clearing
-   * isParked first so it isn't immediately re-parked.
+   * Called once a registered SuspensionWaiter's notifySuspensions
+   * confirms a real attempt is worth trying again: hands it to its
+   * tracker, clearing isParked first so it isn't immediately re-parked.
    */
   final def moveFromParkedToYoung(): Unit = {
     if (!isParked) {
@@ -226,10 +223,10 @@ trait Suspension extends Serializable with DataOutputStreamEventListener {
     } else if (preparingToSuspend_) {
       deferredWakeupWhilePreparing_ = true
     } else {
-      // A suspension can be registered against both a SuspensionWaiter and
-      // a DataOutputStream at once. Whichever fired to trigger this call
-      // already cleared itself, so this is redundant (and harmless) for
-      // that one, but still needed for any other still-registered kind.
+      // A suspension can be registered against its primary waiter and one
+      // or more additional waiters at once. Whichever fired to trigger
+      // this call already cleared itself, so this is redundant (and
+      // harmless) for that one, but still needed for any others.
       clearAllRegistrations()
       savedUstate.suspensionTracker.moveParkedToYoung(this)
     }
@@ -297,71 +294,71 @@ trait Suspension extends Serializable with DataOutputStreamEventListener {
   // correctly set.
   private var maybeRegisteredWaiter: Maybe[SuspensionWaiter] = Nope
 
-  // Tracks this suspension's direct registrations against DataOutputStreams
-  // for one of their facts settling into its final value; not a shared
-  // per-element waiter like maybeRegisteredWaiter. Each suspension may be
-  // watching different DOSs from its own current writing context, and may
-  // need more than one at once (e.g. a length calculation registering on
-  // both its start and end DOS), which is why this is a Set rather than a
-  // single Maybe. One registry covers every such fact: a suspension that
-  // only cares about one of them just re-checks that specific fact when
-  // notified, rather than needing a separate registry per fact.
-  final class DosRegistrations(
-    register: DataOutputStream => Unit,
-    deregister: DataOutputStream => Unit
-  ) {
-    private var doses: Set[DataOutputStream] = Set.empty
+  // Tracks this suspension's direct registrations against SuspensionWaiters
+  // beyond its one primary waiter slot. A Set, not a single Maybe, since a
+  // suspension may need more than one at once (e.g. a length calculation
+  // registering on both its start and end DOS).
+  final class AdditionalWaiterRegistrations {
+    private var waiters: Set[SuspensionWaiter] = Set.empty
 
-    def nonEmpty: Boolean = doses.nonEmpty
+    def nonEmpty: Boolean = waiters.nonEmpty
 
-    def registerFor(dos: DataOutputStream): Unit = {
-      if (!doses.contains(dos)) {
-        doses = doses + dos
-        register(dos)
+    def registerFor(w: SuspensionWaiter): Unit = {
+      if (!waiters.contains(w)) {
+        waiters = waiters + w
+        w.registerSuspension(Suspension.this)
       }
     }
 
     def clear(): Unit = {
-      doses.foreach(deregister)
-      doses = Set.empty
+      waiters.foreach(_.removeSuspension(Suspension.this))
+      waiters = Set.empty
+    }
+
+    // w is telling this suspension it's already been dropped (e.g. w
+    // itself was just reset for reuse), so this only updates this side's
+    // own bookkeeping to match; no removeSuspension callback needed.
+    def forget(w: SuspensionWaiter): Unit = {
+      waiters = waiters - w
     }
   }
 
   // Lazily allocated: many suspensions (e.g. anything resolved via
-  // registerWaiter alone, or before ever blocking on a DOS fact) never
-  // register a DOS listener, so building this and its two closures for
-  // every suspension would be wasted work.
-  private var _registeredDoses: DosRegistrations = null
+  // registerWaiter alone) never register an additional waiter, so
+  // allocating this eagerly would be wasted work.
+  private var _additionalWaiters: AdditionalWaiterRegistrations = null
 
-  final def registeredDoses: DosRegistrations = {
-    if (_registeredDoses eq null) {
-      _registeredDoses = new DosRegistrations(_.registerListener(this), _.removeListener(this))
+  final def additionalWaiters: AdditionalWaiterRegistrations = {
+    if (_additionalWaiters eq null) {
+      _additionalWaiters = new AdditionalWaiterRegistrations
     }
-    _registeredDoses
+    _additionalWaiters
   }
 
-  // Deregisters from the SuspensionWaiter (if any) and every DOS
-  // registration, without resolving or moving this suspension. Checks
-  // the backing field directly, not the registeredDoses accessor, so a
-  // suspension that's never needed one doesn't force the allocation.
+  // Deregisters from the SuspensionWaiter (if any) and every additional
+  // waiter registration, without resolving or moving this suspension.
+  // Checks the backing field directly, not the additionalWaiters
+  // accessor, so a suspension that's never needed one doesn't force the
+  // allocation.
   private[processors] def clearAllRegistrations(): Unit = {
     if (maybeRegisteredWaiter.isDefined) {
       maybeRegisteredWaiter.get.removeSuspension(this)
       maybeRegisteredWaiter = Nope
     }
-    if (_registeredDoses ne null) {
-      _registeredDoses.clear()
+    if (_additionalWaiters ne null) {
+      _additionalWaiters.clear()
     }
   }
 
   /**
    * True exactly when a targeted wake-up is registered against some
-   * SuspensionWaiter (registerWaiter) or DataOutputStream (registeredDoses).
+   * SuspensionWaiter, either the primary one (registerWaiter) or an
+   * additional one (additionalWaiters, e.g. a DOS's settledWaiter).
    * SuspensionTracker parks a suspension with this true instead of
    * attempting it.
    */
   final def isParked: Boolean =
-    maybeRegisteredWaiter.isDefined || ((_registeredDoses ne null) && _registeredDoses.nonEmpty)
+    maybeRegisteredWaiter.isDefined || ((_additionalWaiters ne null) && _additionalWaiters.nonEmpty)
 
   final def registerWaiter(w: SuspensionWaiter, cond: () => Boolean = () => true): Unit = {
     Assert.invariant(maybeRegisteredWaiter.isEmpty)
@@ -369,21 +366,18 @@ trait Suspension extends Serializable with DataOutputStreamEventListener {
     w.registerSuspension(this, cond)
   }
 
-  // DataOutputStreamEventListener's callback: some registered fact about
-  // dos (via registeredDoses) is now known, so this suspension is worth a
-  // real attempt again.
-  final def notifyKnown(dos: DataOutputStream): Unit = {
-    if (!isDone) {
-      moveFromParkedToYoung()
+  // Called when a waiter this suspension is registered on is reset and
+  // drops every suspension it holds without notifying them. w identifies
+  // which waiter is dropping this suspension, since that could be either
+  // the primary registration or one of the additional ones. Without this,
+  // a dropped suspension would keep isParked true forever for a waiter
+  // that no longer tracks it.
+  private[processors] def clearRegisteredWaiter(w: SuspensionWaiter): Unit = {
+    if (maybeRegisteredWaiter.isDefined && (maybeRegisteredWaiter.get eq w)) {
+      maybeRegisteredWaiter = Nope
+    } else if (_additionalWaiters ne null) {
+      _additionalWaiters.forget(w)
     }
-  }
-
-  // Called only when a waiter is reset (e.g. a LengthState being reused)
-  // and drops every suspension it holds without notifying them. Without
-  // this, a dropped suspension would keep isParked true forever for a
-  // waiter that no longer tracks it.
-  private[processors] def clearRegisteredWaiter(): Unit = {
-    maybeRegisteredWaiter = Nope
   }
 
   /**
@@ -404,13 +398,13 @@ trait Suspension extends Serializable with DataOutputStreamEventListener {
 
     if (!alreadyOnNeededWaiter) {
       // Switching waiters, or no targeted wake-up for this reason: drop
-      // the stale registration and any registeredDoses with it.
+      // the stale registration and any additionalWaiters with it.
       if (maybeRegisteredWaiter.isDefined) {
         maybeRegisteredWaiter.get.removeSuspension(this)
         maybeRegisteredWaiter = Nope
       }
-      if (_registeredDoses ne null) {
-        _registeredDoses.clear()
+      if (_additionalWaiters ne null) {
+        _additionalWaiters.clear()
       }
     }
 
@@ -427,7 +421,7 @@ trait Suspension extends Serializable with DataOutputStreamEventListener {
         // and the DOS target set only shrinks, so leave one alone here.
         val absBitPosDoses = noLength.lengthState.maybeAbsBitPosDoses
         if (absBitPosDoses.nonEmpty) {
-          absBitPosDoses.foreach(registeredDoses.registerFor)
+          absBitPosDoses.foreach(dos => additionalWaiters.registerFor(dos.settledWaiter))
         }
       case _ => // no targeted wake-up available for any other blocking reason
     }

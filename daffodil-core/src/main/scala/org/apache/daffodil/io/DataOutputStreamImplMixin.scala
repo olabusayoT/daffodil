@@ -36,6 +36,7 @@ import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.Nope
 import org.apache.daffodil.lib.util.Maybe.One
 import org.apache.daffodil.lib.util.MaybeULong
+import org.apache.daffodil.runtime1.processors.SuspensionWaiter
 
 import org.apache.commons.io.output.TeeOutputStream
 import passera.unsigned.ULong
@@ -95,7 +96,7 @@ trait DataOutputStreamImplMixin
           // we know that no actual writes occurred to this DOS, so it is zero length.
           // And now that it is finsihed, that can never change.
           zlStatus_ = Zero
-          notifyListeners()
+          settledWaiter.notifySuspensions()
         } else {
           // do nothing. It stays what it is, Unknown.
         }
@@ -114,23 +115,11 @@ trait DataOutputStreamImplMixin
     // Unknown -> NonZero happens exactly once per DOS; subsequent writes
     // find it already NonZero.
     if (wasUnknown) {
-      notifyListeners()
+      settledWaiter.notifySuspensions()
     }
   }
 
-  private val stateChangeListeners =
-    new DataOutputStreamListenerRegistry[DataOutputStreamEventListener](
-      this,
-      (l, d) => l.notifyKnown(d)
-    )
-
-  def registerListener(l: DataOutputStreamEventListener): Unit =
-    stateChangeListeners.register(l)
-
-  def removeListener(l: DataOutputStreamEventListener): Unit =
-    stateChangeListeners.remove(l)
-
-  private def notifyListeners(): Unit = stateChangeListeners.clearAndNotifyAll()
+  override val settledWaiter = new SuspensionWaiter
 
   /**
    * Once we determine what it is, this will hold the absolute bit pos
@@ -189,10 +178,10 @@ trait DataOutputStreamImplMixin
     maybeAbsStartingBitPos0b_ = MaybeULong.Nope
     relBitPos0b_ = ULong(0)
     zlStatus_ = ZeroLengthStatus.Unknown
-    // A listener registered against the pre-reset facts would otherwise
-    // fire (or stay silently registered) against facts from this DOS's
+    // A suspension registered against the pre-reset values would otherwise
+    // fire (or stay silently registered) against values from this DOS's
     // next, unrelated lifetime.
-    stateChangeListeners.clear()
+    settledWaiter.clear()
   }
 
   def setAbsStartingBitPos0b(newStartingBitPos0b: ULong): Unit = {
@@ -209,7 +198,7 @@ trait DataOutputStreamImplMixin
       // maybeAbsBitPos0b was Nope and is now defined for the first (and
       // only) time. This DOS's absolute position never becomes unknown
       // again once known, so this is the one moment to notify.
-      notifyListeners()
+      settledWaiter.notifySuspensions()
     } else if (this.maybeAbsStartingBitPos0b_.isDefined) {
       this.maybeAbsolutizedRelativeStartingBitPosInBits_ = this.maybeAbsStartingBitPos0b_
       this.maybeAbsStartingBitPos0b_ = mv

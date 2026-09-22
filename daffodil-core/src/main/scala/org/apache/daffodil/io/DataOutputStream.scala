@@ -24,6 +24,7 @@ import java.nio.file.Path
 
 import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.MaybeULong
+import org.apache.daffodil.runtime1.processors.SuspensionWaiter
 
 import passera.unsigned.ULong
 
@@ -35,30 +36,8 @@ object ZeroLengthStatus {
 }
 
 /**
- * Callback for code outside daffodil-io that wants to know, without
- * polling for it, the moment some fact about a specific DataOutputStream
- * settles into its final, permanent value: currently its absolute bit
- * position (some suspensions only need this, not the DOS to be fully
- * finished, to become resolvable: e.g. alignment fill, or a length
- * calculation where the other endpoint is already absolute) or its
- * zeroLengthStatus (e.g. deciding whether to suppress a separator).
- * Unlike the finished notification below, this one's only implementer
- * (Suspension) isn't a SuspensionWaiter; each
- * suspension may be watching a different DOS from its own current
- * writing context, so it registers itself directly. That's why this
- * stays a generic listener trait instead of also being collapsed onto
- * SuspensionWaiter. A single notifyKnown covers every such fact (rather
- * than a differently-named method per fact) since every implementer to
- * date reacts the same way regardless of which one changed: worth a
- * real attempt again.
- */
-trait DataOutputStreamEventListener {
-  def notifyKnown(dos: DataOutputStream): Unit
-}
-
-/**
  * Shared bookkeeping for a registry of listeners waiting on some
- * DataOutputStream fact that settles once and never changes again:
+ * DataOutputStream outcome that settles once and never changes again:
  * register, remove, and clear-then-notify. notify is supplied
  * per instance rather than via subclassing, so a use site just
  * constructs one directly with its own dos and notify callback (e.g.
@@ -76,7 +55,7 @@ private[io] final class DataOutputStreamListenerRegistry[L](
   def remove(l: L): Unit = { listeners = listeners - l }
 
   // Drops every registered listener without notifying them, for a DOS
-  // being reset for reuse rather than reaching the fact they're waiting on.
+  // being reset for reuse rather than reaching the outcome they're waiting on.
   def clear(): Unit = { listeners = Set.empty }
 
   // Resets the field to empty BEFORE running any callback, not after:
@@ -299,12 +278,12 @@ trait DataOutputStream extends DataStreamCommon {
   def isFinishedOrDead: Boolean
 
   /**
-   * Registers/deregisters a callback for one of this DOS's facts
-   * settling into its final value; see DataOutputStreamEventListener
-   * for what a listener does with that notification.
+   * A SuspensionWaiter a Suspension registers itself against directly,
+   * since (unlike LengthState) there's no stable per-DOS owner to hold
+   * one instead: woken when this DOS's absolute bit position or
+   * zeroLengthStatus settles, since every registrant reacts the same way.
    */
-  def registerListener(l: DataOutputStreamEventListener): Unit
-  def removeListener(l: DataOutputStreamEventListener): Unit
+  def settledWaiter: SuspensionWaiter
 
   /**
    * This function deletes any temnporary files that have been generated

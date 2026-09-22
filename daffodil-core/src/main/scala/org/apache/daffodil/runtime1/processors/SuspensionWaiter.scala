@@ -35,11 +35,11 @@ private[processors] final class SuspensionWaiterRegistration(
  * A call to notifySuspensions() is only ever a hint that a retry might
  * now succeed, never a guarantee; the state that changed might not be
  * the thing this particular registrant actually needs, nor even the same
- * fact a different registrant on this same waiter needs. Each
+ * thing a different registrant on this same waiter needs. Each
  * registration carries its own condition, re-verified here before that
  * one registrant is woken; the default (registerSuspension's cond
  * defaults to always-true) wakes unconditionally, correct when every
- * registrant on a waiter wants the same already-resolved fact.
+ * registrant on a waiter wants the same already-resolved outcome.
  */
 class SuspensionWaiter {
 
@@ -110,14 +110,14 @@ class SuspensionWaiter {
     else soleSuspension eq null
 
   // Drops every registered suspension without notifying them. Only safe
-  // because clearRegisteredWaiter() resets their own back-reference too,
-  // so none is left believing it still has a wake-up armed here.
+  // because clearRegisteredWaiter(this) resets their own back-reference
+  // too, so none is left believing it still has a wake-up armed here.
   def clear(): Unit = {
     if (overflow ne null) {
-      overflow.foreach(_.suspension.clearRegisteredWaiter())
+      overflow.foreach(_.suspension.clearRegisteredWaiter(this))
       overflow.clear()
     } else if (soleSuspension ne null) {
-      soleSuspension.clearRegisteredWaiter()
+      soleSuspension.clearRegisteredWaiter(this)
       soleSuspension = null
       soleCond = null
     }
@@ -168,7 +168,7 @@ class SuspensionWaiter {
   }
 
   // Hands every registrant a real retry regardless of its own condition,
-  // for when the tracked fact has become permanently stale rather than
+  // for when the tracked outcome has become permanently stale rather than
   // merely still-pending: retrying naturally re-resolves against
   // whatever's current instead of waiting forever on a stale one.
   def forceRetryAll(): Unit = {

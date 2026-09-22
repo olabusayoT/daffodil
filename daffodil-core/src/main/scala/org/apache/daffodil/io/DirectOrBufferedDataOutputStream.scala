@@ -590,10 +590,8 @@ class DirectOrBufferedDataOutputStream private[io] (
     }
   }
 
-  // Registers SuspensionWaiters directly rather than through
-  // DataOutputStreamEventListener: this event only ever has a
-  // SuspensionWaiter as a registrant, so depending on
-  // runtime1.processors.SuspensionWaiter here is an accepted exception.
+  // LengthState registers its own waiter directly as the registrant for
+  // this event, same pattern as settledWaiter uses.
   private val finishedListeners = new DataOutputStreamListenerRegistry[SuspensionWaiter](
     this,
     (w, _) => w.notifySuspensions()

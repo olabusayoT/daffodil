@@ -21,9 +21,13 @@ import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.InputStreamReader
 
+import org.apache.daffodil.core.util.TestUtils.intercept
+import org.apache.daffodil.lib.exceptions.Abort
 import org.apache.daffodil.lib.schema.annotation.props.gen.BitOrder
 import org.apache.daffodil.lib.util.Maybe
+import org.apache.daffodil.runtime1.processors.Suspension
 import org.apache.daffodil.runtime1.processors.SuspensionWaiter
+import org.apache.daffodil.runtime1.processors.unparsers.UState
 
 import org.apache.commons.io.IOUtils
 import org.junit.Assert.*
@@ -229,84 +233,103 @@ class TestDirectOrBufferedDataOutputStream {
     )
   }
 
+  // A minimal double, same idiom as TestSuspensionTracker/LengthStateWaiterTest:
+  // registerFor/removeSuspension only ever compare by reference identity and
+  // never call doTask/rd, so no real UState is needed to prove registration
+  // and deregistration happen. A real notify does go on to call
+  // moveFromParkedToYoung, which requires a real savedUstate this double
+  // doesn't have - that failure is expected and asserted for below, after
+  // confirming the deregistration it's supposed to trigger already happened.
+  private def newSuspension(): Suspension = new Suspension {
+    override def rd = throw new NotImplementedError("not used by this test")
+    override protected def doTask(ustate: UState): Unit = ()
+  }
+
   /**
    * A newly buffered DOS starts with no absolute position
-   * (addBufferedDOS calls resetAllBitPos on it). A
-   * DataOutputStreamEventListener registered on it must be notified
-   * the moment setAbsStartingBitPos0b first makes maybeAbsBitPos0b
-   * defined, well before (and independent of) this DOS ever finishing.
+   * (addBufferedDOS calls resetAllBitPos on it). A suspension registered
+   * on its settledWaiter must be notified (and deregistered) the
+   * moment setAbsStartingBitPos0b first makes maybeAbsBitPos0b defined,
+   * well before (and independent of) this DOS ever finishing.
    */
-  @Test def testSetAbsStartingBitPos0bNotifiesAbsBitPosListeners(): Unit = {
+  @Test def testSetAbsStartingBitPos0bNotifiesSettledWaiter(): Unit = {
     val baos = new ByteArrayOrFileOutputStream(2000 * (1 << 20), new File("."), Maybe.Nope)
     val layered = newDirectOrBufferedDataOutputStream(baos, null)
     val buf1 = layered.addBuffered()
 
     assertTrue(buf1.maybeAbsBitPos0b.isEmpty)
 
-    var notifiedWith: DataOutputStream = null
-    buf1.registerListener(dos => notifiedWith = dos)
+    val suspension = newSuspension()
+    suspension.additionalWaiters.registerFor(buf1.settledWaiter)
+    assertTrue(buf1.settledWaiter.isRegisteredSuspension(suspension))
 
-    buf1.setAbsStartingBitPos0b(ULong(42))
+    // The registered suspension has no real UState, so the notify this
+    // triggers fails once it reaches moveFromParkedToYoung's own
+    // savedUstate access - expected here, since what this test actually
+    // verifies is that the notify fired at all, not the full retry.
+    intercept[Abort] { buf1.setAbsStartingBitPos0b(ULong(42)) }
 
     assertTrue(buf1.maybeAbsBitPos0b.isDefined)
     assertFalse(buf1.isFinished)
-    assertTrue(
-      "expected the DataOutputStreamEventListener to be notified as soon as " +
-        "the absolute position became known, without waiting for buf1 to finish",
-      notifiedWith eq buf1
+    assertFalse(
+      "expected the suspension to be deregistered as soon as the absolute " +
+        "position became known, without waiting for buf1 to finish",
+      buf1.settledWaiter.isRegisteredSuspension(suspension)
     )
   }
 
   /**
    * setNonZeroLength (called by anything that writes 1+ bits to the DOS)
-   * is the eager Unknown -> NonZero transition. A
-   * DataOutputStreamEventListener registered beforehand must be
-   * notified the moment that write happens.
+   * is the eager Unknown -> NonZero transition. A suspension registered
+   * beforehand must be notified (and deregistered) the moment that write
+   * happens.
    */
-  @Test def testWritingNotifiesZeroLengthStatusListenersAsNonZero(): Unit = {
+  @Test def testWritingNotifiesSettledWaiterAsNonZero(): Unit = {
     val baos = new ByteArrayOrFileOutputStream(2000 * (1 << 20), new File("."), Maybe.Nope)
     val layered = newDirectOrBufferedDataOutputStream(baos, null)
     val buf1 = layered.addBuffered()
 
     assertTrue(buf1.zeroLengthStatus eq ZeroLengthStatus.Unknown)
 
-    var notifiedWith: DataOutputStream = null
-    buf1.registerListener(dos => notifiedWith = dos)
+    val suspension = newSuspension()
+    suspension.additionalWaiters.registerFor(buf1.settledWaiter)
+    assertTrue(buf1.settledWaiter.isRegisteredSuspension(suspension))
 
-    buf1.putBytes("x".getBytes("ascii"), finfo)
+    intercept[Abort] { buf1.putBytes("x".getBytes("ascii"), finfo) }
 
     assertTrue(buf1.zeroLengthStatus eq ZeroLengthStatus.NonZero)
-    assertTrue(
-      "expected the DataOutputStreamEventListener to be notified as " +
-        "soon as a write made the status NonZero",
-      notifiedWith eq buf1
+    assertFalse(
+      "expected the suspension to be deregistered as soon as a write made " +
+        "the status NonZero",
+      buf1.settledWaiter.isRegisteredSuspension(suspension)
     )
   }
 
   /**
    * Unlike NonZero, Unknown only ever resolves to Zero lazily, when
    * zeroLengthStatus is queried after the DOS finishes or dies having
-   * had nothing written to it. setFinished must force that
-   * resolution and notify, or a listener waiting on a never-written
-   * DOS would wait forever.
+   * had nothing written to it. setFinished must force that resolution
+   * and notify, or a suspension waiting on a never-written DOS would
+   * wait forever.
    */
-  @Test def testFinishingWithNoWritesNotifiesZeroLengthStatusListenersAsZero(): Unit = {
+  @Test def testFinishingWithNoWritesNotifiesSettledWaiterAsZero(): Unit = {
     val baos = new ByteArrayOrFileOutputStream(2000 * (1 << 20), new File("."), Maybe.Nope)
     val layered = newDirectOrBufferedDataOutputStream(baos, null)
     val buf1 = layered.addBuffered()
 
     assertTrue(buf1.zeroLengthStatus eq ZeroLengthStatus.Unknown)
 
-    var notifiedWith: DataOutputStream = null
-    buf1.registerListener(dos => notifiedWith = dos)
+    val suspension = newSuspension()
+    suspension.additionalWaiters.registerFor(buf1.settledWaiter)
+    assertTrue(buf1.settledWaiter.isRegisteredSuspension(suspension))
 
-    buf1.setFinished(finfo)
+    intercept[Abort] { buf1.setFinished(finfo) }
 
     assertTrue(buf1.zeroLengthStatus eq ZeroLengthStatus.Zero)
-    assertTrue(
-      "expected the DataOutputStreamEventListener to be notified once " +
-        "finishing resolved the still-Unknown status to Zero",
-      notifiedWith eq buf1
+    assertFalse(
+      "expected the suspension to be deregistered once finishing " +
+        "resolved the still-Unknown status to Zero",
+      buf1.settledWaiter.isRegisteredSuspension(suspension)
     )
   }
 }

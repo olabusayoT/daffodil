@@ -579,7 +579,7 @@ sealed abstract class LengthState(ie: DIElement) extends HasSuspensionWaiter {
     suspensionWaiter.isRegisteredSuspension(s)
 
   // The DOSs (if any) whose finishing (or dying) might make this length
-  // computable: one for each unresolved start/end fact.
+  // computable: one for each unresolved start/end dependency.
   private var registeredFinishedDoses: Set[DirectOrBufferedDataOutputStream] = Set.empty
 
   // Diffs against the current registrations rather than blindly
