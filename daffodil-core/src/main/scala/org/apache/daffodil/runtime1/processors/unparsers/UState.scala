@@ -393,10 +393,10 @@ abstract class UState(
       // clone the UState so it can no longer change, and pass that clone into
       // setFinished.
       val finfo = this match {
-        case m: UStateMain => m.cloneForSuspension(dos)
+        case m: SuspensionCapableUState => m.cloneForSuspension(dos)
         case _ =>
           Assert.invariantFailed(
-            "State must be a UStateMain when splitting for bit order change"
+            "State must be SuspensionCapableUState when splitting for bit order change"
           )
       }
 
