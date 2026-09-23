@@ -33,7 +33,12 @@ final class SchemaSetRuntimeData(
    */
   variables: VariableMap,
   allLayers: Seq[LayerRuntimeData],
-  @transient layerRuntimeCompilerArg: LayerRuntimeCompiler
+  @transient layerRuntimeCompilerArg: LayerRuntimeCompiler,
+  /** True if this schema has an outputValueCalc element whose value could
+   * resolve without writing (see hasAnyPrefetchBeneficialOVC); baked in at
+   * compile time like the rest of this class. Gates useBuildWritePrefetch -
+   * zero benefit means automatic fallback to single-pass. */
+  val hasAnyPrefetchBeneficialOVC: Boolean
 ) extends Serializable
   with ThrowsSDE {
 

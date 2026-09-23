@@ -24,6 +24,7 @@ import org.apache.daffodil.lib.util.MaybeULong
 import org.apache.daffodil.runtime1.dpath.SuspendableExpression
 import org.apache.daffodil.runtime1.dsom.CompiledExpression
 import org.apache.daffodil.runtime1.infoset.DIComplex
+import org.apache.daffodil.runtime1.infoset.DINode
 import org.apache.daffodil.runtime1.infoset.DISimple
 import org.apache.daffodil.runtime1.infoset.DataValue.DataValuePrimitive
 import org.apache.daffodil.runtime1.infoset.RetryableException
@@ -31,6 +32,7 @@ import org.apache.daffodil.runtime1.processors.ElementRuntimeData
 import org.apache.daffodil.runtime1.processors.Evaluatable
 import org.apache.daffodil.runtime1.processors.UnparseTargetLengthInBitsEv
 import org.apache.daffodil.runtime1.processors.unparsers.*
+import org.apache.daffodil.runtime1.processors.unparsers.MoreTreeAvailable
 
 /**
  * Elements that, when unparsing, have no length specified.
@@ -62,6 +64,49 @@ class ElementUnspecifiedLengthUnparser(
 sealed trait RepMoveMixin {
   def move(start: UState): Unit = {
     start.childIndexStack.setTop(start.childIndexStack.top + 1)
+  }
+}
+
+/**
+ * The build-side hookup for bounded lookahead: called once per node from
+ * unparseBegin (regular and OVC strategies alike). Increments the shared
+ * lead counter, and once it exceeds the prefetch limit, resumes write's
+ * coroutine and blocks until it yields back before continuing build's own
+ * recursion. A no-op for single-pass, where state.sharedContext is never
+ * set.
+ */
+private object BuildWriteLeadHookup {
+
+  /**
+   * Must be called from unparseBegin, not unparseEnd: an ancestor's
+   * increment must happen before any descendant's content is built. A
+   * write cascade triggered here can reach that ancestor before
+   * build's own recursive call into it returns; incrementing in
+   * unparseEnd instead would underflow the counter.
+   */
+  def afterNodeAdded(state: UState): Unit = {
+    // Gated on isBuildOnly, not just sharedContext.isDefined: write's
+    // own UState also has sharedContext set, so gating on that alone
+    // would run build-only bookkeeping (incl. ctx.resumeWrite, which
+    // assumes the caller is build's thread) from write's side too, if
+    // unparseBegin were ever reached there.
+    if (state.isBuildOnly && state.sharedContext.isDefined) {
+      val ctx = state.sharedContext.get
+      ctx.incrementLead()
+      // leadExceedsPrefetchLimit alone doesn't bound the retained
+      // memory of pending suspensions, so pendingSuspensionTripLimit
+      // separately caps total pendingCount; resuming write here can
+      // also resolve suspensions immediately.
+      if (
+        ctx.leadExceedsPrefetchLimit ||
+        ctx.suspensionTracker.pendingCount > ctx.pendingSuspensionTripLimit
+      ) {
+        // resumeWrite may legitimately send WriteDone here, not just
+        // WriteNeedsMore, and records that so nothing tries to resume an
+        // already-finished coroutine again later.
+        ctx.resumeWrite(MoreTreeAvailable)
+      }
+    }
   }
 }
 
@@ -126,7 +171,8 @@ sealed abstract class ElementUnparserBase(
   val eReptypeUnparser: Maybe[Unparser]
 ) extends CombinatorUnparser(erd)
   with RepMoveMixin
-  with ElementUnparserStartEndStrategy {
+  with ElementUnparserStartEndStrategy
+  with WriteUnparser {
 
   final override def childProcessors =
     (eBeforeUnparser.toList ++ eUnparser.toList ++ eAfterUnparser.toList ++ eReptypeUnparser.toList ++ setVarUnparsers.toList).toVector
@@ -161,21 +207,118 @@ sealed abstract class ElementUnparserBase(
     }
   }
 
-  protected def doBeforeContentUnparser(state: UState): Unit = {
-    if (eBeforeUnparser.isDefined)
+  /**
+   * Padding is always a synchronous, write-only concern, so build
+   * (which never writes actual output) unconditionally skips it;
+   * unlike runContentUnparser below, there's no group case to
+   * preserve here.
+   */
+  private[runtime1] def doBeforeContentUnparser(state: UState): Unit = {
+    if (!state.isBuildOnly && eBeforeUnparser.isDefined)
       eBeforeUnparser.get.unparse1(state)
   }
 
-  protected def doAfterContentUnparser(state: UState): Unit = {
-    if (eAfterUnparser.isDefined)
+  private[runtime1] def doAfterContentUnparser(state: UState): Unit = {
+    if (!state.isBuildOnly && eAfterUnparser.isDefined)
       eAfterUnparser.get.unparse1(state)
   }
 
-  protected def runContentUnparser(state: UState): Unit = {
+  /**
+   * Registers whatever suspensions this element's content depends on
+   * (dfdl:length, dfdl:outputValueCalc) before content bytes get
+   * written. No-op by default; overridden by the SpecifiedLength
+   * unparsers. Called unconditionally from writeContent too, before
+   * its group-unparser check, so this isn't skipped for
+   * delimited/escape-scheme-wrapped elements.
+   */
+  private[runtime1] def contentSetup(state: UState): Unit = ()
+
+  /**
+   * eReptypeUnparser is a transient concern like padding, always
+   * skipped for build; eUnparser for a complex element IS the
+   * model-group unparser build recurses into. Gated on
+   * `erd.isSimpleType`, not `WriteUnparser`-ness (delimiter/escape
+   * wrapping makes a simple element's eUnparser one too, and running
+   * it would corrupt one-time state write relies on).
+   */
+  private[runtime1] def dispatchContentUnparser(state: UState): Unit = {
     if (eReptypeUnparser.isDefined) {
-      eReptypeUnparser.get.unparse1(state)
-    } else if (eUnparser.isDefined)
-      eUnparser.get.unparse1(state)
+      if (!state.isBuildOnly) eReptypeUnparser.get.unparse1(state)
+    } else if (eUnparser.isDefined) {
+      if (state.isBuildOnly && erd.isSimpleType) {
+        // build skips simple-element value-writing; the group-recursion
+        // case (erd.isComplexType) falls through to the else branch below
+      } else {
+        eUnparser.get.unparse1(state)
+      }
+    }
+  }
+
+  private[runtime1] def runContentUnparser(state: UState): Unit = {
+    contentSetup(state)
+    dispatchContentUnparser(state)
+  }
+
+  /**
+   * Writes this element's content against an already-built
+   * `containerNode`, without consuming any InfosetInputter events:
+   * dispatches to whatever `eUnparser` turns out to be, a group
+   * unparser or a plain simple-element value-writer.
+   */
+  override def writeContent(containerNode: DINode, state: UState): Unit = {
+    state.currentInfosetNodeStack.push(One(containerNode))
+    state.childIndexStack.push(0L)
+    doBeforeContentUnparser(state)
+    // contentSetup can suspend, and suspending reads state.processor.
+    // That's normally set by the ordinary unparse dispatch, which this
+    // call bypasses entirely, so it's set explicitly here to match.
+    state.setProcessor(this)
+    // Must run before dispatchContentUnparser, unconditionally: an
+    // element whose eUnparser is group-wrapped (delimiter stack, escape
+    // scheme, specified-length prefix) delegates straight to that
+    // wrapper and never reaches dispatchContentUnparser, so without
+    // this call up front such an element would never get its setup run
+    // from write's side.
+    contentSetup(state)
+    // eReptypeUnparser takes priority over eUnparser here too, mirroring
+    // dispatchContentUnparser's own if/else-if: otherwise a repType'd
+    // string element whose raw (unused) eUnparser happens to be
+    // group-wrapped (e.g. delimiter-wrapped text) would incorrectly
+    // delegate to that raw content's dispatch, skipping the repType
+    // conversion entirely.
+    if (
+      eReptypeUnparser.isEmpty && eUnparser.isDefined && eUnparser.get
+        .isInstanceOf[WriteUnparser]
+    ) {
+      eUnparser.get.asInstanceOf[WriteUnparser].writeContent(containerNode, state)
+    } else {
+      dispatchContentUnparser(state)
+    }
+    // The after-content (padding/fill) region depends on the content
+    // having been written, so it must run only once the (possibly
+    // nested) content dispatch above has fully returned; true for both
+    // the simple-element and group-content cases.
+    doAfterContentUnparser(state)
+    // A SIMPLE node's content-conversion unparser only just ran, above
+    // (build skipped it); complex/array nodes were already finalized in
+    // build's unparseEnd, so skip re-finalizing here or setFinal()'s
+    // !isFinal assert aborts. An OVC node may still be valueless
+    // (isChildReady allows write to reach later siblings without one),
+    // so wait for hasValue rather than asserting it via setFinal().
+    if (containerNode.isSimple && !containerNode.isFinal && containerNode.asSimple.hasValue)
+      containerNode.setFinal()
+    // Write-side half of the shared lead counter, matching build's own
+    // once-per-node increment; no-op unless a write-side UState has
+    // opted in via setSharedContext.
+    if (state.sharedContext.isDefined) state.sharedContext.get.decrementLead()
+    // Content-length/value-length suspensions can only unblock once
+    // write has actually written the bytes, so this must run here too,
+    // not just build's unparseEnd, or such suspensions pile up
+    // unresolved until the final isFinal=true call instead of resolving
+    // as data becomes available.
+    state.asInstanceOf[SuspensionCapableUState].evalSuspensions(isFinal = false)
+    state.childIndexStack.pop()
+    state.currentInfosetNodeStack.pop
   }
 
   override def unparse(state: UState): Unit = {
@@ -188,11 +331,8 @@ sealed abstract class ElementUnparserBase(
 
     doBeforeContentUnparser(state)
 
-    //
-    // We must push the TermRuntimeData for all model-groups.
-    // The starting point for this is the model-group of a complex type.
-    // Simple types don't have model groups, so no pushing those.
-    //
+    // We must push the TermRuntimeData for all model-groups, starting from
+    // the complex type's model-group; simple types have none to push.
     if (erd.isComplexType)
       state.pushTRD(erd.optComplexTypeModelGroupRuntimeData.get)
 
@@ -298,11 +438,16 @@ class ElementSpecifiedLengthUnparser(
 
   override val runtimeDependencies = maybeTargetLengthEv.toArray
 
-  override def runContentUnparser(state: UState): Unit = {
-    computeTargetLength(
-      state
-    ) // must happen before run() so that we can take advantage of knowing the length
-    super.runContentUnparser(state) // setup unparsing, which will block for no valu
+  // Must happen before dispatchContentUnparser so we can take
+  // advantage of knowing the length. Build already runs this
+  // unconditionally on the shared infoset tree; write's writeContent
+  // call must not run it again, or it would create an independent
+  // Suspension for the same target length instead of reusing
+  // whatever build already resolved.
+  override private[runtime1] def contentSetup(state: UState): Unit = {
+    if (!(state.sharedContext.isDefined && !state.isBuildOnly)) {
+      computeTargetLength(state)
+    }
   }
 
 }
@@ -324,12 +469,12 @@ class ElementOVCSpecifiedLengthUnparserSuspendableExpression(
     val diSimple = state.currentInfosetNode.asSimple
 
     diSimple.setDataValue(v)
-
-    //
-    // These are now done in the main unparse, but they will
-    // suspend if they cannot be evaluated because there is not data value yet.
-    //
-    // callingUnparser.computeSetVariables(state)
+    // Do NOT setFinal here: a chained SimpleTypeRetryUnparser's own
+    // suspension may still be pending, and its continuation's
+    // overwriteDataValue call asserts !isFinal, which finalizing here
+    // first would trip. writeContent's own hasValue-guarded setFinal
+    // safely covers the common case where everything resolved
+    // synchronously.
   }
 
   override protected def maybeKnownLengthInBits(ustate: UState): MaybeULong = MaybeULong(0L)
@@ -360,14 +505,43 @@ class ElementOVCSpecifiedLengthUnparser(
   private def suspendableExpression =
     new ElementOVCSpecifiedLengthUnparserSuspendableExpression(this, expr)
 
+  // True when this OVC expression references dfdl:valueLength/contentLength.
+  // Not a guarantee the attempt below would fail; a reference to an
+  // already-finished sibling's length could resolve immediately even
+  // during build. Just a static, direction-blind heuristic: most such
+  // references are forward (the common case this optimizes for), so an
+  // uncommon backward reference just takes an avoidable suspend/retry.
+  private val requiresWriteTimeValue: Boolean =
+    !SuspendableExpression.canResolveWithoutWriting(expr)
+
   Assert.invariant(context.dpathElementCompileInfo.isOutputValueCalc)
 
-  override def runContentUnparser(state: UState): Unit = {
-    computeTargetLength(
-      state
-    ) // must happen before run() so that we can take advantage of knowing the length
-    suspendableExpression.run(state) // run the expression. It might or might not have a value.
-    super.runContentUnparser(state) // setup unparsing, which will block for no valu
+  // Build always registers this OVC's suspension unconditionally
+  // (needed for NVI-scope visibility); write's writeContent call must
+  // not register it again -- a `!hasValue` guard alone is
+  // insufficient, since a forward reference to a later sibling's
+  // write-time-only property leaves hasValue false for both, so both
+  // would create independent Suspensions and crash ("cannot set
+  // value/length twice").
+  override private[runtime1] def contentSetup(state: UState): Unit = {
+    if (!(state.sharedContext.isDefined && !state.isBuildOnly)) {
+      // Must happen before dispatchContentUnparser so we can take
+      // advantage of knowing the length.
+      computeTargetLength(state)
+      if (!state.currentInfosetNode.asSimple.hasValue) {
+        // Runs at build's normal structural point so its NVI-scope
+        // patching still applies; deferring this to write instead of
+        // just skipping the wasted attempt could silently resolve
+        // dfdl:newVariableInstance-scoped variables to the wrong
+        // iteration under prefetch.
+        if (state.sharedContext.isDefined && requiresWriteTimeValue) {
+          suspendableExpression.suspendWithoutAttempting(state)
+        } else {
+          // run the expression. It might or might not have a value.
+          suspendableExpression.run(state)
+        }
+      }
+    }
   }
 
 }
@@ -484,6 +658,12 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
       // is pushing and popping to match the events. This provides the proper
       // context for evaluation of expressions.
       state.currentInfosetNodeStack.push(One(newElem))
+
+      // Must happen here (begin), not in unparseEnd: an ancestor's lead
+      // increment must happen before any descendant's content is built,
+      // or a write triggered here could reach that ancestor before
+      // build's own recursive call into it returns, underflowing the counter.
+      BuildWriteLeadHookup.afterNodeAdded(state)
     }
   }
 
@@ -530,15 +710,18 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
         }
       }
 
-      // cur is finished, mark it as final and free if possible. Note that we
-      // need the container and not the parent of the current element to free
-      // it. This way if this element is in an array, we free this element
-      // from the array. We also do not set hidden IVC elements as
-      // final--although we allow hidden IVC elements when unparsing, they
-      // never get a value so we can't set them as final without breaking
-      // assertions. Nothing can access hidden IVC elements, so this should
-      // not break anything
-      if (!state.withinHiddenNest || erd.isRepresented) cur.setFinal()
+      // cur is finished: mark it final and free via its container (not
+      // parent, so an array-member frees from the array), except hidden IVC
+      // elements (never get a value, so setFinal would trip assertions) and,
+      // for build/write-prefetch, SIMPLE elements: build skips their
+      // content-conversion unparser, so finalizing here would make
+      // write's later overwriteDataValue call trip its `!isFinal`
+      // invariant. Complex/array nodes are unaffected, since write
+      // never calls overwriteDataValue on those.
+      if (
+        (!state.withinHiddenNest || erd.isRepresented) &&
+        !(state.isBuildOnly && cur.isSimple)
+      ) cur.setFinal()
       val curContainer =
         if (cur.erd.isArray) cur.diParent.maybeLastChild.get
         else cur.diParent
@@ -558,7 +741,7 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
 
       move(state)
 
-      state.asInstanceOf[UStateMain].evalSuspensions(isFinal = false)
+      state.asInstanceOf[SuspensionCapableUState].evalSuspensions(isFinal = false)
     }
   }
 
@@ -626,6 +809,12 @@ trait OVCStartEndStrategy extends ElementUnparserStartEndStrategy {
 
     parentComplex.addChild(ovcElem, state.tunable)
     state.currentInfosetNodeStack.push(One(ovcElem))
+
+    // Must happen here (begin), not in unparseEnd: an ancestor's lead
+    // increment must happen before any descendant's content is built,
+    // or a write triggered here could reach that ancestor before
+    // build's own recursive call into it returns, underflowing the counter.
+    BuildWriteLeadHookup.afterNodeAdded(state)
   }
 
   protected final override def unparseEnd(state: UState): Unit = {

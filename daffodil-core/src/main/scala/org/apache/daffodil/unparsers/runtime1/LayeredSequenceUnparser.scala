@@ -17,6 +17,7 @@
 
 package org.apache.daffodil.unparsers.runtime1
 
+import org.apache.daffodil.runtime1.infoset.DINode
 import org.apache.daffodil.runtime1.layers.LayerDriver
 import org.apache.daffodil.runtime1.processors.SequenceRuntimeData
 import org.apache.daffodil.runtime1.processors.unparsers.*
@@ -28,8 +29,48 @@ class LayeredSequenceUnparser(
 
   override def nom = "LayeredSequence"
 
-  override def unparse(state: UState): Unit = {
+  private def handleLayerThrowable(layerDriver: LayerDriver, t: Throwable): Unit = {
+    if (layerDriver ne null) {
+      layerDriver.handleThrowable(t)
+    } else {
+      LayerDriver.handleThrowableWithoutLayer(t)
+    }
+  }
 
+  // Same setup/teardown as unparse() below, via withLayerTransform. Without
+  // this override, write-side dispatch would treat this as a plain
+  // WriteUnparser (inherited), bypassing the layer transform entirely: raw
+  // bytes, no compression/checksum, no layer error handling.
+  override def writeContent(containerNode: DINode, state: UState): Unit = {
+    // Needed for the same reason as ChoiceCombinatorUnparser's writeContent:
+    // setFinished/cloneForSuspension reach state.bitOrder/state.processor,
+    // normally set by Unparser.unparse1's wrapper, which this
+    // recursive-dispatch code bypasses.
+    state.setProcessor(LayeredSequenceUnparser.this)
+    withLayerTransform(state) {
+      LayeredSequenceUnparser.super.writeContent(containerNode, state)
+    }
+  }
+
+  override def unparse(state: UState): Unit = {
+    // Layers are write-only: build only needs to navigate into the layer
+    // body to build the tree, not run the byte transform, so this skips
+    // withLayerTransform entirely. Without it, build's no-op-sink DOS
+    // gets `addBuffered()` splits that never merge back, and `cloneForSuspension` below would cast it to UStateMain, which BuildState isn't.
+    if (state.isBuildOnly) {
+      super.unparse(state)
+      return
+    }
+    withLayerTransform(state) {
+      super.unparse(state)
+    }
+  }
+
+  // Splits off a buffered DOS for the layer to flush through, so fragment
+  // bits/bitOrder on the original DOS can't affect how the layer flushes
+  // bytes, then runs the layer driver's transform around runBody. The
+  // `finally` restoration ensures later writes always reach `layerFollowingDOS`, win or lose.
+  private def withLayerTransform(state: UState)(runBody: => Unit): Unit = {
     val originalDOS = state.getDataOutputStream
 
     // create a new buffered DOS that this layer will flush to when the layer
@@ -74,7 +115,7 @@ class LayeredSequenceUnparser(
 
       // unparse the layer body into layerDOS
       state.setDataOutputStream(layerDOS)
-      super.unparse(state)
+      runBody
       // now we're done unparsing the layer recursively.
       // While doing that unparsing, the data output stream may have been split, so the
       // DOS in the state may no longer be the layerDOS.
@@ -95,8 +136,14 @@ class LayeredSequenceUnparser(
       // layer stack is potentially still needed, so
       // nothing can be cleaned up at this point.
     } catch {
-      case t: Throwable if (layerDriver ne null) => layerDriver.handleThrowable(t)
-      case t: Throwable => LayerDriver.handleThrowableWithoutLayer(t)
+      // Pure write-side control-flow signals, unrelated to the layer
+      // itself; rewrapping either into a LayerFatalException would defeat
+      // the write-side's own handling (a stalled-write deadlock
+      // diagnostic, or build's abort cleanup) with a raw "layer failed"
+      // exception.
+      case e: AwaitChildStalledException => throw e
+      case e: BuildAbortedException => throw e
+      case t: Throwable => handleLayerThrowable(layerDriver, t)
       // otherwise we have no layer driver, so we were unable to load the layer.
       // just let that propagate.
     } finally {

@@ -91,7 +91,8 @@ trait SchemaSetRuntime1Mixin {
         root.elementRuntimeData,
         variableMap,
         allLayers,
-        layerRuntimeCompiler
+        layerRuntimeCompiler,
+        root.hasAnyPrefetchBeneficialOVC
       )
     if (root.numComponents > root.numUniqueComponents)
       Logger.log.debug(

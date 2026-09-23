@@ -100,6 +100,10 @@ class NewVariableInstanceStartUnparser(vrd: VariableRuntimeData, trd: TermRuntim
   override def childProcessors = Vector()
 
   override def unparse(state: UState) = {
+    // Runs unconditionally during build, not write-gated: a suspension's
+    // shallow-copy clone only sees a scope pushed before it was cloned, so
+    // deferring this push to write would leave that suspension permanently
+    // wired to the wrong VariableInstance. The pop is deferred to write.
     val nvi = state.newVariableInstance(vrd)
 
     if (vrd.maybeDefaultValueExpr.isDefined) {
@@ -124,5 +128,11 @@ class NewVariableInstanceEndUnparser(vrd: VariableRuntimeData, trd: TermRuntimeD
 
   override def childProcessors = Vector()
 
-  override def unparse(state: UState) = state.removeVariableInstance(vrd)
+  override def unparse(state: UState) = {
+    // Polymorphic pop: build pops only its own build-local NVI stack,
+    // never the shared vTable; single-pass/write pop the shared vTable
+    // instead. Only write pops the vTable, since it must stay alive
+    // until write-time value-setting is done.
+    state.removeVariableInstance(vrd)
+  }
 }

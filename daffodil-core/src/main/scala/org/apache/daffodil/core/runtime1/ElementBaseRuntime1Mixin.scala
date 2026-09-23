@@ -27,6 +27,7 @@ import org.apache.daffodil.lib.schema.annotation.props.gen.LengthKind
 import org.apache.daffodil.lib.schema.annotation.props.gen.Representation.Text
 import org.apache.daffodil.lib.util.Delay
 import org.apache.daffodil.lib.util.Maybe
+import org.apache.daffodil.runtime1.dpath.SuspendableExpression
 import org.apache.daffodil.runtime1.dsom.DPathElementCompileInfo
 import org.apache.daffodil.runtime1.processors.ElementRuntimeData
 import org.apache.daffodil.runtime1.processors.RuntimeData
@@ -133,6 +134,19 @@ trait ElementBaseRuntime1Mixin { self: ElementBase =>
 
     isReferenced || mightHaveSuspensions
   }
+
+  /**
+   * True if the schema has at least one dfdl:outputValueCalc element whose
+   * expression can resolve without writing (schema-wide; consult only via
+   * schemaSet.root). Gates useBuildWritePrefetch: if false, every OVC needs an
+   * actual written byte position, so racing build ahead is never beneficial.
+   */
+  final lazy val hasAnyPrefetchBeneficialOVC: Boolean =
+    schemaSet.allSchemaComponents.exists {
+      case e: ElementBase if e.isOutputValueCalc =>
+        SuspendableExpression.canResolveWithoutWriting(e.ovcCompiledExpression)
+      case _ => false
+    }
 
   final override lazy val dpathCompileInfo = dpathElementCompileInfo
 

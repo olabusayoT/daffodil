@@ -181,8 +181,10 @@ class VariableSuspended(qname: NamedQName, context: VariableRuntimeData)
  * expressions in a defineVariable are circular, or later during parsing if
  * newVariableInstance contains a circular expression
  */
-class VariableCircularDefinition(qname: NamedQName, context: VariableRuntimeData)
-  extends VariableException(
+class VariableCircularDefinition(
+  qname: NamedQName,
+  context: VariableRuntimeData
+) extends VariableException(
     qname,
     context,
     s"Variable map (runtime): variable $qname is part of a circular definition with other variables"
@@ -284,6 +286,29 @@ class VariableMap private (
     new VariableMap(vrds, newTable)
   }
 
+  /**
+   * Used only by BuildState.cloneForSuspension, on a clone just produced
+   * above, never the live VariableMap. Corrects the frozen snapshot's head
+   * at vmapIndex to the instance build's recursion currently considers
+   * active, since a later retry replays only against this frozen clone.
+   */
+  def overrideHeadForSuspensionClone(vmapIndex: Int, instance: VariableInstance): Unit = {
+    // Replaces rather than prepends: this clone is never pushed/popped
+    // again via a real NVI scope change, so a stale extra head would
+    // inflate vTable(vmapIndex).size by one, tripping setVariable's "more
+    // than one instance in scope" guard later even with no scope actually
+    // open on this clone.
+    vTable(vmapIndex) = instance +: vTable(vmapIndex).tail
+  }
+
+  /**
+   * The pre-NVI default instance for vmapIndex, used by BuildState
+   * whenever build's local NVI scope stack for this index is empty.
+   * newVariableInstance always prepends and only write's later
+   * removeVariableInstance call ever pops the shared array, so this is always the LAST entry regardless of how many NVI scopes build has pushed (and locally popped) since.
+   */
+  def originalInstanceAt(vmapIndex: Int): VariableInstance = vTable(vmapIndex).last
+
   // For defineVariable's with non-constant expressions for default values, it
   // is necessary to force the evaluation of the expressions after the
   // VariableMap has been created and initialized, but before parsing begins. We
@@ -361,18 +386,7 @@ class VariableMap private (
     referringContext: ThrowsSDE,
     state: ParseOrUnparseState
   ): DataValuePrimitive = {
-    val varQName = vrd.globalQName
-    vrd.direction match {
-      case VariableDirection.ParseOnly if (!state.isInstanceOf[PState]) =>
-        state.SDE(
-          s"Attempting to read variable $varQName which is marked as parseOnly during unparsing"
-        )
-      case VariableDirection.UnparseOnly if (!state.isInstanceOf[UState]) =>
-        state.SDE(
-          s"Attempting to read variable $varQName which is marked as unparseOnly during parsing"
-        )
-      case _ => // Do nothing
-    }
+    checkDirectionForRead(vrd, state)
 
     val variable = {
       // The vrd.vmapIndex cannot be out of range of the vTable, because the vTable size
@@ -391,6 +405,43 @@ class VariableMap private (
       }
       varAtIndex
     }
+    readVariable(variable, vrd, referringContext, state)
+  }
+
+  /**
+   * Direction-eligibility check shared by the live-stack lookup above and
+   * BuildState's build-local scope lookup (see BuildState.scala); both need
+   * the same parseOnly/unparseOnly guard regardless of which
+   * VariableInstance the read ultimately resolves against.
+   */
+  def checkDirectionForRead(vrd: VariableRuntimeData, state: ParseOrUnparseState): Unit = {
+    val varQName = vrd.globalQName
+    vrd.direction match {
+      case VariableDirection.ParseOnly if (!state.isInstanceOf[PState]) =>
+        state.SDE(
+          s"Attempting to read variable $varQName which is marked as parseOnly during unparsing"
+        )
+      case VariableDirection.UnparseOnly if (!state.isInstanceOf[UState]) =>
+        state.SDE(
+          s"Attempting to read variable $varQName which is marked as unparseOnly during parsing"
+        )
+      case _ => // Do nothing
+    }
+  }
+
+  /**
+   * Overload of readVariable above that runs the variable-state machine
+   * against a specific, caller-supplied VariableInstance rather than
+   * always the shared vTable's head. BuildState overrides its read path
+   * to target whichever instance build's recursion currently has open, since the shared vTable's head can lag behind build's nesting once more than one newVariableInstance for the same variable is pushed there.
+   */
+  def readVariable(
+    variable: VariableInstance,
+    vrd: VariableRuntimeData,
+    referringContext: ThrowsSDE,
+    state: ParseOrUnparseState
+  ): DataValuePrimitive = {
+    val varQName = vrd.globalQName
     variable.state match {
       case VariableRead if (variable.value.isDefined) => variable.value.getNonNullable
       case VariableDefined | VariableSet if (variable.value.isDefined) => {
@@ -422,7 +473,10 @@ class VariableMap private (
   }
 
   /**
-   * Assigns a variable and sets the variables state to VariableSet
+   * Assigns a variable and sets its state to VariableSet, against the
+   * shared vTable's head. BuildState overrides state.setVariable to
+   * instead resolve against whichever instance build's recursion
+   * currently has open, via the instance-targeted overload below.
    */
   def setVariable(
     vrd: VariableRuntimeData,
@@ -430,9 +484,24 @@ class VariableMap private (
     referringContext: ThrowsSDE,
     pstate: ParseOrUnparseState
   ): Unit = {
-    val varQName = vrd.globalQName
     val variableInstances = vTable(vrd.vmapIndex)
-    val variable = variableInstances.head
+    setVariable(variableInstances.head, vrd, newValue, referringContext, pstate)
+  }
+
+  /**
+   * Overload of setVariable above that runs the variable-set state
+   * machine against a specific, caller-supplied VariableInstance rather
+   * than always the shared vTable's head; see BuildState's
+   * state.setVariable override (BuildState.scala).
+   */
+  def setVariable(
+    variable: VariableInstance,
+    vrd: VariableRuntimeData,
+    newValue: DataValuePrimitive,
+    referringContext: ThrowsSDE,
+    pstate: ParseOrUnparseState
+  ): Unit = {
+    val varQName = vrd.globalQName
     variable.state match {
       case VariableSet => {
         referringContext.SDE(
@@ -471,7 +540,7 @@ class VariableMap private (
            * variable.
            */
           case VariableDirection.UnparseOnly | VariableDirection.Both
-              if (vrd.maybeDefaultValueExpr.isDefined && variableInstances.size > 1) => {
+              if (vrd.maybeDefaultValueExpr.isDefined && vTable(vrd.vmapIndex).size > 1) => {
             // Variable has an unparse direction, a default value, and a
             // newVariableInstance
             pstate.SDE(

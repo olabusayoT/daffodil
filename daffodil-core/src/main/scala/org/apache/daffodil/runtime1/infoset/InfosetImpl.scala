@@ -176,13 +176,13 @@ sealed trait DINode {
   private var _isFinal: Boolean = false
 
   /**
-  * Use to mark a node as final, indicating that its value will not change or have
-  * any children added to it. Setting an element as final does not preclude it from
-  * being discarded by backtracking, i.e. it is only locally final, but might still
-  * be inside an enclosing PoU.
-  *
-  * This cannot be called if an element is already marked as final to help ensure
-  * correct use.
+   * Use to mark a node as final, indicating that its value will not change or have
+   * any children added to it. Setting an element as final does not preclude it from
+   * being discarded by backtracking, i.e. it is only locally final, but might still
+   * be inside an enclosing PoU.
+   *
+   * This cannot be called if an element is already marked as final to help ensure
+   * correct use.
    */
   def setFinal(): Unit = {
     Assert.invariant(!_isFinal)
@@ -1334,6 +1334,11 @@ final class DIArray(
 
   final def freeChildIfNoLongerNeeded(index: Int, doFree: Boolean): Unit = {
     val node = _contents(index)
+    // Under build/write-prefetch, both BuildState and write's writeContent
+    // dispatch can reach this slot; write may have already freed (nulled) it
+    // by the time build's independent call arrives here (build's doFree is
+    // always false, so this would only mark wouldHaveBeenFreed, moot here).
+    if (node == null) return
     if (!node.erd.dpathElementCompileInfo.isReferencedByExpressions) {
       if (doFree) {
         // set to null so that the garbage collector can free this node
@@ -1825,6 +1830,9 @@ sealed class DIComplex(override val erd: ElementRuntimeData)
 
   def freeChildIfNoLongerNeeded(index: Int, doFree: Boolean): Unit = {
     val node = child(index)
+    // Under build/write-prefetch, write may have already freed (nulled)
+    // this slot by the time build's independent call arrives here.
+    if (node == null) return
     if (!node.erd.dpathElementCompileInfo.isReferencedByExpressions) {
       if (doFree) {
         // set to null so that the garbage collector can free this node

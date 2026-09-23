@@ -32,11 +32,24 @@ import org.apache.daffodil.runtime1.processors.unparsers.UState
  * dfdl:setVariable expressions (which variables are in-turn used by
  * dfdl:outputValueCalc.
  */
+object SuspendableExpression {
+
+  /** True unless expr calls valueLength/contentLength (which needs a
+   * written DOS position, not merely a known value); other reads
+   * resolve once the value is known. A static property of expr alone;
+   * it doesn't know whether the referenced position is already written. */
+  def canResolveWithoutWriting(expr: CompiledExpression[AnyRef]): Boolean =
+    expr.valueReferencedElementInfos.isEmpty && expr.contentReferencedElementInfos.isEmpty
+}
+
 trait SuspendableExpression extends Suspension {
 
   override val isReadOnly = true
 
   protected def expr: CompiledExpression[AnyRef]
+
+  override def canResolveWithoutWriting: Boolean =
+    SuspendableExpression.canResolveWithoutWriting(expr)
 
   override def toString =
     "SuspendableExpression(" + rd.diagnosticDebugName + ", expr=" + expr.prettyExpr + ")"

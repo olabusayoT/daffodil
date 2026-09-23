@@ -228,12 +228,19 @@ class CaptureStartOfContentLengthUnparser(override val context: ElementRuntimeDa
   override val runtimeDependencies = Array()
 
   override def unparse(state: UState): Unit = {
-    val dos = state.getDataOutputStream
-    val elem = state.currentInfosetNode.asInstanceOf[DIElement]
-    if (dos.maybeAbsBitPos0b.isDefined) {
-      elem.contentLength.setAbsStartPos0bInBits(dos.maybeAbsBitPos0b.getULong)
-    } else {
-      elem.contentLength.setRelStartPos0bInBits(dos.relBitPos0b, dos)
+    // Write-only: this reaches write via a generic non-WriteUnparser
+    // fallback, which has no way to know build already (uselessly) ran
+    // it on build's fake DOS. Without this gate, build's call sets the
+    // position once (wrong), and write's later call trips the "must
+    // only be set once" invariant.
+    if (!state.isBuildOnly) {
+      val dos = state.getDataOutputStream
+      val elem = state.currentInfosetNode.asInstanceOf[DIElement]
+      if (dos.maybeAbsBitPos0b.isDefined) {
+        elem.contentLength.setAbsStartPos0bInBits(dos.maybeAbsBitPos0b.getULong)
+      } else {
+        elem.contentLength.setRelStartPos0bInBits(dos.relBitPos0b, dos)
+      }
     }
   }
 }
@@ -246,27 +253,32 @@ class CaptureEndOfContentLengthUnparser(
   override val runtimeDependencies = Array()
 
   override def unparse(state: UState): Unit = {
-    val dos = state.getDataOutputStream
-    val elem = state.currentInfosetNode.asInstanceOf[DIElement]
+    // Write-only, for the same reason as content-length capture: build
+    // already (uselessly) runs this on its own fake DOS, and a second,
+    // write-side call would trip the "must only be set once" invariant.
+    if (!state.isBuildOnly) {
+      val dos = state.getDataOutputStream
+      val elem = state.currentInfosetNode.asInstanceOf[DIElement]
 
-    if (
-      elem.contentLength.isStartAbsolute && dos.maybeAbsBitPos0b.isEmpty && maybeFixedLengthInBits.isDefined
-    ) {
-      // If this element has an absolute starting bit position, but the current
-      // DOS bit position is only known relatively, that means there was some
-      // suspension related to this element that had an unknown length.
-      // However, if this is a fixed length element, we can calculate the
-      // absolute position of this DOS based on its absolute starting position
-      // position, its length, and the relative position of the current DOS
-      val startAbsBitPos0b: ULong = elem.contentLength.maybeStartPos0bInBits.getULong
-      val currentAbsPos0b = startAbsBitPos0b + maybeFixedLengthInBits.getULong
-      dos.setAbsStartingBitPos0b(currentAbsPos0b - dos.relBitPos0b)
-    }
+      if (
+        elem.contentLength.isStartAbsolute && dos.maybeAbsBitPos0b.isEmpty && maybeFixedLengthInBits.isDefined
+      ) {
+        // If this element has an absolute starting bit position, but the current
+        // DOS bit position is only known relatively, that means there was some
+        // suspension related to this element that had an unknown length.
+        // However, if this is a fixed length element, we can calculate the
+        // absolute position of this DOS based on its absolute starting position
+        // position, its length, and the relative position of the current DOS
+        val startAbsBitPos0b: ULong = elem.contentLength.maybeStartPos0bInBits.getULong
+        val currentAbsPos0b = startAbsBitPos0b + maybeFixedLengthInBits.getULong
+        dos.setAbsStartingBitPos0b(currentAbsPos0b - dos.relBitPos0b)
+      }
 
-    if (dos.maybeAbsBitPos0b.isDefined) {
-      elem.contentLength.setAbsEndPos0bInBits(dos.maybeAbsBitPos0b.getULong)
-    } else {
-      elem.contentLength.setRelEndPos0bInBits(dos.relBitPos0b, dos)
+      if (dos.maybeAbsBitPos0b.isDefined) {
+        elem.contentLength.setAbsEndPos0bInBits(dos.maybeAbsBitPos0b.getULong)
+      } else {
+        elem.contentLength.setRelEndPos0bInBits(dos.relBitPos0b, dos)
+      }
     }
   }
 }
@@ -277,12 +289,17 @@ class CaptureStartOfValueLengthUnparser(override val context: ElementRuntimeData
   override val runtimeDependencies = Array()
 
   override def unparse(state: UState): Unit = {
-    val dos = state.getDataOutputStream
-    val elem = state.currentInfosetNode.asInstanceOf[DIElement]
-    if (dos.maybeAbsBitPos0b.isDefined) {
-      elem.valueLength.setAbsStartPos0bInBits(dos.maybeAbsBitPos0b.getULong)
-    } else {
-      elem.valueLength.setRelStartPos0bInBits(dos.relBitPos0b, dos)
+    // Write-only, for the same reason as content-length capture: build
+    // already (uselessly) runs this on its own fake DOS, and a second,
+    // write-side call would trip the "must only be set once" invariant.
+    if (!state.isBuildOnly) {
+      val dos = state.getDataOutputStream
+      val elem = state.currentInfosetNode.asInstanceOf[DIElement]
+      if (dos.maybeAbsBitPos0b.isDefined) {
+        elem.valueLength.setAbsStartPos0bInBits(dos.maybeAbsBitPos0b.getULong)
+      } else {
+        elem.valueLength.setRelStartPos0bInBits(dos.relBitPos0b, dos)
+      }
     }
   }
 }
@@ -293,12 +310,17 @@ class CaptureEndOfValueLengthUnparser(override val context: ElementRuntimeData)
   override val runtimeDependencies = Array()
 
   override def unparse(state: UState): Unit = {
-    val dos = state.getDataOutputStream
-    val elem = state.currentInfosetNode.asInstanceOf[DIElement]
-    if (dos.maybeAbsBitPos0b.isDefined) {
-      elem.valueLength.setAbsEndPos0bInBits(dos.maybeAbsBitPos0b.getULong)
-    } else {
-      elem.valueLength.setRelEndPos0bInBits(dos.relBitPos0b, dos)
+    // Write-only, for the same reason as content-length capture: build
+    // already (uselessly) runs this on its own fake DOS, and a second,
+    // write-side call would trip the "must only be set once" invariant.
+    if (!state.isBuildOnly) {
+      val dos = state.getDataOutputStream
+      val elem = state.currentInfosetNode.asInstanceOf[DIElement]
+      if (dos.maybeAbsBitPos0b.isDefined) {
+        elem.valueLength.setAbsEndPos0bInBits(dos.maybeAbsBitPos0b.getULong)
+      } else {
+        elem.valueLength.setRelEndPos0bInBits(dos.relBitPos0b, dos)
+      }
     }
   }
 }
@@ -349,7 +371,7 @@ class TargetLengthOperation(
  * Several sub-unparsers need to have the value length, and the target length
  * in order to compute their own length.
  */
-sealed trait NeedValueAndTargetLengthMixin {
+sealed trait NeedValueAndTargetLengthMixin { self: SuspendableOperation =>
 
   def targetLengthEv: Evaluatable[MaybeJULong]
   def maybeLengthEv: Maybe[LengthEv]

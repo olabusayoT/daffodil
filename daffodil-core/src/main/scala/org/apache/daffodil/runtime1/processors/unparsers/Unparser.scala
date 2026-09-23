@@ -20,7 +20,12 @@ package org.apache.daffodil.runtime1.processors.unparsers
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.util.Maybe.*
 import org.apache.daffodil.runtime1.dsom.RuntimeSchemaDefinitionError
+import org.apache.daffodil.runtime1.infoset.DINode
 import org.apache.daffodil.runtime1.processors.*
+import org.apache.daffodil.unparsers.runtime1.ElementUnparserBase
+import org.apache.daffodil.unparsers.runtime1.NewVariableInstanceStartUnparser
+import org.apache.daffodil.unparsers.runtime1.SetVariableUnparser
+import org.apache.daffodil.unparsers.runtime1.WriteUnparser
 
 sealed trait Unparser extends Processor {
 
@@ -49,22 +54,28 @@ sealed trait Unparser extends Processor {
     //
     // So this is a temporary fix, until we can figure out where else to do this.
     //
-    this match {
-      // bit order only applies to primitives, not combinators, nor "noData" unparsers.
-      case af: AlignmentPrimUnparser => // ok. Don't check bitOrder before Aligning.
-      case u: PrimUnparser => {
-        u.context match {
-          case trd: TermRuntimeData => {
-            ustate.bitOrder // asking for bitOrder checks bit order changes.
-            // this splits DOS on bitOrder changes if absoluteBitPos not known
+    // Skipped for build: asking bitOrder can trigger a DOS split via
+    // cloneForSuspension, which BuildState can't do and would trip an
+    // invariant. Build reaches this wrapper for SeqCompUnparser siblings
+    // whose own internal gates aren't enough, so this must be skipped too.
+    if (!ustate.isBuildOnly) {
+      this match {
+        // bit order only applies to primitives, not combinators, nor "noData" unparsers.
+        case af: AlignmentPrimUnparser => // ok. Don't check bitOrder before Aligning.
+        case u: PrimUnparser => {
+          u.context match {
+            case trd: TermRuntimeData => {
+              ustate.bitOrder // asking for bitOrder checks bit order changes.
+              // this splits DOS on bitOrder changes if absoluteBitPos not known
+            }
+            case rd: RuntimeData =>
+              Assert.invariantFailed(
+                "Primitive unparser " + u + " has non-Term runtime data: " + rd
+              )
           }
-          case rd: RuntimeData =>
-            Assert.invariantFailed(
-              "Primitive unparser " + u + " has non-Term runtime data: " + rd
-            )
         }
+        case _ => // ok
       }
-      case _ => // ok
     }
     try {
       unparse(ustate)
@@ -72,7 +83,11 @@ sealed trait Unparser extends Processor {
       ustate.resetFormatInfoCaches()
     }
     if (ustate.dataProc.isDefined) ustate.dataProc.get.after(ustate, this)
-    ustate.setMaybeProcessor(savedProc)
+    // Restore the prior processor only if one existed. Nope means this is
+    // the first unparse1 call on a freshly cloned suspension UState, which
+    // starts with none; resetting to Nope would discard the only context
+    // it will ever have, since runSuspension's later setFinished() needs one.
+    if (savedProc.isDefined) ustate.setMaybeProcessor(savedProc)
   }
 
   def UE(ustate: UState, s: String, args: Any*) = {
@@ -147,7 +162,8 @@ final class ErrorUnparser(override val context: TermRuntimeData = null)
 
 final class SeqCompUnparser(context: RuntimeData, val childUnparsers: Array[Unparser])
   extends CombinatorUnparser(context)
-  with ToBriefXMLImpl {
+  with ToBriefXMLImpl
+  with WriteUnparser {
 
   override val runtimeDependencies = Array()
 
@@ -161,6 +177,37 @@ final class SeqCompUnparser(context: RuntimeData, val childUnparsers: Array[Unpa
       val unparser = childUnparsers(i)
       i += 1
       unparser.unparse1(ustate)
+    }
+  }
+
+  /**
+   * SeqCompUnparser can wrap any `WriteUnparser` (sequence/choice/
+   * hidden-group/delimiter-stack), so it walks children one at a time
+   * like `unparse()` above: each runs synchronously if not itself a
+   * WriteUnparser, else recurses into its own writeContent.
+   */
+  override def writeContent(containerNode: DINode, ustate: UState): Unit = {
+    var i = 0
+    while (i < childUnparsers.length) {
+      childUnparsers(i) match {
+        case _: NewVariableInstanceStartUnparser | _: SetVariableUnparser =>
+          // Skip: build's unconditional recursion already ran these once
+          // (no isBuildOnly gate on either; see their own doc comments).
+          // Re-running on write would create a second VariableInstance or
+          // re-evaluate setVariable ("cannot set variable twice").
+          ()
+        case elemUnp: ElementUnparserBase =>
+          // An element never appears here directly (SeqCompUnparser only
+          // wraps alignment/capture-length prims alongside a group's body
+          // unparser); plain unparse1 since writeContent expects an
+          // already-existing child node, not this shared containerNode.
+          elemUnp.unparse1(ustate)
+        case wu: WriteUnparser =>
+          wu.writeContent(containerNode, ustate)
+        case cu =>
+          cu.unparse1(ustate)
+      }
+      i += 1
     }
   }
 

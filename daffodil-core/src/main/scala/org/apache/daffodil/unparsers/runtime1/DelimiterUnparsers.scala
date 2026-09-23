@@ -49,6 +49,11 @@ class DelimiterTextUnparser(
   }
 
   def unparse(state: UState): Unit = {
+    // Write-only, like ElementUnparserBase's doBeforeContentUnparser/
+    // doAfterContentUnparser gate. Also required for safety: build never
+    // pushes a delimiter stack node, so state.localDelimiters would hit
+    // BuildState's writeOnly stub (Assert.usageError) otherwise.
+    if (state.isBuildOnly) return
 
     Logger.log.debug(
       s"Unparsing starting at bit position: ${state.getDataOutputStream.maybeAbsBitPos0b}"

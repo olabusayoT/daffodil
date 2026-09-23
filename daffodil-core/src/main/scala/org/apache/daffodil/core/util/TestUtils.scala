@@ -43,6 +43,7 @@ import org.apache.daffodil.lib.iapi.*
 import org.apache.daffodil.lib.util.*
 import org.apache.daffodil.lib.xml.*
 import org.apache.daffodil.runtime1.iapi.DFDL
+import org.apache.daffodil.runtime1.infoset.InfosetInputter
 import org.apache.daffodil.runtime1.infoset.ScalaXMLInfosetInputter
 import org.apache.daffodil.runtime1.infoset.ScalaXMLInfosetOutputter
 import org.apache.daffodil.runtime1.processors.DataProcessor
@@ -118,9 +119,11 @@ object TestUtils {
     testSchema: scala.xml.Elem,
     infosetXML: Node,
     unparseTo: String,
-    areTracing: Boolean = false
+    areTracing: Boolean = false,
+    tunables: Map[String, String] = Map.empty
   ): java.util.List[api.Diagnostic] = {
-    val compiler = Compiler().withTunable("allowExternalPathExpressions", "true")
+    val compiler =
+      Compiler().withTunable("allowExternalPathExpressions", "true").withTunables(tunables)
     val pf = compiler.compileNode(testSchema)
     if (pf.isError) throwDiagnostics(pf.getDiagnostics)
     var u = saveAndReload(pf.onPath("/").asInstanceOf[DataProcessor])
@@ -196,6 +199,32 @@ object TestUtils {
     val p = saveAndReload(pf.onPath("/").asInstanceOf[DataProcessor])
     if (p.isError) throwDiagnostics(p.getDiagnostics)
     p
+  }
+
+  /**
+   * Compiles testSchema with the given tunables and returns the resulting
+   * DataProcessor, with no saveAndReload round-trip (unlike compileSchema)
+   * since some callers build test-only state directly off the live object.
+   */
+  def compileForUnparse(
+    testSchema: Node,
+    tunables: Map[String, String] = Map.empty
+  ): DataProcessor = {
+    val pf = Compiler().withTunables(tunables).compileNode(testSchema)
+    if (pf.isError) throwDiagnostics(pf.getDiagnostics)
+    val dp = pf.onPath("/").asInstanceOf[DataProcessor]
+    if (dp.isError) throwDiagnostics(dp.getDiagnostics)
+    dp
+  }
+
+  /**
+   * Builds a fresh InfosetInputter walking infosetXML against dp, already
+   * initialized (root TRD pushed) the same way a real unparse would.
+   */
+  def newInitializedInputter(infosetXML: Node, dp: DataProcessor): InfosetInputter = {
+    val inputter = new InfosetInputter(new ScalaXMLInfosetInputter(infosetXML))
+    inputter.initialize(dp.ssrd.elementRuntimeData, dp.tunables)
+    inputter
   }
 
   private def runSchemaOnRBC(

@@ -81,7 +81,13 @@ abstract class UState(
   with ThrowsSDE
   with SavesErrorsAndWarnings {
 
-  final override def setVariable(
+  /**
+   * Not final: BuildState overrides this to target its build-local NVI
+   * scope stack, since the shared vTable's head is popped only by write,
+   * much later, and could otherwise land a build-time set on the wrong,
+   * already-exited scope. See BuildState.scala.
+   */
+  override def setVariable(
     vrd: VariableRuntimeData,
     newValue: DataValuePrimitive,
     referringContext: ThrowsSDE
@@ -89,22 +95,23 @@ abstract class UState(
     vbox.vmap.setVariable(vrd, newValue, referringContext, this)
 
   /**
-   * For unparsing, this throws a RetryableException in the case where the variable cannot (yet) be read.
-   *
-   * @param vrd Identifies the variable to read.
-   * @param referringContext Where to place blame if there is an error.
-   * @return The data value of the variable, or throws exceptions if there is no value.
+   * For unparsing, throws a RetryableException if the variable can't yet
+   * be read. Not final: BuildState overrides this to resolve reads
+   * against its build-local NVI scope stack, since the shared vTable's
+   * head (popped only by write, much later) can still show an already-exited scope. See BuildState.scala.
    */
-  final override def getVariable(
+  override def getVariable(
     vrd: VariableRuntimeData,
     referringContext: ThrowsSDE
   ): DataValuePrimitive =
     vbox.vmap.readVariable(vrd, referringContext, this)
 
-  final override def newVariableInstance(vrd: VariableRuntimeData): VariableInstance =
+  // Not final: see BuildState's override.
+  override def newVariableInstance(vrd: VariableRuntimeData): VariableInstance =
     variableMap.newVariableInstance(vrd)
 
-  final override def removeVariableInstance(vrd: VariableRuntimeData): Unit =
+  // Not final: see BuildState's override.
+  override def removeVariableInstance(vrd: VariableRuntimeData): Unit =
     variableMap.removeVariableInstance(vrd)
 
   /**
@@ -404,9 +411,48 @@ abstract class UState(
 
   def documentElement: DIDocument
 
-  final val releaseUnneededInfoset: Boolean = !areDebugging && tunable.releaseUnneededInfoset
+  // Build must never free infoset nodes: build runs ahead of write, so
+  // freeChildIfNoLongerNeeded would null out a child reference write
+  // hasn't read yet. Write still frees as normal once done with a node
+  // (see DIArray/DIComplex.freeChildIfNoLongerNeeded).
+  final val releaseUnneededInfoset: Boolean =
+    !isBuildOnly && !areDebugging && tunable.releaseUnneededInfoset
 
   def delimitedParseResult = Nope
+
+  // UStateMain owns the real one; UStateForSuspension delegates to its
+  // mainUState so that a Suspension can always reach its tracker via
+  // savedUstate, even after it's been cloned off for suspension.
+  def suspensionTracker: SuspensionTracker
+
+  // Optional reference to the shared build/write lead counter. Defaults
+  // unset (a no-op for every existing call site); only BuildState sets it
+  // (in its constructor), and only a write-side UState that opts in (via
+  // setSharedContext) reads it.
+  private var sharedContextMaybe: Maybe[UnparseSharedContext] = Nope
+  final def setSharedContext(ctx: UnparseSharedContext): Unit = sharedContextMaybe = One(ctx)
+  final def sharedContext: Maybe[UnparseSharedContext] = sharedContextMaybe
+
+  // True for BuildState and any UStateForSuspension cloned from one (see
+  // override below). Unparsers gate content-writing on this rather than
+  // `isInstanceOf[BuildState]`, which a suspension continuation running
+  // on a UStateForSuspension would miss despite being build-side.
+  def isBuildOnly: Boolean = false
+}
+
+/**
+ * Mixed in by any `UState` that can create and track its own
+ * `Suspension`s - `UStateMain` and `BuildState`, since build creates
+ * value-only (OVC/setVariable) suspensions too. `Suspension.suspend()`
+ * casts through this trait rather than hardcoding `UStateMain` directly,
+ * so a `BuildState`-created suspension resolves correctly instead of
+ * throwing `ClassCastException`.
+ */
+trait SuspensionCapableUState { self: UState =>
+  def suspensions: Seq[Suspension]
+  def addSuspension(se: Suspension): Unit
+  def evalSuspensions(isFinal: Boolean): Unit
+  def cloneForSuspension(suspendedDOS: DirectOrBufferedDataOutputStream): UState
 }
 
 /**
@@ -418,7 +464,7 @@ abstract class UState(
  * memory.
  */
 final class UStateForSuspension(
-  val mainUState: UStateMain,
+  val mainUState: UState with SuspensionCapableUState,
   val dataOutputStream: DirectOrBufferedDataOutputStream,
   vbox: VariableBox,
   override val currentInfosetNode: DINode,
@@ -429,6 +475,8 @@ final class UStateForSuspension(
   tunable: DaffodilTunables,
   areDebugging: Boolean
 ) extends UState(vbox, mainUState.diagnostics, mainUState.dataProc, tunable, areDebugging) {
+
+  override def isBuildOnly: Boolean = mainUState.isBuildOnly
 
   _dataOutputStream = dataOutputStream
   dState.setMode(UnparserBlocking)
@@ -443,6 +491,7 @@ final class UStateForSuspension(
   override def getEncoder(cs: BitsCharset): BitsCharsetEncoder = mainUState.getEncoder(cs)
 
   override def suspensions = mainUState.suspensions
+  override val suspensionTracker = mainUState.suspensionTracker
 
   // override def charBufferDataOutputStream = mainUState.charBufferDataOutputStream
   override def withUnparserDataInputStream = mainUState.withUnparserDataInputStream
@@ -503,7 +552,44 @@ final class UStateForSuspension(
   }
 }
 
-final class UStateMain private (
+/**
+ * Live (stack-backed) array-iteration/occurs/group/child index tracking,
+ * shared by UStateMain and BuildState: each stack starts seeded with 1L,
+ * and moveOverOne*Only bumps its top by one as navigation advances.
+ * UStateForSuspension needs none of this; it stubs the stacks to die and
+ * tracks arrayIterationPos/occursPos as plain frozen Longs captured at
+ * suspension time instead (see its overrides above), so this lives in a
+ * mixin rather than directly on UState.
+ */
+trait LiveIndexStacks { self: UState =>
+  override val arrayIterationIndexStack = MStackOfLong()
+  arrayIterationIndexStack.push(1L)
+  override def moveOverOneArrayIterationIndexOnly(): Unit =
+    arrayIterationIndexStack.setTop(arrayIterationIndexStack.top + 1)
+  override def arrayIterationPos = arrayIterationIndexStack.top
+
+  override val occursIndexStack = MStackOfLong()
+  occursIndexStack.push(1L)
+  override def moveOverOneOccursIndexOnly(): Unit =
+    occursIndexStack.setTop(occursIndexStack.top + 1)
+  override def occursPos = occursIndexStack.top
+
+  override val groupIndexStack = MStackOfLong()
+  groupIndexStack.push(1L)
+  override def moveOverOneGroupIndexOnly(): Unit =
+    groupIndexStack.setTop(groupIndexStack.top + 1)
+  override def groupPos = groupIndexStack.top
+
+  // TODO: it doesn't look anything is actually reading the value of childindex
+  // stack. Can we get rid of it?
+  override val childIndexStack = MStackOfLong()
+  childIndexStack.push(1L)
+  override def moveOverOneElementChildOnly(): Unit =
+    childIndexStack.setTop(childIndexStack.top + 1)
+  override def childPos = childIndexStack.top
+}
+
+final class UStateMain private[unparsers] (
   private val inputter: InfosetInputter,
   outStream: java.io.OutputStream,
   vbox: VariableBox,
@@ -511,7 +597,9 @@ final class UStateMain private (
   dataProcArg: DataProcessor,
   tunable: DaffodilTunables,
   areDebugging: Boolean
-) extends UState(vbox, diagnosticsArg, One(dataProcArg), tunable, areDebugging) {
+) extends UState(vbox, diagnosticsArg, One(dataProcArg), tunable, areDebugging)
+  with SuspensionCapableUState
+  with LiveIndexStacks {
 
   dState.setMode(UnparserBlocking)
 
@@ -553,8 +641,10 @@ final class UStateMain private (
         // MStack, since the escape scheme cache logic requires an MStack. We
         // reallyjust need the top for cloning for suspensions, but that
         // requires changes to how the escape schema cache is accessed, which
-        // isn't a trivial change.
-        val esClone = new MStackOfMaybe[EscapeSchemeUnparserHelper]()
+        // isn't a trivial change. Sized to the source's actual depth since
+        // nothing ever pushes onto a suspension's cloned escapeSchemeEVCache
+        // after this point.
+        val esClone = new MStackOfMaybe[EscapeSchemeUnparserHelper](escapeSchemeEVCache.length)
         esClone.copyFrom(escapeSchemeEVCache)
         Maybe(esClone)
       } else {
@@ -563,8 +653,11 @@ final class UStateMain private (
     val ds =
       if (!delimiterStack.isEmpty) {
         // If there are any delimiters, then we need to clone them all since
-        // they may be needed for escaping
-        val dsClone = new MStackOf[DelimiterStackUnparseNode]()
+        // they may be needed for escaping. Sized to the source's actual
+        // depth: pushDelimiters/popDelimiters both die on this clone (see
+        // below), so it's read-only for the rest of the suspension's life
+        // and can never grow past this depth.
+        val dsClone = new MStackOf[DelimiterStackUnparseNode](delimiterStack.length)
         dsClone.copyFrom(delimiterStack)
         Maybe(dsClone)
       } else {
@@ -665,29 +758,6 @@ final class UStateMain private (
 
   override val currentInfosetNodeStack = new MStackOfMaybe[DINode]
 
-  override val arrayIterationIndexStack = MStackOfLong()
-  arrayIterationIndexStack.push(1L)
-  override def moveOverOneArrayIterationIndexOnly() =
-    arrayIterationIndexStack.setTop(arrayIterationIndexStack.top + 1)
-  override def arrayIterationPos = arrayIterationIndexStack.top
-
-  override val occursIndexStack = MStackOfLong()
-  occursIndexStack.push(1L)
-  override def moveOverOneOccursIndexOnly() = occursIndexStack.setTop(occursIndexStack.top + 1)
-  override def occursPos = occursIndexStack.top
-
-  override val groupIndexStack = MStackOfLong()
-  groupIndexStack.push(1L)
-  override def moveOverOneGroupIndexOnly() = groupIndexStack.setTop(groupIndexStack.top + 1)
-  override def groupPos = groupIndexStack.top
-
-  // TODO: it doesn't look anything is actually reading the value of childindex
-  // stack. Can we get rid of it?
-  override val childIndexStack = MStackOfLong()
-  childIndexStack.push(1L)
-  override def moveOverOneElementChildOnly() = childIndexStack.setTop(childIndexStack.top + 1)
-  override def childPos = childIndexStack.top
-
   override lazy val escapeSchemeEVCache = new MStackOfMaybe[EscapeSchemeUnparserHelper]
 
   val delimiterStack = new MStackOf[DelimiterStackUnparseNode]()
@@ -707,8 +777,19 @@ final class UStateMain private (
    * All the other clones used for outputValueCalc, those never
    * need to add any.
    */
-  private val suspensionTracker =
+  private val ownSuspensionTracker =
     new SuspensionTracker(tunable.unparseSuspensionWaitYoung, tunable.unparseSuspensionWaitOld)
+
+  // When sharedContext is set, route through the SAME tracker the other
+  // side of that split uses, or these suspensions would queue where
+  // nothing ever drains them.
+  override def suspensionTracker: SuspensionTracker = {
+    if (sharedContext.isDefined) {
+      sharedContext.get.suspensionTracker
+    } else {
+      ownSuspensionTracker
+    }
+  }
 
   def addSuspension(se: Suspension): Unit = {
     suspensionTracker.trackSuspension(se)
@@ -771,5 +852,29 @@ object UState {
       areDebugging
     )
     newState
+  }
+
+  /**
+   * Like `createInitialUState`, but takes an already-constructed
+   * `VariableBox` directly instead of copying it fresh: in the two-phase
+   * build-then-write path, write must see the SAME `VariableBox` build
+   * mutated, not an independent copy frozen at the pre-build state.
+   */
+  def createInitialUStateForSharedVariables(
+    outStream: java.io.OutputStream,
+    dataProc: DFDL.DataProcessor,
+    inputter: InfosetInputter,
+    vbox: VariableBox,
+    areDebugging: Boolean
+  ): UStateMain = {
+    new UStateMain(
+      inputter,
+      outStream,
+      vbox,
+      Nil,
+      dataProc.asInstanceOf[DataProcessor],
+      dataProc.tunables,
+      areDebugging
+    )
   }
 }
