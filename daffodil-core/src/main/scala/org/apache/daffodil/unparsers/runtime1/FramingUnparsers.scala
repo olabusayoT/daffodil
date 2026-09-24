@@ -29,6 +29,10 @@ class SkipRegionUnparser(skipInBits: Int, override val context: TermRuntimeData)
   override val runtimeDependencies = Array()
 
   override def unparse(state: UState) = {
+    // Build's DataOutputStream is a non-writing placeholder that never gets
+    // a prior bit order, so dos.skip's internal bit-order check would trip;
+    // write redoes this node for real, so build can skip it entirely.
+    if (state.isBuildOnly) return
     val dos = state.getDataOutputStream
     if (!dos.skip(skipInBits, state)) UE(state, "Unable to skip %s(bits).", skipInBits)
   }

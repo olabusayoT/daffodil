@@ -20,7 +20,13 @@ package org.apache.daffodil.runtime1.processors.unparsers
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.util.Maybe.*
 import org.apache.daffodil.runtime1.dsom.RuntimeSchemaDefinitionError
+import org.apache.daffodil.runtime1.infoset.DINode
 import org.apache.daffodil.runtime1.processors.*
+import org.apache.daffodil.unparsers.runtime1.CaptureEndOfContentLengthUnparser
+import org.apache.daffodil.unparsers.runtime1.CaptureEndOfValueLengthUnparser
+import org.apache.daffodil.unparsers.runtime1.CaptureStartOfContentLengthUnparser
+import org.apache.daffodil.unparsers.runtime1.CaptureStartOfValueLengthUnparser
+import org.apache.daffodil.unparsers.runtime1.WriteUnparser
 
 sealed trait Unparser extends Processor {
 
@@ -49,22 +55,28 @@ sealed trait Unparser extends Processor {
     //
     // So this is a temporary fix, until we can figure out where else to do this.
     //
-    this match {
-      // bit order only applies to primitives, not combinators, nor "noData" unparsers.
-      case af: AlignmentPrimUnparser => // ok. Don't check bitOrder before Aligning.
-      case u: PrimUnparser => {
-        u.context match {
-          case trd: TermRuntimeData => {
-            ustate.bitOrder // asking for bitOrder checks bit order changes.
-            // this splits DOS on bitOrder changes if absoluteBitPos not known
+    // Skipped for build: asking bitOrder can trigger a DOS split via
+    // cloneForSuspension, which BuildState can't do and would trip an
+    // invariant. Build still reaches this wrapper for some siblings not
+    // already filtered out earlier, so this must be skipped for them too.
+    if (!ustate.isBuildOnly) {
+      this match {
+        // bit order only applies to primitives, not combinators, nor "noData" unparsers.
+        case af: AlignmentPrimUnparser => // ok. Don't check bitOrder before Aligning.
+        case u: PrimUnparser => {
+          u.context match {
+            case trd: TermRuntimeData => {
+              ustate.bitOrder // asking for bitOrder checks bit order changes.
+              // this splits DOS on bitOrder changes if absoluteBitPos not known
+            }
+            case rd: RuntimeData =>
+              Assert.invariantFailed(
+                "Primitive unparser " + u + " has non-Term runtime data: " + rd
+              )
           }
-          case rd: RuntimeData =>
-            Assert.invariantFailed(
-              "Primitive unparser " + u + " has non-Term runtime data: " + rd
-            )
         }
+        case _ => // ok
       }
-      case _ => // ok
     }
     try {
       unparse(ustate)
@@ -72,7 +84,11 @@ sealed trait Unparser extends Processor {
       ustate.resetFormatInfoCaches()
     }
     if (ustate.dataProc.isDefined) ustate.dataProc.get.after(ustate, this)
-    ustate.setMaybeProcessor(savedProc)
+    // Restore the prior processor only if one existed. Nope means this is
+    // the first unparse1 call on a freshly cloned suspension UState, which
+    // starts with none; resetting to Nope would discard the only context
+    // it will ever have, which is still needed once the suspension completes.
+    if (savedProc.isDefined) ustate.setMaybeProcessor(savedProc)
   }
 
   def UE(ustate: UState, s: String, args: Any*) = {
@@ -125,6 +141,10 @@ trait SuspendableUnparser extends PrimUnparser {
   protected def suspendableOperation: SuspendableOperation
 
   override final def unparse(state: UState): Unit = {
+    // Build's DataOutputStream is a non-writing placeholder that never gets
+    // a prior bit order, so this check would trip; write redoes this node
+    // for real, so build can skip it entirely.
+    if (state.isBuildOnly) return
     state.bitOrder // force checking of bitOrder changes on non-byte boundaries
     // also forces capture of bitOrder value in case of suspension.
     suspendableOperation.run(state)
@@ -147,7 +167,8 @@ final class ErrorUnparser(override val context: TermRuntimeData = null)
 
 final class SeqCompUnparser(context: RuntimeData, val childUnparsers: Array[Unparser])
   extends CombinatorUnparser(context)
-  with ToBriefXMLImpl {
+  with ToBriefXMLImpl
+  with WriteUnparser {
 
   override val runtimeDependencies = Array()
 
@@ -160,7 +181,41 @@ final class SeqCompUnparser(context: RuntimeData, val childUnparsers: Array[Unpa
     while (i < childUnparsers.length) {
       val unparser = childUnparsers(i)
       i += 1
-      unparser.unparse1(ustate)
+      // None of these children have any tree-structural effect, only DOS
+      // position changes; write always redoes that itself against real
+      // bytes, so build gains nothing from also running them against its
+      // fake sink.
+      val isPositionOnly = unparser match {
+        case _: SuspendableUnparser => true
+        case _: AlignmentPrimUnparser => true
+        case _: CaptureStartOfContentLengthUnparser => true
+        case _: CaptureEndOfContentLengthUnparser => true
+        case _: CaptureStartOfValueLengthUnparser => true
+        case _: CaptureEndOfValueLengthUnparser => true
+        case _ => false
+      }
+      if (!(ustate.isBuildOnly && isPositionOnly)) {
+        unparser.unparse1(ustate)
+      }
+    }
+  }
+
+  /**
+   * SeqCompUnparser can wrap any `WriteUnparser` (sequence/choice/
+   * hidden-group/delimiter-stack) alongside plain prims: a `WriteUnparser`
+   * recurses into its own writeContent; everything else (a bare element
+   * never appears here directly, only wrapped by one) runs via unparse1.
+   */
+  override def writeContent(containerNode: DINode, ustate: UState): Unit = {
+    var i = 0
+    while (i < childUnparsers.length) {
+      childUnparsers(i) match {
+        case wu: WriteUnparser =>
+          wu.writeContent(containerNode, ustate)
+        case cu =>
+          cu.unparse1(ustate)
+      }
+      i += 1
     }
   }
 

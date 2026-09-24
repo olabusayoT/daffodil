@@ -68,6 +68,10 @@ final class SetVariableUnparser(
     new SetVariableSuspendableExpression(expr, context, referencingContext)
 
   override def unparse(state: UState): Unit = {
+    // Build never evaluates expressions, so this only runs on write's
+    // (or single-pass's) side, landing the set in that side's own
+    // document-order-scoped evaluation context.
+    if (state.isBuildOnly) return
     suspendableExpression.run(state)
   }
 
@@ -100,6 +104,10 @@ class NewVariableInstanceStartUnparser(vrd: VariableRuntimeData, trd: TermRuntim
   override def childProcessors = Vector()
 
   override def unparse(state: UState) = {
+    // Build never evaluates expressions and so never creates a
+    // Suspension, so this only runs on write's (or single-pass's) side;
+    // the pop below is gated the same way.
+    if (state.isBuildOnly) return
     val nvi = state.newVariableInstance(vrd)
 
     if (vrd.maybeDefaultValueExpr.isDefined) {
@@ -124,5 +132,10 @@ class NewVariableInstanceEndUnparser(vrd: VariableRuntimeData, trd: TermRuntimeD
 
   override def childProcessors = Vector()
 
-  override def unparse(state: UState) = state.removeVariableInstance(vrd)
+  override def unparse(state: UState) = {
+    // Symmetric with the push above: build never pushes a scope, so it
+    // must not pop one either.
+    if (state.isBuildOnly) return
+    state.removeVariableInstance(vrd)
+  }
 }
