@@ -24,7 +24,6 @@ import org.apache.daffodil.lib.util.MaybeULong
 import org.apache.daffodil.runtime1.dpath.SuspendableExpression
 import org.apache.daffodil.runtime1.dsom.CompiledExpression
 import org.apache.daffodil.runtime1.infoset.DIComplex
-import org.apache.daffodil.runtime1.infoset.DIElement
 import org.apache.daffodil.runtime1.infoset.DISimple
 import org.apache.daffodil.runtime1.infoset.DataValue.DataValuePrimitive
 import org.apache.daffodil.runtime1.infoset.RetryableException
@@ -212,38 +211,6 @@ sealed abstract class ElementUnparserBase(
 
   }
 
-  /**
-   * Builds this element's infoset node and, for complex types, recurses into
-   * its content to build descendant nodes. Skips expression evaluation
-   * (target length, outputValueCalc), variable assignment, and eBefore/
-   * eAfterUnparser, since those only apply once real bytes are being written.
-   */
-  final override def build(state: UState): Unit = {
-    unparseBegin(state)
-    // Captured now: unparseEnd (below) pops it back off currentInfosetNodeStack,
-    // after which state.currentInfosetNode refers to the parent instead.
-    val builtElement = state.currentInfosetNode.asInstanceOf[DIElement]
-    if (state.maybePrefetchController.isDefined) {
-      state.maybePrefetchController.get.emitStart(builtElement)
-    }
-
-    if (erd.isComplexType) {
-      state.pushTRD(erd.optComplexTypeModelGroupRuntimeData.get)
-      buildContent(state)
-      state.popTRD(erd.optComplexTypeModelGroupRuntimeData.get)
-    }
-
-    unparseEnd(state)
-    if (state.maybePrefetchController.isDefined) {
-      state.maybePrefetchController.get.emitEnd(builtElement)
-    }
-  }
-
-  private def buildContent(state: UState): Unit = {
-    if (eReptypeUnparser.isDefined) eReptypeUnparser.get.build(state)
-    else if (eUnparser.isDefined) eUnparser.get.build(state)
-  }
-
   def validate(state: UState): Unit = {
     ??? // TODO: JIRA DFDL-1582 - Is the ticket for implementing the Unparser - validation feature
 
@@ -414,12 +381,12 @@ sealed trait ElementUnparserStartEndStrategy {
    * Consumes the required infoset events and changes context so that the
    * element's DIElement node is the context element.
    */
-  protected def unparseBegin(state: UState): Unit
+  def unparseBegin(state: UState): Unit
 
   /**
    * Restores prior context. Consumes end-element event.
    */
-  protected def unparseEnd(state: UState): Unit
+  def unparseEnd(state: UState): Unit
 
   protected def captureRuntimeValuedExpressionValues(ustate: UState): Unit
 
@@ -436,7 +403,7 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
    * Consumes the required infoset events and changes context so that the
    * element's DIElement node is the context element.
    */
-  final override protected def unparseBegin(state: UState): Unit = {
+  final override def unparseBegin(state: UState): Unit = {
     if (erd.isQuasiElement) {
       // Quasi elements are used for RepType and PrefixedLength, and have no corresponding
       // events in the infoset inputter. The parent parser will push a DIElement for us to
@@ -523,7 +490,7 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
   /**
    * Restores prior context. Consumes end-element event.
    */
-  final override protected def unparseEnd(state: UState): Unit = {
+  final override def unparseEnd(state: UState): Unit = {
     if (erd.isQuasiElement) {
       // Quasi elements are used for TypeValueCalc, and have no corresponding events in the infoset inputter
       // The parent parser will handle pushing and poping the Infoset, so we do not need to do anything here.
@@ -606,7 +573,7 @@ trait OVCStartEndStrategy extends ElementUnparserStartEndStrategy {
   /**
    * For OVC, the behavior w.r.t. consuming infoset events is different.
    */
-  protected final override def unparseBegin(state: UState): Unit = {
+  final override def unparseBegin(state: UState): Unit = {
     val ovcElem =
       if (!state.withinHiddenNest) {
         // outputValueCalc elements are optional in the infoset. If the next event
@@ -661,7 +628,7 @@ trait OVCStartEndStrategy extends ElementUnparserStartEndStrategy {
     state.currentInfosetNodeStack.push(One(ovcElem))
   }
 
-  protected final override def unparseEnd(state: UState): Unit = {
+  final override def unparseEnd(state: UState): Unit = {
     // if an OVC element existed, the start AND end events were consumed in
     // unparseBegin. No need to advance the cursor here.
 

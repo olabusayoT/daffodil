@@ -22,6 +22,8 @@ import org.apache.daffodil.core.grammar.Gram
 import org.apache.daffodil.core.grammar.Terminal
 import org.apache.daffodil.lib.schema.annotation.props.SeparatorSuppressionPolicy
 import org.apache.daffodil.lib.util.Maybe
+import org.apache.daffodil.lib.util.Maybe.Nope
+import org.apache.daffodil.lib.util.Maybe.One
 import org.apache.daffodil.lib.util.MaybeInt
 import org.apache.daffodil.lib.util.Misc
 import org.apache.daffodil.runtime1.processors.parsers.*
@@ -124,6 +126,12 @@ class OrderedSequence(sq: SequenceTermBase, sequenceChildrenArg: Seq[SequenceChi
       }
     }
   }
+
+  override lazy val builder: Maybe[Builder] = {
+    val childBuildInfos = sequenceChildren.flatMap { _.optSequenceChildBuildInfo }
+    if (childBuildInfos.isEmpty) Nope
+    else One(new SequenceBuilder(childBuildInfos.toIndexedSeq))
+  }
 }
 
 class UnorderedSequence(
@@ -219,5 +227,11 @@ class UnorderedSequence(
           new OrderedUnseparatedSequenceUnparser(srd, childUnparsers)
       }
     }
+  }
+
+  override lazy val builder: Maybe[Builder] = {
+    val childBuildInfos = sequenceChildren.flatMap { _.optSequenceChildBuildInfo }
+    if (childBuildInfos.isEmpty) Nope
+    else One(new SequenceBuilder(childBuildInfos.toIndexedSeq))
   }
 }

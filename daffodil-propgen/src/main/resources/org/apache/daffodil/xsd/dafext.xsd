@@ -668,7 +668,7 @@
         <xs:element name="useBuildThenWrite" type="xs:boolean" default="false" minOccurs="0">
           <xs:annotation>
             <xs:documentation>
-              Experimental. When unparsing, first build the entire infoset tree
+              When unparsing, first build the entire infoset tree
               from the InfosetInputter, then write it in a second pass. This
               lets forward-referencing expressions (e.g. dfdl:outputValueCalc,
               dfdl:valueLength) resolve directly against the tree instead of
@@ -680,7 +680,7 @@
         <xs:element name="useBuildWritePrefetch" type="xs:boolean" default="false" minOccurs="0">
           <xs:annotation>
             <xs:documentation>
-              Experimental. When unparsing, build and write concurrently
+              When unparsing, build and write concurrently
               instead of as two fully separate passes: build races ahead of
               write by at most unparsePrefetchWindowNodes fully-built
               elements, handing control to write once that window fills, and
@@ -696,7 +696,7 @@
         <xs:element name="unparsePrefetchWindowNodes" type="xs:int" default="100" minOccurs="0">
           <xs:annotation>
             <xs:documentation>
-              Experimental. Only used when useBuildWritePrefetch is true. The
+              Only used when useBuildWritePrefetch is true. The
               maximum number of fully-built elements build may run ahead of
               write before pausing and handing control to write.
             </xs:documentation>

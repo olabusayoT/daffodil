@@ -30,15 +30,6 @@ sealed trait Unparser extends Processor {
 
   protected def unparse(ustate: UState): Unit
 
-  /**
-   * Builds the infoset structure this unparser is responsible for (if any),
-   * consuming events from the InfosetInputter as needed, without evaluating
-   * expressions, writing bytes, or creating suspensions. Overridden only by
-   * unparsers that create infoset nodes or that decide which child
-   * unparser(s) are structurally present.
-   */
-  def build(ustate: UState): Unit = ()
-
   final def unparse1(ustate: UState) = {
     Assert.invariant(isInitialized)
     val savedProc = ustate.maybeProcessor
@@ -148,7 +139,6 @@ final class ErrorUnparser(override val context: TermRuntimeData = null)
   def unparse(ustate: UState): Unit = {
     Assert.abort("Error Unparser")
   }
-  override def build(ustate: UState): Unit = unparse(ustate)
   override def childProcessors = Vector()
 
   override def toBriefXML(depthLimit: Int = -1) = "<error/>"
@@ -174,14 +164,6 @@ final class SeqCompUnparser(context: RuntimeData, val childUnparsers: Array[Unpa
     }
   }
 
-  override def build(ustate: UState): Unit = {
-    var i = 0
-    while (i < childUnparsers.length) {
-      childUnparsers(i).build(ustate)
-      i += 1
-    }
-  }
-
   override def toString: String = {
     val strings = childUnparsers.map { _.toString }
     strings.mkString(" ~ ")
@@ -198,8 +180,6 @@ case class DummyUnparser(primitiveName: String) extends PrimUnparserNoData {
 
   def unparse(state: UState): Unit =
     state.SDE("Unparser (%s) is not yet implemented.", primitiveName)
-
-  override def build(state: UState): Unit = unparse(state)
 
   override def childProcessors = Vector()
   override def toBriefXML(depthLimit: Int = -1) =
@@ -220,8 +200,6 @@ case class NotUnparsableUnparser(override val context: ElementRuntimeData)
     )
     context.toss(rsde)
   }
-
-  override def build(state: UState): Unit = unparse(state)
 
   override def childProcessors = Vector()
   override val runtimeDependencies = Array()

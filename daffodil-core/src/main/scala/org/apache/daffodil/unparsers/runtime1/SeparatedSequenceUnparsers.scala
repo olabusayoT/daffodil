@@ -129,9 +129,6 @@ class OrderedSeparatedSequenceUnparser(
 
   override def childProcessors = childUnparsers.toVector
 
-  override protected def buildChildUnparsers: IndexedSeq[SequenceChildUnparser] =
-    childUnparsers.toIndexedSeq
-
   /**
    * Unparses one occurrence with associated separator (non-suppressable).
    */

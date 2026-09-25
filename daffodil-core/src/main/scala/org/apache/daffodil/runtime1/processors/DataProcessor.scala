@@ -744,7 +744,9 @@ class DataProcessor(
       (mtrd.get eq rootUnparser.context)
     }
 
-    rootUnparser.build(state)
+    // The root element always has a builder: it is exactly the case that
+    // gets ElementBuilder wrapped around it, regardless of schema content.
+    ssrd.builder.get.build(state)
     state.popTRD(rootUnparser.context.asInstanceOf[TermRuntimeData])
 
     state.setProcessor(rootUnparser)

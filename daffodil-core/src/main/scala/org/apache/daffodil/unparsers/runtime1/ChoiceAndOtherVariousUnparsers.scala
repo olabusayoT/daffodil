@@ -148,22 +148,6 @@ class ChoiceCombinatorUnparser(
       state.popTRD(childUnparser.context.asInstanceOf[TermRuntimeData])
     }
   }
-
-  /**
-   * Builds just the one structurally-present branch, skipping the unused-
-   * space padding that choiceLengthInBits triggers for write, since that
-   * writes bytes rather than infoset nodes.
-   */
-  override def build(state: UState): Unit = {
-    if (state.withinHiddenNest) {
-      choiceBranchMap.defaultUnparser.get.build(state)
-    } else {
-      val childUnparser = resolveChoiceBranch(state)
-      state.pushTRD(childUnparser.context.asInstanceOf[TermRuntimeData])
-      childUnparser.build(state)
-      state.popTRD(childUnparser.context.asInstanceOf[TermRuntimeData])
-    }
-  }
 }
 
 class DelimiterStackUnparser(
@@ -210,9 +194,6 @@ class DelimiterStackUnparser(
 
     state.popDelimiters()
   }
-
-  // Delimiters are write-only content; build() only needs the body's structure.
-  override def build(state: UState): Unit = bodyUnparser.build(state)
 }
 
 class DynamicEscapeSchemeUnparser(
@@ -240,8 +221,4 @@ class DynamicEscapeSchemeUnparser(
     // invalidate the escape scheme cache
     escapeScheme.invalidateCache(state)
   }
-
-  // The escape scheme only governs delimiter matching in written bytes;
-  // build() only needs the body's structure.
-  override def build(state: UState): Unit = bodyUnparser.build(state)
 }
