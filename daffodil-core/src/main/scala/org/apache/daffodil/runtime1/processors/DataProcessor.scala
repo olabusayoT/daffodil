@@ -69,6 +69,8 @@ import org.apache.daffodil.runtime1.infoset.XMLTextInfosetOutputter
 import org.apache.daffodil.runtime1.processors.parsers.PState
 import org.apache.daffodil.runtime1.processors.parsers.ParseError
 import org.apache.daffodil.runtime1.processors.parsers.Parser
+import org.apache.daffodil.runtime1.processors.unparsers.BuildWritePrefetchController
+import org.apache.daffodil.runtime1.processors.unparsers.BuildWritePrefetchInputter
 import org.apache.daffodil.runtime1.processors.unparsers.UState
 import org.apache.daffodil.runtime1.processors.unparsers.UStateMain
 import org.apache.daffodil.runtime1.processors.unparsers.UnparseError
@@ -460,11 +462,52 @@ class DataProcessor(
   }
 
   def unparse(actualInputter: api.infoset.InfosetInputter, outStream: java.io.OutputStream) = {
-    if (tunables.useBuildThenWrite) {
+    if (tunables.useBuildWritePrefetch) {
+      unparseViaBuildWritePrefetch(actualInputter, outStream)
+    } else if (tunables.useBuildThenWrite) {
       unparseViaBuildThenWrite(actualInputter, outStream)
     } else {
       unparseSinglePass(actualInputter, outStream)
     }
+  }
+
+  /**
+   * Builds and writes the tree concurrently via a coroutine handoff (never
+   * simultaneously), with build racing at most unparsePrefetchWindowNodes
+   * elements ahead of write, so forward references can often resolve
+   * directly against the tree without holding the whole tree in memory.
+   */
+  private def unparseViaBuildWritePrefetch(
+    actualInputter: api.infoset.InfosetInputter,
+    outStream: java.io.OutputStream
+  ): UnparseResult = {
+    val buildInputter = new InfosetInputter(actualInputter)
+    // Write always trails build, never ahead of it, so nothing build has
+    // produced is safe to release until write itself has passed it.
+    val buildTunables = tunables.withTunable("releaseUnneededInfoset", "false")
+    val buildState = new UStateMain(
+      buildInputter,
+      java.io.OutputStream.nullOutputStream(),
+      variableMap.copy(),
+      Nil,
+      this,
+      buildTunables,
+      areDebugging
+    )
+    val controller = new BuildWritePrefetchController(
+      tunables.unparsePrefetchWindowNodes,
+      () => {
+        try {
+          buildInputter.initialize(ssrd.elementRuntimeData, tunables)
+          buildState.dataProc.get.init(buildState, ssrd.unparser)
+          doBuild(buildState)
+        } finally {
+          buildState.getDataOutputStream.cleanUp()
+        }
+      }
+    )
+    buildState.maybePrefetchController = One(controller)
+    unparseSinglePass(new BuildWritePrefetchInputter(controller), outStream)
   }
 
   /**

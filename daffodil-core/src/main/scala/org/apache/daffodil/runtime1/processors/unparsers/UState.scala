@@ -134,6 +134,14 @@ abstract class UState(
 
   def getDataOutputStream: DirectOrBufferedDataOutputStream = _dataOutputStream
 
+  /**
+   * Set only on the state driving a windowed build/write-prefetch build
+   * pass, so build() can report each element it finishes to the controller
+   * bounding how far ahead it may run. Left Nope everywhere else, so build()
+   * carries no reporting overhead outside that one path.
+   */
+  var maybePrefetchController: Maybe[BuildWritePrefetchController] = Nope
+
   def setDataOutputStream(dos: DirectOrBufferedDataOutputStream): Unit = {
     _dataOutputStream = dos
   }

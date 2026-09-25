@@ -24,6 +24,7 @@ import org.apache.daffodil.lib.util.MaybeULong
 import org.apache.daffodil.runtime1.dpath.SuspendableExpression
 import org.apache.daffodil.runtime1.dsom.CompiledExpression
 import org.apache.daffodil.runtime1.infoset.DIComplex
+import org.apache.daffodil.runtime1.infoset.DIElement
 import org.apache.daffodil.runtime1.infoset.DISimple
 import org.apache.daffodil.runtime1.infoset.DataValue.DataValuePrimitive
 import org.apache.daffodil.runtime1.infoset.RetryableException
@@ -219,6 +220,12 @@ sealed abstract class ElementUnparserBase(
    */
   final override def build(state: UState): Unit = {
     unparseBegin(state)
+    // Captured now: unparseEnd (below) pops it back off currentInfosetNodeStack,
+    // after which state.currentInfosetNode refers to the parent instead.
+    val builtElement = state.currentInfosetNode.asInstanceOf[DIElement]
+    if (state.maybePrefetchController.isDefined) {
+      state.maybePrefetchController.get.emitStart(builtElement)
+    }
 
     if (erd.isComplexType) {
       state.pushTRD(erd.optComplexTypeModelGroupRuntimeData.get)
@@ -227,6 +234,9 @@ sealed abstract class ElementUnparserBase(
     }
 
     unparseEnd(state)
+    if (state.maybePrefetchController.isDefined) {
+      state.maybePrefetchController.get.emitEnd(builtElement)
+    }
   }
 
   private def buildContent(state: UState): Unit = {
