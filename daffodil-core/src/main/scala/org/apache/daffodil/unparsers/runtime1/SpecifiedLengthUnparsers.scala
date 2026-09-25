@@ -70,6 +70,10 @@ final class SpecifiedLengthExplicitImplicitUnparser(
       eUnparser.unparse1(state)
     }
   }
+
+  // The unsupported-encoding check above is write-only diagnostics; the same
+  // error surfaces on write's pass regardless, so build() just recurses.
+  override def build(state: UState): Unit = eUnparser.build(state)
 }
 
 /**
@@ -191,5 +195,10 @@ class SpecifiedLengthPrefixedUnparser(
       suspension.run(state)
     }
   }
+
+  // The prefix length is computed from eUnparser's actual written content
+  // length, entirely via a detached throwaway node and suspensions; none of
+  // that touches the real infoset tree, so build() just recurses into eUnparser.
+  override def build(state: UState): Unit = eUnparser.build(state)
 
 }

@@ -66,6 +66,9 @@ class OrderedUnseparatedSequenceUnparser(
 
   override def childProcessors = childUnparsers.toVector
 
+  override protected def buildChildUnparsers: IndexedSeq[SequenceChildUnparser] =
+    childUnparsers.toIndexedSeq
+
   /**
    * Unparses one iteration of an array/optional element
    */

@@ -85,41 +85,52 @@ class ChoiceCombinatorUnparser(
 
   override def childProcessors = choiceBranchMap.childProcessors
 
+  /**
+   * Peeks the next event to determine which branch of the choice is
+   * structurally present, per the ChoiceBranchEvent key it maps to. Pushes
+   * the model group's TRD to resolve the event's ERD, then swaps it for the
+   * resolved branch's TRD, leaving that pushed for the caller to pop.
+   */
+  private def resolveChoiceBranch(state: UState): Unparser = {
+    state.pushTRD(mgrd)
+    val event: InfosetAccessor = state.inspectOrError
+    val key: ChoiceBranchEvent = event match {
+      //
+      // The ChoiceBranchStartEvent(...) is not a case class constructor. It is a
+      // hash-table lookup for a cached value. This avoids constructing these
+      // objects over and over again.
+      //
+      case e if e.isStart && e.isElement => ChoiceBranchStartEvent(e.erd.namedQName)
+      case e if e.isEnd && e.isElement => ChoiceBranchEndEvent(e.erd.namedQName)
+      case e if e.isStart && e.isArray => ChoiceBranchStartEvent(e.erd.namedQName)
+      case e if e.isEnd && e.isArray => ChoiceBranchEndEvent(e.erd.namedQName)
+    }
+
+    val maybeChildUnparser = choiceBranchMap.get(key)
+    if (maybeChildUnparser.isEmpty) {
+      UnparseError(
+        One(mgrd.schemaFileLocation),
+        One(state.currentLocation),
+        "Found next element %s, but expected one of %s.",
+        key.qname.toExtendedSyntax,
+        choiceBranchMap.keys
+          .map {
+            _.qname.toExtendedSyntax
+          }
+          .mkString(", ")
+      )
+    }
+    val childUnparser = maybeChildUnparser.get
+    state.popTRD(mgrd)
+    childUnparser
+  }
+
   def unparse(state: UState): Unit = {
     if (state.withinHiddenNest) {
       val branchForUnparseIfHidden = choiceBranchMap.defaultUnparser
       branchForUnparseIfHidden.get.unparse1(state)
     } else {
-      state.pushTRD(mgrd)
-      val event: InfosetAccessor = state.inspectOrError
-      val key: ChoiceBranchEvent = event match {
-        //
-        // The ChoiceBranchStartEvent(...) is not a case class constructor. It is a
-        // hash-table lookup for a cached value. This avoids constructing these
-        // objects over and over again.
-        //
-        case e if e.isStart && e.isElement => ChoiceBranchStartEvent(e.erd.namedQName)
-        case e if e.isEnd && e.isElement => ChoiceBranchEndEvent(e.erd.namedQName)
-        case e if e.isStart && e.isArray => ChoiceBranchStartEvent(e.erd.namedQName)
-        case e if e.isEnd && e.isArray => ChoiceBranchEndEvent(e.erd.namedQName)
-      }
-
-      val maybeChildUnparser = choiceBranchMap.get(key)
-      if (maybeChildUnparser.isEmpty) {
-        UnparseError(
-          One(mgrd.schemaFileLocation),
-          One(state.currentLocation),
-          "Found next element %s, but expected one of %s.",
-          key.qname.toExtendedSyntax,
-          choiceBranchMap.keys
-            .map {
-              _.qname.toExtendedSyntax
-            }
-            .mkString(", ")
-        )
-      }
-      val childUnparser = maybeChildUnparser.get
-      state.popTRD(mgrd)
+      val childUnparser = resolveChoiceBranch(state)
       state.pushTRD(childUnparser.context.asInstanceOf[TermRuntimeData])
       if (choiceLengthInBits.isDefined) {
         val suspendableOp =
@@ -134,6 +145,22 @@ class ChoiceCombinatorUnparser(
       } else {
         childUnparser.unparse1(state)
       }
+      state.popTRD(childUnparser.context.asInstanceOf[TermRuntimeData])
+    }
+  }
+
+  /**
+   * Builds just the one structurally-present branch, skipping the unused-
+   * space padding that choiceLengthInBits triggers for write, since that
+   * writes bytes rather than infoset nodes.
+   */
+  override def build(state: UState): Unit = {
+    if (state.withinHiddenNest) {
+      choiceBranchMap.defaultUnparser.get.build(state)
+    } else {
+      val childUnparser = resolveChoiceBranch(state)
+      state.pushTRD(childUnparser.context.asInstanceOf[TermRuntimeData])
+      childUnparser.build(state)
       state.popTRD(childUnparser.context.asInstanceOf[TermRuntimeData])
     }
   }
@@ -183,6 +210,9 @@ class DelimiterStackUnparser(
 
     state.popDelimiters()
   }
+
+  // Delimiters are write-only content; build() only needs the body's structure.
+  override def build(state: UState): Unit = bodyUnparser.build(state)
 }
 
 class DynamicEscapeSchemeUnparser(
@@ -210,4 +240,8 @@ class DynamicEscapeSchemeUnparser(
     // invalidate the escape scheme cache
     escapeScheme.invalidateCache(state)
   }
+
+  // The escape scheme only governs delimiter matching in written bytes;
+  // build() only needs the body's structure.
+  override def build(state: UState): Unit = bodyUnparser.build(state)
 }

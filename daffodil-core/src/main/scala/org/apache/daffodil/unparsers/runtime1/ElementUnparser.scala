@@ -211,6 +211,29 @@ sealed abstract class ElementUnparserBase(
 
   }
 
+  /**
+   * Builds this element's infoset node and, for complex types, recurses into
+   * its content to build descendant nodes. Skips expression evaluation
+   * (target length, outputValueCalc), variable assignment, and eBefore/
+   * eAfterUnparser, since those only apply once real bytes are being written.
+   */
+  final override def build(state: UState): Unit = {
+    unparseBegin(state)
+
+    if (erd.isComplexType) {
+      state.pushTRD(erd.optComplexTypeModelGroupRuntimeData.get)
+      buildContent(state)
+      state.popTRD(erd.optComplexTypeModelGroupRuntimeData.get)
+    }
+
+    unparseEnd(state)
+  }
+
+  private def buildContent(state: UState): Unit = {
+    if (eReptypeUnparser.isDefined) eReptypeUnparser.get.build(state)
+    else if (eUnparser.isDefined) eUnparser.get.build(state)
+  }
+
   def validate(state: UState): Unit = {
     ??? // TODO: JIRA DFDL-1582 - Is the ticket for implementing the Unparser - validation feature
 

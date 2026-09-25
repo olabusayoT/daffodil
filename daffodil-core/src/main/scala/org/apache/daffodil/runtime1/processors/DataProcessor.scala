@@ -64,11 +64,13 @@ import org.apache.daffodil.runtime1.infoset.DIElement
 import org.apache.daffodil.runtime1.infoset.InfosetException
 import org.apache.daffodil.runtime1.infoset.InfosetInputter
 import org.apache.daffodil.runtime1.infoset.TeeInfosetOutputter
+import org.apache.daffodil.runtime1.infoset.TreeInfosetInputter
 import org.apache.daffodil.runtime1.infoset.XMLTextInfosetOutputter
 import org.apache.daffodil.runtime1.processors.parsers.PState
 import org.apache.daffodil.runtime1.processors.parsers.ParseError
 import org.apache.daffodil.runtime1.processors.parsers.Parser
 import org.apache.daffodil.runtime1.processors.unparsers.UState
+import org.apache.daffodil.runtime1.processors.unparsers.UStateMain
 import org.apache.daffodil.runtime1.processors.unparsers.UnparseError
 
 /**
@@ -458,6 +460,95 @@ class DataProcessor(
   }
 
   def unparse(actualInputter: api.infoset.InfosetInputter, outStream: java.io.OutputStream) = {
+    if (tunables.useBuildThenWrite) {
+      unparseViaBuildThenWrite(actualInputter, outStream)
+    } else {
+      unparseSinglePass(actualInputter, outStream)
+    }
+  }
+
+  /**
+   * Builds the entire infoset tree from actualInputter first, then writes it
+   * via a second, ordinary single-pass unparse fed from a replay of that
+   * tree. Forward-referencing expressions can then resolve directly against
+   * the tree, in the cases where having the whole tree already built makes
+   * that possible, rather than via a suspension.
+   */
+  private def unparseViaBuildThenWrite(
+    actualInputter: api.infoset.InfosetInputter,
+    outStream: java.io.OutputStream
+  ): UnparseResult = {
+    val buildInputter = new InfosetInputter(actualInputter)
+    // Nothing may be freed from the tree while it's being built: write hasn't
+    // consumed any of it yet, unlike single-pass unparse's interleaved build
+    // and write, which is what releaseUnneededInfoset is otherwise safe for.
+    val buildTunables = tunables.withTunable("releaseUnneededInfoset", "false")
+    val buildState = new UStateMain(
+      buildInputter,
+      java.io.OutputStream.nullOutputStream(),
+      variableMap.copy(),
+      Nil,
+      this,
+      buildTunables,
+      areDebugging
+    )
+    val buildFailure =
+      try {
+        buildInputter.initialize(ssrd.elementRuntimeData, tunables)
+        buildState.dataProc.get.init(buildState, ssrd.unparser)
+        doBuild(buildState)
+        None
+      } catch {
+        case ue: UnparseError => {
+          buildState.addUnparseError(ue)
+          Some(buildState.unparseResult)
+        }
+        case procErr: ProcessingError => {
+          buildState.setFailed(procErr.toUnparseError)
+          Some(buildState.unparseResult)
+        }
+        case sde: SchemaDefinitionError => {
+          buildState.setFailed(sde)
+          Some(buildState.unparseResult)
+        }
+        case sdefw: SchemaDefinitionErrorFromWarning => {
+          buildState.setFailed(sdefw)
+          Some(buildState.unparseResult)
+        }
+        case e: ErrorAlreadyHandled => {
+          buildState.setFailed(e.th)
+          Some(buildState.unparseResult)
+        }
+        case e: TunableLimitExceededError => {
+          buildState.setFailed(e)
+          Some(buildState.unparseResult)
+        }
+        case se: org.xml.sax.SAXException => {
+          buildState.setFailed(new UnparseError(None, None, se))
+          Some(buildState.unparseResult)
+        }
+        case e: scala.xml.parsing.FatalError => {
+          buildState.setFailed(new UnparseError(None, None, e))
+          Some(buildState.unparseResult)
+        }
+        case ie: InfosetException => {
+          buildState.setFailed(new UnparseError(None, None, ie))
+          Some(buildState.unparseResult)
+        }
+      } finally {
+        buildState.getDataOutputStream.cleanUp()
+      }
+    buildFailure match {
+      case Some(res) => res
+      case None =>
+        unparseSinglePass(new TreeInfosetInputter(buildState.documentElement), outStream)
+    }
+  }
+
+  private def unparseSinglePass(
+    actualInputter: api.infoset.InfosetInputter,
+    outStream: java.io.OutputStream
+  ) = {
     val inputter = new InfosetInputter(actualInputter)
     val unparserState =
       UState.createInitialUState(outStream, this, inputter, areDebugging)
@@ -575,6 +666,55 @@ class DataProcessor(
     // An application could do this in a loop calling unparse repeatedly
     // without having to create a new infoset event stream or outputstream.
     //
+    Assert.invariant(!state.getDataOutputStream.isFinished)
+    try {
+      state.getDataOutputStream.setFinished(state)
+    } catch {
+      case boc: BitOrderChangeException =>
+        state.SDE(boc)
+      case fio: FileIOException =>
+        state.SDE(fio)
+    }
+
+    val ev = state.advanceMaybe
+    if (ev.isDefined) {
+      UnparseError(
+        Nope,
+        One(state.currentLocation),
+        "Expected no remaining events, but received %s.",
+        ev.get
+      )
+    }
+  }
+
+  /**
+   * Builds the entire infoset tree from state's InfosetInputter. Mirrors
+   * doUnparse's structure, but calls build() instead of unparse1(), and
+   * skips initializeVariables() since build never evaluates expressions.
+   */
+  private def doBuild(state: UState): Unit = {
+    val rootUnparser = ssrd.unparser
+
+    Assert.invariant {
+      val mtrd = state.maybeTopTRD()
+      mtrd.isDefined &&
+      (mtrd.get eq rootUnparser.context)
+    }
+
+    rootUnparser.build(state)
+    state.popTRD(rootUnparser.context.asInstanceOf[TermRuntimeData])
+
+    state.setProcessor(rootUnparser)
+
+    Assert.invariant(state.arrayIterationIndexStack.length == 1)
+    Assert.invariant(state.occursIndexStack.length == 1)
+    Assert.invariant(state.groupIndexStack.length == 1)
+    Assert.invariant(state.childIndexStack.length == 1)
+    Assert.invariant(state.currentInfosetNodeMaybe.isEmpty)
+    Assert.invariant(state.escapeSchemeEVCache.isEmpty)
+    Assert.invariant(state.maybeTopTRD().isEmpty)
+    Assert.invariant(!state.withinHiddenNest)
+
     Assert.invariant(!state.getDataOutputStream.isFinished)
     try {
       state.getDataOutputStream.setFinished(state)
