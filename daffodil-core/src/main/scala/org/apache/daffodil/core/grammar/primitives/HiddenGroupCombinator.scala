@@ -20,9 +20,12 @@ package org.apache.daffodil.core.grammar.primitives
 import org.apache.daffodil.core.dsom.ModelGroup
 import org.apache.daffodil.core.grammar.Gram
 import org.apache.daffodil.core.grammar.Terminal
+import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.runtime1.processors.parsers.HiddenGroupCombinatorParser
 import org.apache.daffodil.runtime1.processors.parsers.Parser
+import org.apache.daffodil.runtime1.processors.unparsers.Builder
 import org.apache.daffodil.runtime1.processors.unparsers.Unparser
+import org.apache.daffodil.unparsers.runtime1.HiddenGroupBuilder
 import org.apache.daffodil.unparsers.runtime1.HiddenGroupCombinatorUnparser
 
 final class HiddenGroupCombinator(ctxt: ModelGroup, body: Gram)
@@ -33,5 +36,8 @@ final class HiddenGroupCombinator(ctxt: ModelGroup, body: Gram)
 
   override lazy val unparser: Unparser =
     new HiddenGroupCombinatorUnparser(ctxt.modelGroupRuntimeData, body.unparser)
+
+  override lazy val builder: Maybe[Builder] =
+    if (body.builder.isDefined) Maybe(new HiddenGroupBuilder(body.builder.get)) else Maybe.Nope
 
 }

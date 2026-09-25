@@ -36,14 +36,17 @@ import org.apache.daffodil.runtime1.processors.parsers.ElementParser
 import org.apache.daffodil.runtime1.processors.parsers.ElementParserInputValueCalc
 import org.apache.daffodil.runtime1.processors.parsers.NadaParser
 import org.apache.daffodil.runtime1.processors.parsers.Parser
+import org.apache.daffodil.runtime1.processors.unparsers.Builder
 import org.apache.daffodil.runtime1.processors.unparsers.Unparser
 import org.apache.daffodil.unparsers.runtime1.CaptureEndOfContentLengthUnparser
 import org.apache.daffodil.unparsers.runtime1.CaptureEndOfValueLengthUnparser
 import org.apache.daffodil.unparsers.runtime1.CaptureStartOfContentLengthUnparser
 import org.apache.daffodil.unparsers.runtime1.CaptureStartOfValueLengthUnparser
+import org.apache.daffodil.unparsers.runtime1.ElementBuilder
 import org.apache.daffodil.unparsers.runtime1.ElementOVCSpecifiedLengthUnparser
 import org.apache.daffodil.unparsers.runtime1.ElementOVCUnspecifiedLengthUnparser
 import org.apache.daffodil.unparsers.runtime1.ElementSpecifiedLengthUnparser
+import org.apache.daffodil.unparsers.runtime1.ElementUnparserBase
 import org.apache.daffodil.unparsers.runtime1.ElementUnparserInputValueCalc
 import org.apache.daffodil.unparsers.runtime1.ElementUnspecifiedLengthUnparser
 import org.apache.daffodil.unparsers.runtime1.ElementUnusedUnparser
@@ -142,6 +145,17 @@ class ElementCombinator(
       subComb.unparser
     }
   }
+
+  // dfdl:inputValueCalc elements are never represented on the wire, so
+  // they have no content to build regardless of what eValue itself is;
+  // matches ElementUnparserInputValueCalc's own hardcoded Nope content.
+  private lazy val contentBuilder: Maybe[Builder] =
+    if (!context.isRepresented) Maybe.Nope
+    else if (repTypeElementGram.builder.isDefined) repTypeElementGram.builder
+    else eValue.builder
+
+  override lazy val builder: Maybe[Builder] =
+    Maybe(new ElementBuilder(unparser.asInstanceOf[ElementUnparserBase], contentBuilder))
 
 }
 
@@ -374,6 +388,9 @@ class ElementParseAndUnspecifiedLength(
       new ElementUnparserInputValueCalc(context.erd, uSetVar)
     }
   }
+
+  override lazy val builder: Maybe[Builder] =
+    Maybe(new ElementBuilder(unparser.asInstanceOf[ElementUnparserBase], contentBuilder))
 }
 
 abstract class ElementCombinatorBase(
@@ -448,5 +465,15 @@ abstract class ElementCombinatorBase(
   lazy val eRepTypeUnparser: Maybe[Unparser] = repTypeElementGram.maybeUnparser
 
   def unparser: Unparser
+
+  // dfdl:inputValueCalc elements are never represented on the wire, so they
+  // have no content to build regardless of what eGram itself is; matches
+  // ElementUnparserInputValueCalc's own hardcoded Nope content.
+  lazy val contentBuilder: Maybe[Builder] =
+    if (!context.isRepresented) Maybe.Nope
+    else if (repTypeElementGram.builder.isDefined) repTypeElementGram.builder
+    else eGram.builder
+
+  def builder: Maybe[Builder]
 
 }

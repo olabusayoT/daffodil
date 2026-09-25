@@ -56,6 +56,88 @@ case class ChoiceBranchMap(
   def keys = lookupTable.keySet.asScala
 }
 
+/**
+ * Peeks the next event to determine which branch of a choice group is
+ * structurally present, returning the ChoiceBranchEvent key it maps to.
+ * Shared by ChoiceCombinatorUnparser (write) and ChoiceBuilder (build),
+ * since both dispatch on the exact same peeked event.
+ */
+private[runtime1] object ChoiceBranchEventResolver {
+  def resolve(state: UState): ChoiceBranchEvent = {
+    val event: InfosetAccessor = state.inspectOrError
+    event match {
+      //
+      // The ChoiceBranchStartEvent(...) is not a case class constructor. It is a
+      // hash-table lookup for a cached value. This avoids constructing these
+      // objects over and over again.
+      //
+      case e if e.isStart && e.isElement => ChoiceBranchStartEvent(e.erd.namedQName)
+      case e if e.isEnd && e.isElement => ChoiceBranchEndEvent(e.erd.namedQName)
+      case e if e.isStart && e.isArray => ChoiceBranchStartEvent(e.erd.namedQName)
+      case e if e.isEnd && e.isArray => ChoiceBranchEndEvent(e.erd.namedQName)
+    }
+  }
+}
+
+/**
+ * The Builder-side analog of ChoiceBranchMap: each branch's Builder is
+ * paired with its TermRuntimeData, since build must push/pop that TRD around
+ * the branch the same way write does (the InfosetInputter's own name
+ * resolution depends on it), and unlike Unparser, Builder has no context of
+ * its own to read it from.
+ */
+case class ChoiceBranchBuilderMap(
+  lookupTable: ProperlySerializableMap[ChoiceBranchEvent, (TermRuntimeData, Builder)],
+  unmappedDefault: Option[(TermRuntimeData, Builder)]
+) extends Serializable {
+
+  def get(cbe: ChoiceBranchEvent): Maybe[(TermRuntimeData, Builder)] = {
+    val fromTable = lookupTable.get(cbe)
+    if (fromTable != null) One(fromTable)
+    else if (unmappedDefault.isDefined) One(unmappedDefault.get)
+    else Nope
+  }
+
+  def defaultEntry = unmappedDefault
+
+  def keys = lookupTable.keySet.asScala
+}
+
+final class ChoiceBuilder(
+  mgrd: ModelGroupRuntimeData,
+  choiceBranchBuilderMap: ChoiceBranchBuilderMap
+) extends Builder {
+
+  override def build(state: UState): Unit = {
+    if (state.withinHiddenNest) {
+      val (_, builder) = choiceBranchBuilderMap.defaultEntry.get
+      builder.build(state)
+    } else {
+      state.pushTRD(mgrd)
+      val key = ChoiceBranchEventResolver.resolve(state)
+      val maybeEntry = choiceBranchBuilderMap.get(key)
+      if (maybeEntry.isEmpty) {
+        UnparseError(
+          One(mgrd.schemaFileLocation),
+          One(state.currentLocation),
+          "Found next element %s, but expected one of %s.",
+          key.qname.toExtendedSyntax,
+          choiceBranchBuilderMap.keys
+            .map {
+              _.qname.toExtendedSyntax
+            }
+            .mkString(", ")
+        )
+      }
+      val (trd, childBuilder) = maybeEntry.get
+      state.popTRD(mgrd)
+      state.pushTRD(trd)
+      childBuilder.build(state)
+      state.popTRD(trd)
+    }
+  }
+}
+
 /*
  * Sometimes choices have an empty branch (e.g. a sequence that just has an
  * assert in it) that optimizes to a NadaUnparser. NadaUnparsers should all
@@ -69,6 +151,18 @@ class ChoiceBranchEmptyUnparser(val context: RuntimeData) extends PrimUnparserNo
   override val runtimeDependencies = Array()
 
   def unparse(state: UState): Unit = {
+    // do nothing
+  }
+}
+
+/*
+ * Builder-side analog of ChoiceBranchEmptyUnparser: a choice's default
+ * branch may have no builder of its own (e.g. a bare dfdl:initiator="empty"
+ * sequence with no elements), but the default entry must still be present
+ * so an unmatched event resolves to it instead of failing with "no entry".
+ */
+object ChoiceBranchEmptyBuilder extends Builder {
+  def build(state: UState): Unit = {
     // do nothing
   }
 }
@@ -91,18 +185,7 @@ class ChoiceCombinatorUnparser(
       branchForUnparseIfHidden.get.unparse1(state)
     } else {
       state.pushTRD(mgrd)
-      val event: InfosetAccessor = state.inspectOrError
-      val key: ChoiceBranchEvent = event match {
-        //
-        // The ChoiceBranchStartEvent(...) is not a case class constructor. It is a
-        // hash-table lookup for a cached value. This avoids constructing these
-        // objects over and over again.
-        //
-        case e if e.isStart && e.isElement => ChoiceBranchStartEvent(e.erd.namedQName)
-        case e if e.isEnd && e.isElement => ChoiceBranchEndEvent(e.erd.namedQName)
-        case e if e.isStart && e.isArray => ChoiceBranchStartEvent(e.erd.namedQName)
-        case e if e.isEnd && e.isArray => ChoiceBranchEndEvent(e.erd.namedQName)
-      }
+      val key: ChoiceBranchEvent = ChoiceBranchEventResolver.resolve(state)
 
       val maybeChildUnparser = choiceBranchMap.get(key)
       if (maybeChildUnparser.isEmpty) {

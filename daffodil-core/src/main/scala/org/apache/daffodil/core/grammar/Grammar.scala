@@ -21,9 +21,12 @@ import org.apache.daffodil.core.compiler.ForParser
 import org.apache.daffodil.core.compiler.ForUnparser
 import org.apache.daffodil.core.dsom.*
 import org.apache.daffodil.lib.exceptions.Assert
+import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.runtime1.processors.parsers.AssertExpressionEvaluationParser
 import org.apache.daffodil.runtime1.processors.parsers.NadaParser
 import org.apache.daffodil.runtime1.processors.parsers.SeqCompParser
+import org.apache.daffodil.runtime1.processors.unparsers.Builder
+import org.apache.daffodil.runtime1.processors.unparsers.SeqCompBuilder
 import org.apache.daffodil.runtime1.processors.unparsers.SeqCompUnparser
 import org.apache.daffodil.unparsers.runtime1.NadaUnparser
 
@@ -123,6 +126,18 @@ class SeqComp private (context: SchemaComponent, children: Seq[Gram])
     if (unparserChildren.isEmpty) new NadaUnparser(context.runtimeData)
     else if (unparserChildren.length == 1) unparserChildren.head
     else new SeqCompUnparser(context.runtimeData, unparserChildren.toArray)
+  }
+
+  lazy val builderChildren: Seq[Builder] = {
+    children
+      .filter(x => !x.isEmpty && (x.forWhat != ForParser) && x.builder.isDefined)
+      .map { x => x.builder.get }
+  }
+
+  final override lazy val builder: Maybe[Builder] = {
+    if (builderChildren.isEmpty) Maybe.Nope
+    else if (builderChildren.length == 1) Maybe(builderChildren.head)
+    else Maybe(new SeqCompBuilder(builderChildren.toArray))
   }
 }
 

@@ -233,6 +233,31 @@ sealed abstract class ElementUnparserBase(
   }
 }
 
+/**
+ * Builds this element's infoset node and, for complex types, recurses into
+ * its content to build descendant nodes. Reuses elementUnparser's own
+ * unparseBegin/unparseEnd unchanged: build needs exactly that structural
+ * bookkeeping (including the TRD push/pop, which the InfosetInputter's own
+ * name resolution depends on) and nothing else, so there's no separate
+ * copy of it to keep in sync.
+ */
+final class ElementBuilder(
+  private[runtime1] val elementUnparser: ElementUnparserBase,
+  contentBuilder: Maybe[Builder]
+) extends Builder {
+
+  override def build(state: UState): Unit = {
+    val erd = elementUnparser.erd
+    elementUnparser.unparseBegin(state)
+    if (erd.isComplexType) {
+      state.pushTRD(erd.optComplexTypeModelGroupRuntimeData.get)
+      if (contentBuilder.isDefined) contentBuilder.get.build(state)
+      state.popTRD(erd.optComplexTypeModelGroupRuntimeData.get)
+    }
+    elementUnparser.unparseEnd(state)
+  }
+}
+
 trait ElementSpecifiedLengthMixin {
 
   protected def maybeTargetLengthEv: Maybe[UnparseTargetLengthInBitsEv]
@@ -380,13 +405,18 @@ sealed trait ElementUnparserStartEndStrategy {
   /**
    * Consumes the required infoset events and changes context so that the
    * element's DIElement node is the context element.
+   *
+   * package-private rather than protected: ElementBuilder (build's
+   * counterpart to this element's write-side unparse) calls this directly
+   * on the paired ElementUnparserBase instance, reusing this same
+   * structural bookkeeping rather than duplicating it.
    */
-  protected def unparseBegin(state: UState): Unit
+  private[runtime1] def unparseBegin(state: UState): Unit
 
   /**
    * Restores prior context. Consumes end-element event.
    */
-  protected def unparseEnd(state: UState): Unit
+  private[runtime1] def unparseEnd(state: UState): Unit
 
   protected def captureRuntimeValuedExpressionValues(ustate: UState): Unit
 
@@ -403,7 +433,7 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
    * Consumes the required infoset events and changes context so that the
    * element's DIElement node is the context element.
    */
-  final override protected def unparseBegin(state: UState): Unit = {
+  final override private[runtime1] def unparseBegin(state: UState): Unit = {
     if (erd.isQuasiElement) {
       // Quasi elements are used for RepType and PrefixedLength, and have no corresponding
       // events in the infoset inputter. The parent parser will push a DIElement for us to
@@ -490,7 +520,7 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
   /**
    * Restores prior context. Consumes end-element event.
    */
-  final override protected def unparseEnd(state: UState): Unit = {
+  final override private[runtime1] def unparseEnd(state: UState): Unit = {
     if (erd.isQuasiElement) {
       // Quasi elements are used for TypeValueCalc, and have no corresponding events in the infoset inputter
       // The parent parser will handle pushing and poping the Infoset, so we do not need to do anything here.
@@ -573,7 +603,7 @@ trait OVCStartEndStrategy extends ElementUnparserStartEndStrategy {
   /**
    * For OVC, the behavior w.r.t. consuming infoset events is different.
    */
-  protected final override def unparseBegin(state: UState): Unit = {
+  private[runtime1] final override def unparseBegin(state: UState): Unit = {
     val ovcElem =
       if (!state.withinHiddenNest) {
         // outputValueCalc elements are optional in the infoset. If the next event
@@ -628,7 +658,7 @@ trait OVCStartEndStrategy extends ElementUnparserStartEndStrategy {
     state.currentInfosetNodeStack.push(One(ovcElem))
   }
 
-  protected final override def unparseEnd(state: UState): Unit = {
+  private[runtime1] final override def unparseEnd(state: UState): Unit = {
     // if an OVC element existed, the start AND end events were consumed in
     // unparseBegin. No need to advance the cursor here.
 

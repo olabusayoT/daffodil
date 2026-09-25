@@ -24,8 +24,10 @@ import org.apache.daffodil.lib.schema.annotation.props.SeparatorSuppressionPolic
 import org.apache.daffodil.lib.schema.annotation.props.gen.LengthKind
 import org.apache.daffodil.lib.schema.annotation.props.gen.OccursCountKind
 import org.apache.daffodil.lib.schema.annotation.props.gen.Representation
+import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.runtime1.dpath.NodeInfo
 import org.apache.daffodil.runtime1.processors.parsers.*
+import org.apache.daffodil.runtime1.processors.unparsers.Builder
 import org.apache.daffodil.unparsers.runtime1.*
 
 /**
@@ -81,6 +83,15 @@ abstract class SequenceChild(protected val sq: SequenceTermBase, child: Term, gr
 
   final lazy val optSequenceChildUnparser: Option[SequenceChildUnparser] =
     if (childUnparser.isEmpty) None else Some(unparser)
+
+  /**
+   * This child's own content Builder, if it has one. Only meaningful
+   * (and only ever consulted) when optSequenceChildUnparser is defined, so
+   * this is Nope whenever that is None, keeping the two aligned for callers
+   * that zip them together.
+   */
+  final lazy val optSequenceChildBuilder: Maybe[Builder] =
+    if (childUnparser.isEmpty) Maybe.Nope else child.termContentBody.builder
 
   /**
    * There's only parse result helpers here, so let's abbreviate

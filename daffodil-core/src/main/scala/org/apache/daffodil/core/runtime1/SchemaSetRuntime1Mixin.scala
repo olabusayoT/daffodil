@@ -21,6 +21,7 @@ import org.apache.daffodil.core.dsom.SchemaSet
 import org.apache.daffodil.core.dsom.SequenceTermBase
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.util.Logger
+import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.runtime1.iapi.DFDL
 import org.apache.daffodil.runtime1.layers.LayerRuntimeCompiler
 import org.apache.daffodil.runtime1.layers.LayerRuntimeData
@@ -29,6 +30,7 @@ import org.apache.daffodil.runtime1.processors.Processor
 import org.apache.daffodil.runtime1.processors.SchemaSetRuntimeData
 import org.apache.daffodil.runtime1.processors.VariableMap
 import org.apache.daffodil.runtime1.processors.parsers.NotParsableParser
+import org.apache.daffodil.runtime1.processors.unparsers.Builder
 import org.apache.daffodil.runtime1.processors.unparsers.NotUnparsableUnparser
 
 trait SchemaSetRuntime1Mixin {
@@ -61,6 +63,10 @@ trait SchemaSetRuntime1Mixin {
     unp
   }.value
 
+  lazy val builder: Maybe[Builder] = LV(Symbol("builder")) {
+    if (generateUnparser) root.document.builder else Maybe.Nope
+  }.value
+
   private lazy val layerRuntimeCompiler = new LayerRuntimeCompiler
 
   private lazy val allLayers: Seq[LayerRuntimeData] = LV(Symbol("allLayers")) {
@@ -88,6 +94,7 @@ trait SchemaSetRuntime1Mixin {
       new SchemaSetRuntimeData(
         parser,
         unparser,
+        builder,
         root.elementRuntimeData,
         variableMap,
         allLayers,

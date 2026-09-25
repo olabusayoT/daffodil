@@ -26,6 +26,7 @@ import org.apache.daffodil.lib.util.MaybeInt
 import org.apache.daffodil.lib.util.Misc
 import org.apache.daffodil.runtime1.processors.parsers.*
 import org.apache.daffodil.runtime1.processors.unparsers.*
+import org.apache.daffodil.unparsers.runtime1.SequenceBuilder
 import org.apache.daffodil.unparsers.runtime1.{ Separated as SeparatedUnparser, * }
 
 /**
@@ -124,6 +125,14 @@ class OrderedSequence(sq: SequenceTermBase, sequenceChildrenArg: Seq[SequenceChi
       }
     }
   }
+
+  private lazy val childBuilderPairs: Array[(SequenceChildUnparser, Maybe[Builder])] =
+    sequenceChildren.flatMap { c =>
+      c.optSequenceChildUnparser.map { u => (u, c.optSequenceChildBuilder) }
+    }
+
+  override lazy val builder: Maybe[Builder] =
+    if (childBuilderPairs.isEmpty) Maybe.Nope else Maybe(new SequenceBuilder(childBuilderPairs))
 }
 
 class UnorderedSequence(
@@ -220,4 +229,12 @@ class UnorderedSequence(
       }
     }
   }
+
+  private lazy val childBuilderPairs: Array[(SequenceChildUnparser, Maybe[Builder])] =
+    sequenceChildren.flatMap { c =>
+      c.optSequenceChildUnparser.map { u => (u, c.optSequenceChildBuilder) }
+    }
+
+  override lazy val builder: Maybe[Builder] =
+    if (childBuilderPairs.isEmpty) Maybe.Nope else Maybe(new SequenceBuilder(childBuilderPairs))
 }

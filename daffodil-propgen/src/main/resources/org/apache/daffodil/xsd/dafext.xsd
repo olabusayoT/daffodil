@@ -665,6 +665,18 @@
             </xs:restriction>
           </xs:simpleType>
         </xs:element>
+        <xs:element name="useBuildThenWrite" type="xs:boolean" default="false" minOccurs="0">
+          <xs:annotation>
+            <xs:documentation>
+              When unparsing, first build the entire infoset tree from the
+              InfosetInputter, then write it in a second pass. This lets
+              forward-referencing expressions (e.g. dfdl:outputValueCalc,
+              dfdl:valueLength) resolve directly against the tree instead of
+              via a suspension, in the cases where the whole tree already
+              being present makes that possible.
+            </xs:documentation>
+          </xs:annotation>
+        </xs:element>
       </xs:all>
     </xs:complexType>
   </xs:element>

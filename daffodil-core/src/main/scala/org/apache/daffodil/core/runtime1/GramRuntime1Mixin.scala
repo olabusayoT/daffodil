@@ -21,6 +21,7 @@ import org.apache.daffodil.core.grammar.Gram
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.runtime1.processors.parsers.Parser
+import org.apache.daffodil.runtime1.processors.unparsers.Builder
 import org.apache.daffodil.runtime1.processors.unparsers.Unparser
 
 trait GramRuntime1Mixin { self: Gram =>
@@ -59,4 +60,16 @@ trait GramRuntime1Mixin { self: Gram =>
       else Maybe(u)
     }
   }
+
+  /**
+   * Provides this production's Builder, if it has one.
+   *
+   * Unlike unparser, most productions have none: only elements and model
+   * groups (sequences/choices) need to build infoset structure, so this
+   * defaults to Nope. Productions that wrap a body they don't need to build
+   * anything of their own for (delimiters, escape schemes, hidden groups,
+   * nil dispatch, etc.) override this to delegate to or wrap their body's
+   * builder, exactly as they would if they needed a real one.
+   */
+  def builder: Maybe[Builder] = Maybe.Nope
 }

@@ -20,11 +20,14 @@ package org.apache.daffodil.core.grammar.primitives
 import org.apache.daffodil.core.dsom.*
 import org.apache.daffodil.core.grammar.Terminal
 import org.apache.daffodil.core.layers.LayerSchemaCompiler
+import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Misc
 import org.apache.daffodil.runtime1.processors.parsers.LayeredSequenceParser
 import org.apache.daffodil.runtime1.processors.parsers.Parser as DaffodilParser
+import org.apache.daffodil.runtime1.processors.unparsers.Builder
 import org.apache.daffodil.runtime1.processors.unparsers.Unparser as DaffodilUnparser
 import org.apache.daffodil.unparsers.runtime1.LayeredSequenceUnparser
+import org.apache.daffodil.unparsers.runtime1.SequenceBuilder
 
 case class LayeredSequence(sq: SequenceGroupTermBase, bodyTerm: SequenceChild)
   extends Terminal(sq, true) {
@@ -47,4 +50,12 @@ case class LayeredSequence(sq: SequenceGroupTermBase, bodyTerm: SequenceChild)
 
   override lazy val unparser: DaffodilUnparser =
     new LayeredSequenceUnparser(srd, bodyUnparser)
+
+  // Layering is a write-only byte-stream transform; the built infoset tree
+  // just needs the body term's own content, not the layer wrapping itself.
+  // LayeredSequenceUnparser itself is a one-child OrderedUnseparatedSequenceUnparser,
+  // which pushes the body term's own TRD before invoking its unparser; mirror that
+  // same structure here so the body element's TRD is on the stack when it builds.
+  override lazy val builder: Maybe[Builder] =
+    Maybe(new SequenceBuilder(Array((bodyTerm.unparser, bodyTerm.optSequenceChildBuilder))))
 }

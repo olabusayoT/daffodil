@@ -67,3 +67,14 @@ case class ComplexNilOrContentUnparser(
       contentUnparser.unparse1(state)
   }
 }
+
+/**
+ * A nilled complex element has no children to build. nilUnparser writes the
+ * nil representation's bytes, so build() has nothing to do for it.
+ */
+final class ComplexNilOrContentBuilder(contentBuilder: Builder) extends Builder {
+  override def build(state: UState): Unit = {
+    val inode = state.currentInfosetNode.asComplex
+    if (!inode.isNilled) contentBuilder.build(state)
+  }
+}

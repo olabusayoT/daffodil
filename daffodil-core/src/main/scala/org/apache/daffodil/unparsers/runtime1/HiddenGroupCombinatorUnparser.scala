@@ -43,3 +43,19 @@ class HiddenGroupCombinatorUnparser(ctxt: ModelGroupRuntimeData, bodyUnparser: U
     }
   }
 }
+
+/**
+ * withinHiddenNest must be maintained during build too: it's what tells a
+ * hidden element's unparseBegin/unparseEnd to manufacture a node instead of
+ * consuming an event that will never exist.
+ */
+final class HiddenGroupBuilder(bodyBuilder: Builder) extends Builder {
+  override def build(state: UState): Unit = {
+    try {
+      state.incrementHiddenDef()
+      bodyBuilder.build(state)
+    } finally {
+      state.decrementHiddenDef()
+    }
+  }
+}

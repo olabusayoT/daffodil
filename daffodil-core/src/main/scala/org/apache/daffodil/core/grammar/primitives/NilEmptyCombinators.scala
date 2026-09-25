@@ -21,8 +21,11 @@ import org.apache.daffodil.core.dsom.ElementBase
 import org.apache.daffodil.core.grammar.Gram
 import org.apache.daffodil.core.grammar.Terminal
 import org.apache.daffodil.lib.exceptions.Assert
+import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.runtime1.processors.parsers.ComplexNilOrContentParser
 import org.apache.daffodil.runtime1.processors.parsers.SimpleNilOrValueParser
+import org.apache.daffodil.runtime1.processors.unparsers.Builder
+import org.apache.daffodil.unparsers.runtime1.ComplexNilOrContentBuilder
 import org.apache.daffodil.unparsers.runtime1.ComplexNilOrContentUnparser
 import org.apache.daffodil.unparsers.runtime1.SimpleNilOrValueUnparser
 
@@ -58,5 +61,11 @@ case class ComplexNilOrContent(ctxt: ElementBase, nilGram: Gram, contentGram: Gr
 
   override lazy val unparser =
     ComplexNilOrContentUnparser(ctxt.erd, nilUnparser, contentUnparser)
+
+  override lazy val builder: Maybe[Builder] =
+    if (contentGram.builder.isDefined)
+      Maybe(new ComplexNilOrContentBuilder(contentGram.builder.get))
+    else
+      Maybe.Nope
 
 }

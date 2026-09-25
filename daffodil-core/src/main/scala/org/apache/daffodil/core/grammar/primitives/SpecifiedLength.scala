@@ -24,6 +24,7 @@ import org.apache.daffodil.core.grammar.Gram
 import org.apache.daffodil.core.grammar.Terminal
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.schema.annotation.props.gen.LengthUnits
+import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.runtime1.dpath.NodeInfo.PrimType
 import org.apache.daffodil.runtime1.processors.parsers.*
 import org.apache.daffodil.runtime1.processors.unparsers.*
@@ -92,11 +93,14 @@ class SpecifiedLengthPattern(e: ElementBase, eGram: => Gram)
     // we don't use the pattern when unparsing.
     eUnparser
   }
+
+  override lazy val builder: Maybe[Builder] = eGram.builder
 }
 
 trait SpecifiedLengthExplicitImplicitUnparserMixin {
 
   def e: ElementBase
+  def eGram: Gram
   def eUnparser: Unparser
 
   lazy val unparser: Unparser = {
@@ -109,6 +113,13 @@ trait SpecifiedLengthExplicitImplicitUnparserMixin {
         e.unparseTargetLengthInBitsEv
       )
   }
+
+  // The unsupported-encoding check only matters once actually unparsing;
+  // build() just needs the body's structure. Each mixing class re-declares
+  // this with `override`, since unlike unparser, Gram's builder default is
+  // concrete (Nope), not abstract, so Scala requires the override to be
+  // resolved at the concrete class, not here in the trait.
+  def builderFromEGram: Maybe[Builder] = eGram.builder
 }
 
 class SpecifiedLengthExplicit(e: ElementBase, eGram: => Gram, bitsMultiplier: Int)
@@ -130,6 +141,8 @@ class SpecifiedLengthExplicit(e: ElementBase, eGram: => Gram, bitsMultiplier: In
       )
   }
 
+  override lazy val builder: Maybe[Builder] = builderFromEGram
+
 }
 
 class SpecifiedLengthImplicit(e: ElementBase, eGram: => Gram, nBits: Long)
@@ -142,6 +155,8 @@ class SpecifiedLengthImplicit(e: ElementBase, eGram: => Gram, nBits: Long)
 
   lazy val parser: Parser =
     new SpecifiedLengthImplicitParser(eParser, e.elementRuntimeData, nBits)
+
+  override lazy val builder: Maybe[Builder] = builderFromEGram
 
 }
 
@@ -183,6 +198,12 @@ class SpecifiedLengthPrefixed(e: ElementBase, eGram: => Gram, bitsMultiplier: In
       pladj
     )
   }
+
+  // The prefix length is computed from eUnparser's actual written content
+  // length, entirely via a detached throwaway node and suspensions; none of
+  // that touches the real infoset tree, so build() just needs eGram's own
+  // structure.
+  override lazy val builder: Maybe[Builder] = eGram.builder
 }
 
 class SpecifiedLengthExplicitCharacters(e: ElementBase, eGram: => Gram)
@@ -193,6 +214,8 @@ class SpecifiedLengthExplicitCharacters(e: ElementBase, eGram: => Gram)
 
   lazy val parser: Parser =
     new SpecifiedLengthExplicitCharactersParser(eParser, e.elementRuntimeData, e.lengthEv)
+
+  override lazy val builder: Maybe[Builder] = builderFromEGram
 }
 
 class SpecifiedLengthImplicitCharacters(e: ElementBase, eGram: => Gram, nChars: Long)
@@ -203,6 +226,8 @@ class SpecifiedLengthImplicitCharacters(e: ElementBase, eGram: => Gram, nChars: 
 
   lazy val parser: Parser =
     new SpecifiedLengthImplicitCharactersParser(eParser, e.elementRuntimeData, nChars)
+
+  override lazy val builder: Maybe[Builder] = builderFromEGram
 }
 
 class SpecifiedLengthPrefixedCharacters(e: ElementBase, eGram: => Gram)

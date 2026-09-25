@@ -29,10 +29,12 @@ import org.apache.daffodil.lib.cookers.ChoiceBranchKeyCooker
 import org.apache.daffodil.lib.cookers.IntRangeCooker
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.schema.annotation.props.gen.ChoiceLengthKind
+import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.MaybeInt
 import org.apache.daffodil.lib.util.ProperlySerializableMap.*
 import org.apache.daffodil.runtime1.infoset.ChoiceBranchEvent
 import org.apache.daffodil.runtime1.processors.RangeBound
+import org.apache.daffodil.runtime1.processors.TermRuntimeData
 import org.apache.daffodil.runtime1.processors.parsers.*
 import org.apache.daffodil.runtime1.processors.unparsers.*
 import org.apache.daffodil.unparsers.runtime1.*
@@ -330,6 +332,40 @@ case class ChoiceCombinator(ch: ChoiceTermBase, alternatives: Seq[Gram])
         eventUnparserMap.toProperlySerializableMap
       val cbm = ChoiceBranchMap(serializableMap, branchForUnparse)
       new ChoiceCombinatorUnparser(ch.modelGroupRuntimeData, cbm, choiceLengthInBits)
+    }
+  }
+
+  private lazy val (eventBranchTermMap, optDefaultBranchTerm) = ch.choiceBranchMap
+
+  private lazy val optDefaultBuilderEntry: Option[(TermRuntimeData, Builder)] =
+    optDefaultBranchTerm.map { defaultBranch =>
+      // The default branch may have no builder of its own (e.g. a bare
+      // dfdl:initiator="empty" sequence with no elements), but the default
+      // entry must still be present so unmatched events resolve to it
+      // instead of failing to find any entry at all.
+      val b = defaultBranch.termContentBody.builder.toOption.getOrElse(ChoiceBranchEmptyBuilder)
+      (defaultBranch.termRuntimeData, b)
+    }
+
+  private lazy val eventBuilderEntryMap: Map[ChoiceBranchEvent, (TermRuntimeData, Builder)] =
+    eventBranchTermMap.flatMap { case (cbe, branchTerm) =>
+      branchTerm.termContentBody.builder.toOption.map { b =>
+        (cbe, (branchTerm.termRuntimeData, b))
+      }
+    }
+
+  override lazy val builder: Maybe[Builder] = {
+    if (eventBuilderEntryMap.isEmpty) {
+      optDefaultBuilderEntry match {
+        case Some((_, b)) => Maybe(b)
+        case None => Maybe.Nope
+      }
+    } else {
+      val serializableMap
+        : ProperlySerializableMap[ChoiceBranchEvent, (TermRuntimeData, Builder)] =
+        eventBuilderEntryMap.toProperlySerializableMap
+      val cbbm = ChoiceBranchBuilderMap(serializableMap, optDefaultBuilderEntry)
+      Maybe(new ChoiceBuilder(ch.modelGroupRuntimeData, cbbm))
     }
   }
 }
