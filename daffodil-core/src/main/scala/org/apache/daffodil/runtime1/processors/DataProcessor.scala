@@ -68,8 +68,17 @@ import org.apache.daffodil.runtime1.infoset.XMLTextInfosetOutputter
 import org.apache.daffodil.runtime1.processors.parsers.PState
 import org.apache.daffodil.runtime1.processors.parsers.ParseError
 import org.apache.daffodil.runtime1.processors.parsers.Parser
+import org.apache.daffodil.runtime1.processors.unparsers.AwaitChildStalledException
+import org.apache.daffodil.runtime1.processors.unparsers.BuildAbortedException
+import org.apache.daffodil.runtime1.processors.unparsers.BuildCursor
+import org.apache.daffodil.runtime1.processors.unparsers.BuildState
+import org.apache.daffodil.runtime1.processors.unparsers.NotUnparsableUnparser
+import org.apache.daffodil.runtime1.processors.unparsers.SuspensionCapableUState
 import org.apache.daffodil.runtime1.processors.unparsers.UState
 import org.apache.daffodil.runtime1.processors.unparsers.UnparseError
+import org.apache.daffodil.runtime1.processors.unparsers.UnparseSharedContext
+import org.apache.daffodil.runtime1.processors.unparsers.Unparser
+import org.apache.daffodil.unparsers.runtime1.ElementUnparserBase
 
 /**
  * Implementation mixin - provides simple helper methods
@@ -458,6 +467,249 @@ class DataProcessor(
   }
 
   def unparse(actualInputter: api.infoset.InfosetInputter, outStream: java.io.OutputStream) = {
+    // Prefetch is in use only if the tunable is on and some OVC could
+    // resolve early; when every OVC is content-length-dependent, no amount
+    // of racing build ahead helps, so fall back to single-pass.
+    if (ssrd.isPrefetchInUse) {
+      unparseViaBuildThenWrite(actualInputter, outStream)
+    } else {
+      unparseSinglePass(actualInputter, outStream)
+    }
+  }
+
+  /**
+   * Shared by unparseViaBuildThenWrite and unparseSinglePass's top-level
+   * catch blocks: maps an exception caught during unparsing to a failed
+   * `state` plus its `unparseResult`, or rethrows if it's not one of the
+   * known unparse-error categories.
+   */
+  private def unparseErrorResult(state: UState, t: Throwable): UnparseResult = t match {
+    case ue: UnparseError => {
+      state.addUnparseError(ue)
+      state.unparseResult
+    }
+    case procErr: ProcessingError => {
+      state.setFailed(procErr.toUnparseError)
+      state.unparseResult
+    }
+    case sde: SchemaDefinitionError => {
+      // A SDE was detected at runtime (perhaps due to a runtime-valued property like byteOrder or encoding)
+      // These are fatal, and there's no notion of backtracking them, so they propagate to top level
+      // here.
+      state.setFailed(sde)
+      state.unparseResult
+    }
+    case sdefw: SchemaDefinitionErrorFromWarning => {
+      state.setFailed(sdefw)
+      state.unparseResult
+    }
+    case e: ErrorAlreadyHandled => {
+      state.setFailed(e.th)
+      state.unparseResult
+    }
+    case e: TunableLimitExceededError => {
+      state.setFailed(e)
+      state.unparseResult
+    }
+    case se: org.xml.sax.SAXException => {
+      state.setFailed(new UnparseError(None, None, se))
+      state.unparseResult
+    }
+    case e: scala.xml.parsing.FatalError => {
+      state.setFailed(new UnparseError(None, None, e))
+      state.unparseResult
+    }
+    case ie: InfosetException => {
+      state.setFailed(new UnparseError(None, None, ie))
+      state.unparseResult
+    }
+    case th: Throwable => throw th
+  }
+
+  /**
+   * Build/write-prefetch unparse path (gated on `useBuildWritePrefetch`).
+   * `BuildState` builds the tree via a `BuildCursor`, while write recurses
+   * via `writeContent` and advances the cursor whenever it needs tree that
+   * does not exist yet. Everything runs on this one thread.
+   */
+  private def unparseViaBuildThenWrite(
+    actualInputter: api.infoset.InfosetInputter,
+    outStream: java.io.OutputStream
+  ): UnparseResult = {
+    val rootUnparser = ssrd.unparser
+    val inputter = new InfosetInputter(actualInputter)
+    val sharedCtx = new UnparseSharedContext(
+      // Shared by build and write, which together tick this tracker at
+      // roughly twice the per-node rate a single traversal would;
+      // doubling both thresholds restores the intended sweep density.
+      new SuspensionTracker(
+        tunables.unparseSuspensionWaitYoung * 2,
+        tunables.unparseSuspensionWaitOld * 2
+      ),
+      this,
+      tunables,
+      prefetchLimit = tunables.unparsePrefetchWindowNodes
+    )
+
+    // Lazy so each is created only after the step before it has succeeded,
+    // and never for a run that fails earlier, since each holds an output
+    // stream that must then be cleaned up.
+    lazy val buildState = new BuildState(inputter, sharedCtx, Nil, areDebugging)
+    // The root element always has a builder: it is exactly the case that
+    // gets ElementBuilder wrapped around it, regardless of schema content.
+    lazy val cursor = new BuildCursor(ssrd.builder.get, buildState, sharedCtx)
+    lazy val writeState = UState.createInitialUState(outStream, this, inputter, areDebugging)
+
+    def initBuildSide(): Unit = {
+      if (areDebugging) {
+        Assert.invariant(optDebugger.isDefined)
+        addEventHandler(debugger)
+        buildState.notifyDebugging(true)
+      }
+      init(buildState, rootUnparser)
+      sharedCtx.setBuildCursor(cursor)
+    }
+
+    def initWriteSide(): Unit = {
+      writeState.setSharedContext(sharedCtx)
+      if (areDebugging) {
+        writeState.notifyDebugging(true)
+      }
+      init(writeState, rootUnparser)
+      // Forces evaluation of non-constant defineVariable defaults; write
+      // is the side that reads/writes variables here, so it needs this on
+      // its own copy.
+      writeState.initializeVariables()
+      writeState.getDataOutputStream.setPriorBitOrder(ssrd.elementRuntimeData.defaultBitOrder)
+    }
+
+    def writeTree(): Unit = {
+      val rootElemUnp = rootUnparser.asInstanceOf[ElementUnparserBase]
+      try {
+        val rootNode = sharedCtx.awaitChild(inputter.documentElement, 0)
+        rootElemUnp.writeContent(rootNode, writeState)
+      } catch {
+        // A genuine deadlock (if any) surfaces via finishWriteSide's
+        // own evalSuspensions(isFinal = true) call, which runs regardless
+        // of how this try block exits.
+        case _: AwaitChildStalledException =>
+      }
+    }
+
+    // A NotUnparsableUnparser (dfdl:parseUnparsePolicy="parseOnly") can't be
+    // cast to ElementUnparserBase or driven through the build/write split;
+    // unparseSinglePass already runs it via unparse1 and gets the correct
+    // diagnostic, so reuse that instead of a ClassCastException here.
+    rootUnparser match {
+      case _: NotUnparsableUnparser => return unparseSinglePass(actualInputter, outStream)
+      case _ => // fall through to the actual build/write-prefetch path below
+    }
+
+    try {
+      inputter.initialize(ssrd.elementRuntimeData, tunables)
+    } catch {
+      // Safe before initialize() completes: creating the state only copies
+      // variableMap, never touching inputter.documentElement. This early
+      // return skips the cleanup below, so it cleans up here.
+      case t: Throwable =>
+        try {
+          return unparseErrorResult(writeState, t)
+        } finally {
+          writeState.getDataOutputStream.cleanUp()
+        }
+    }
+
+    try {
+      initBuildSide()
+      try {
+        initWriteSide()
+        writeTree()
+        // Write only ever advances build as far as it needs, so build may
+        // still have its trailing end events left to consume.
+        cursor.runToCompletion()
+        finishBuildSide(buildState, rootUnparser)
+        finishWriteSide(writeState, rootUnparser)
+        writeState.unparseResult
+      } catch {
+        // Build's own failure is reported against buildState rather than
+        // against write's partially-written state.
+        case b: BuildAbortedException => unparseErrorResult(buildState, b.getCause)
+        case t: Throwable => unparseErrorResult(writeState, t)
+      } finally {
+        writeState.getDataOutputStream.cleanUp()
+      }
+    } catch {
+      // Only reached for a failure before write's state existed, or one
+      // unparseErrorResult itself rethrew (which it will rethrow again).
+      case t: Throwable => unparseErrorResult(buildState, t)
+    } finally {
+      buildState.getDataOutputStream.cleanUp()
+    }
+  }
+
+  // evalSuspensions(isFinal = true) runs BEFORE the stack-depth
+  // invariants below: one tripping first could mask the real
+  // SuspensionDeadlockException diagnostic this ordering exists to
+  // surface.
+  private def finishWriteSide(
+    writeState: UState with SuspensionCapableUState,
+    rootUnparser: Unparser
+  ): Unit = {
+    writeState.setProcessor(rootUnparser)
+
+    // Routed via the shared SuspensionTracker, the SAME one BuildState
+    // registered into, so both build-side and write-side suspensions
+    // get resolved here.
+    writeState.evalSuspensions(isFinal = true)
+
+    Assert.invariant(writeState.arrayIterationIndexStack.length == 1)
+    Assert.invariant(writeState.occursIndexStack.length == 1)
+    Assert.invariant(writeState.groupIndexStack.length == 1)
+    Assert.invariant(writeState.childIndexStack.length == 1)
+    Assert.invariant(writeState.currentInfosetNodeMaybe.isEmpty)
+    Assert.invariant(writeState.escapeSchemeEVCache.isEmpty)
+    Assert.invariant(writeState.maybeTopTRD().isEmpty)
+    Assert.invariant(!writeState.withinHiddenNest)
+
+    Assert.invariant(!writeState.getDataOutputStream.isFinished)
+    try {
+      writeState.getDataOutputStream.setFinished(writeState)
+    } catch {
+      case boc: BitOrderChangeException =>
+        writeState.SDE(boc)
+      case fio: FileIOException =>
+        writeState.SDE(fio)
+    }
+  }
+
+  // Asserts build's stacks ended up balanced and the inputter has
+  // nothing left unconsumed.
+  private def finishBuildSide(buildState: BuildState, rootUnparser: Unparser): Unit = {
+    buildState.popTRD(rootUnparser.context.asInstanceOf[TermRuntimeData])
+    buildState.setProcessor(rootUnparser)
+
+    Assert.invariant(buildState.arrayIterationIndexStack.length == 1)
+    Assert.invariant(buildState.occursIndexStack.length == 1)
+    Assert.invariant(buildState.groupIndexStack.length == 1)
+    Assert.invariant(buildState.childIndexStack.length == 1)
+    Assert.invariant(buildState.currentInfosetNodeMaybe.isEmpty)
+    Assert.invariant(buildState.maybeTopTRD().isEmpty)
+
+    val remainingEvent = buildState.advanceMaybe
+    if (remainingEvent.isDefined) {
+      UnparseError(
+        Nope,
+        One(buildState.currentLocation),
+        "Expected no remaining events, but received %s.",
+        remainingEvent.get
+      )
+    }
+  }
+
+  private def unparseSinglePass(
+    actualInputter: api.infoset.InfosetInputter,
+    outStream: java.io.OutputStream
+  ) = {
     val inputter = new InfosetInputter(actualInputter)
     val unparserState =
       UState.createInitialUState(outStream, this, inputter, areDebugging)
@@ -477,47 +729,7 @@ class DataProcessor(
         unparserState.evalSuspensions(isFinal = true)
         unparserState.unparseResult
       } catch {
-        case ue: UnparseError => {
-          unparserState.addUnparseError(ue)
-          unparserState.unparseResult
-        }
-        case procErr: ProcessingError => {
-          val x = procErr
-          unparserState.setFailed(x.toUnparseError)
-          unparserState.unparseResult
-        }
-        case sde: SchemaDefinitionError => {
-          // A SDE was detected at runtime (perhaps due to a runtime-valued property like byteOrder or encoding)
-          // These are fatal, and there's no notion of backtracking them, so they propagate to top level
-          // here.
-          unparserState.setFailed(sde)
-          unparserState.unparseResult
-        }
-        case sdefw: SchemaDefinitionErrorFromWarning => {
-          unparserState.setFailed(sdefw)
-          unparserState.unparseResult
-        }
-        case e: ErrorAlreadyHandled => {
-          unparserState.setFailed(e.th)
-          unparserState.unparseResult
-        }
-        case e: TunableLimitExceededError => {
-          unparserState.setFailed(e)
-          unparserState.unparseResult
-        }
-        case se: org.xml.sax.SAXException => {
-          unparserState.setFailed(new UnparseError(None, None, se))
-          unparserState.unparseResult
-        }
-        case e: scala.xml.parsing.FatalError => {
-          unparserState.setFailed(new UnparseError(None, None, e))
-          unparserState.unparseResult
-        }
-        case ie: InfosetException => {
-          unparserState.setFailed(new UnparseError(None, None, ie))
-          unparserState.unparseResult
-        }
-        case th: Throwable => throw th
+        case t: Throwable => unparseErrorResult(unparserState, t)
       } finally {
         unparserState.getDataOutputStream.cleanUp()
       }

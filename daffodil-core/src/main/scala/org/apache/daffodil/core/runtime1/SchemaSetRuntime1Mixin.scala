@@ -21,6 +21,8 @@ import org.apache.daffodil.core.dsom.SchemaSet
 import org.apache.daffodil.core.dsom.SequenceTermBase
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.util.Logger
+import org.apache.daffodil.lib.util.Maybe
+import org.apache.daffodil.lib.util.Maybe.Nope
 import org.apache.daffodil.runtime1.iapi.DFDL
 import org.apache.daffodil.runtime1.layers.LayerRuntimeCompiler
 import org.apache.daffodil.runtime1.layers.LayerRuntimeData
@@ -29,6 +31,7 @@ import org.apache.daffodil.runtime1.processors.Processor
 import org.apache.daffodil.runtime1.processors.SchemaSetRuntimeData
 import org.apache.daffodil.runtime1.processors.VariableMap
 import org.apache.daffodil.runtime1.processors.parsers.NotParsableParser
+import org.apache.daffodil.runtime1.processors.unparsers.Builder
 import org.apache.daffodil.runtime1.processors.unparsers.NotUnparsableUnparser
 
 trait SchemaSetRuntime1Mixin {
@@ -61,6 +64,18 @@ trait SchemaSetRuntime1Mixin {
     unp
   }.value
 
+  // Not forced eagerly: onPath only references this when
+  // tunable.useBuildWritePrefetch is on (the tunable is fixed at compile
+  // time), so schemas that never enable it never pay to construct the
+  // Builder tree.
+  lazy val builder: Maybe[Builder] = {
+    if (generateUnparser) {
+      root.document.builder
+    } else {
+      Nope
+    }
+  }
+
   private lazy val layerRuntimeCompiler = new LayerRuntimeCompiler
 
   private lazy val allLayers: Seq[LayerRuntimeData] = LV(Symbol("allLayers")) {
@@ -84,14 +99,21 @@ trait SchemaSetRuntime1Mixin {
     // null parser/unparser, and that it's impossible for a DataProcessor
     // to have an error
     Assert.invariant(!root.isError)
+    // Only reference builder/hasAnyPrefetchBeneficialOVC (a full Builder
+    // tree, a schema component scan) when prefetch will be used: a schema
+    // with no prefetch-beneficial OVC never runs the build/write path, so
+    // building the Builder tree would be waste even with the tunable on.
+    val isPrefetchInUse = tunable.useBuildWritePrefetch && root.hasAnyPrefetchBeneficialOVC
     val ssrd =
       new SchemaSetRuntimeData(
         parser,
         unparser,
+        if (isPrefetchInUse) builder else Nope,
         root.elementRuntimeData,
         variableMap,
         allLayers,
-        layerRuntimeCompiler
+        layerRuntimeCompiler,
+        isPrefetchInUse
       )
     if (root.numComponents > root.numUniqueComponents)
       Logger.log.debug(
