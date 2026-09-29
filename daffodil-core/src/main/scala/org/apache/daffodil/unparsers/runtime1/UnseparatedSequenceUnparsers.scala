@@ -95,9 +95,10 @@ class OrderedUnseparatedSequenceUnparser(
   }
 
   /**
-   * Writes an array/optional term's full occurrence loop, if it produced
-   * any occurrences; nothing to do otherwise. There's no separator
-   * bookkeeping to account for either way, since this sequence has none.
+   * Writes an array/optional term's occurrences, if it produced any;
+   * nothing to do otherwise. There's no separator bookkeeping to account
+   * for either way, since this sequence has none, unlike the separated
+   * sequence's zeroOccurrences.
    */
   private def writeRepeatingTerm(
     rep: RepeatingChildUnparser,
@@ -106,58 +107,66 @@ class OrderedUnseparatedSequenceUnparser(
     state: UState
   ): Unit = {
     val idx = state.childIndexStack.top.toInt
-    if (sharedCtx.childExistsOrFinal(complex, idx)) {
-      val next = complex.child(idx)
-      if (next.erd eq rep.erd) {
-        next match {
-          case arrayNode: DIArray =>
-            // A dfdl:occursIndex() expression in the occurrence's own
-            // content reads state.occursIndexStack.top, which must track
-            // the actual occurrence being written.
-            state.pushOccurrenceIndices()
-            try {
-              var arrayOcc = 0
-              while (sharedCtx.childExistsOrFinal(arrayNode, arrayOcc)) {
-                val occNode = sharedCtx.awaitChild(arrayNode, arrayOcc)
-                rep.childUnparser
-                  .asInstanceOf[ElementUnparserBase]
-                  .writeContent(occNode, state)
-                arrayNode.freeChildIfNoLongerNeeded(arrayOcc, state.releaseUnneededInfoset)
-                arrayOcc += 1
-                state.moveOverOneArrayIterationIndexOnly()
-                state.moveOverOneOccursIndexOnly()
-              }
-              complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
-              state.moveOverOneElementChildOnly()
-            } finally {
-              state.popOccurrenceIndices()
-            }
-          case scalarOptional =>
-            val readyChild = sharedCtx.awaitChild(complex, idx)
-            // Same reason as the array case above: a dfdl:occursIndex()
-            // expression in the occurrence's own content reads
-            // state.occursIndexStack.top.
-            state.pushOccurrenceIndices()
-            try {
-              rep.childUnparser
-                .asInstanceOf[ElementUnparserBase]
-                .writeContent(readyChild, state)
-              state.moveOverOneElementChildOnly()
-              complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
-              state.moveOverOneArrayIterationIndexOnly()
-              state.moveOverOneOccursIndexOnly()
-            } finally {
-              state.popOccurrenceIndices()
-            }
-        }
+    if (hasOccurrences(rep, complex, idx, sharedCtx)) {
+      complex.child(idx) match {
+        case arrayNode: DIArray =>
+          writeArrayOccurrences(rep, arrayNode, complex, idx, sharedCtx, state)
+        case _ =>
+          writeScalarOptionalOccurrence(rep, complex, idx, sharedCtx, state)
       }
-      // else: this term produced zero occurrences; a different term's
-      // child appeared in this tree position instead, and there's no
-      // separator bookkeeping to resolve for it here, unlike the
-      // separated sequence's own zeroOccurrences.
     }
-    // else: no more children will ever come; this optional/array term is
-    // absent, again with nothing further to do about it here.
+  }
+
+  private def writeArrayOccurrences(
+    rep: RepeatingChildUnparser,
+    arrayNode: DIArray,
+    complex: DIComplex,
+    idx: Int,
+    sharedCtx: UnparseSharedContext,
+    state: UState
+  ): Unit = {
+    // A dfdl:occursIndex() expression in the occurrence's own content reads
+    // state.occursIndexStack.top, which must track the actual occurrence
+    // being written.
+    state.pushOccurrenceIndices()
+    try {
+      var arrayOcc = 0
+      while (sharedCtx.childExistsOrFinal(arrayNode, arrayOcc)) {
+        val occNode = sharedCtx.awaitChild(arrayNode, arrayOcc)
+        rep.childUnparser.asInstanceOf[ElementUnparserBase].writeContent(occNode, state)
+        arrayNode.freeChildIfNoLongerNeeded(arrayOcc, state.releaseUnneededInfoset)
+        arrayOcc += 1
+        state.moveOverOneArrayIterationIndexOnly()
+        state.moveOverOneOccursIndexOnly()
+      }
+      complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
+      state.moveOverOneElementChildOnly()
+    } finally {
+      state.popOccurrenceIndices()
+    }
+  }
+
+  // A scalar optional is still a RepeatingChildUnparser, just one that can
+  // never hold more than one occurrence, so it pushes the same occurrence
+  // indices a true array does.
+  private def writeScalarOptionalOccurrence(
+    rep: RepeatingChildUnparser,
+    complex: DIComplex,
+    idx: Int,
+    sharedCtx: UnparseSharedContext,
+    state: UState
+  ): Unit = {
+    val readyChild = sharedCtx.awaitChild(complex, idx)
+    state.pushOccurrenceIndices()
+    try {
+      rep.childUnparser.asInstanceOf[ElementUnparserBase].writeContent(readyChild, state)
+      state.moveOverOneElementChildOnly()
+      complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
+      state.moveOverOneArrayIterationIndexOnly()
+      state.moveOverOneOccursIndexOnly()
+    } finally {
+      state.popOccurrenceIndices()
+    }
   }
 
   /**
@@ -171,23 +180,10 @@ class OrderedUnseparatedSequenceUnparser(
     state: UState
   ): Unit = {
     cu.childUnparser match {
-      // A plain scalar element term: await its one tree child, write
-      // its content, then advance the element-child position.
       case elemUnp: ElementUnparserBase =>
-        val idx = state.childIndexStack.top.toInt
-        val child = sharedCtx.awaitChild(complex, idx)
-        elemUnp.writeContent(child, state)
-        state.moveOverOneElementChildOnly()
-        complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
+        writeElementTerm(elemUnp, complex, sharedCtx, state)
       case wu: WriteUnparser =>
-        val idx = state.childIndexStack.top.toInt
-        // This nested group (e.g. a choice) may have resolved to a branch
-        // with no infoset footprint at all; only wait for a child's
-        // readiness when childExistsOrFinal says one genuinely exists.
-        if (sharedCtx.childExistsOrFinal(complex, idx)) {
-          sharedCtx.awaitChild(complex, idx)
-        }
-        wu.writeContent(complex, state)
+        writeGroupTerm(wu, complex, sharedCtx, state)
       case nvi: NewVariableInstanceStartUnparser =>
         nvi.unparse1(state)
       case sv: SetVariableUnparser =>
@@ -195,14 +191,41 @@ class OrderedUnseparatedSequenceUnparser(
       case nvi: NewVariableInstanceEndUnparser =>
         nvi.unparse1(state)
       case align: AlignmentPrimUnparser =>
-        // Padding has no non-idempotent side effect (unlike assert/discriminator
-        // below), so re-running it here is required, not forbidden: build's
-        // own recursion only ran it against build's no-op-sink DOS.
+        // Padding has no non-idempotent side effect (unlike assert/
+        // discriminator), so re-running it here is required, not
+        // forbidden: build's own traversal only ran it against build's
+        // no-op-sink DOS.
         align.unparse1(state)
       case _ =>
         // No tree child, so nothing to wait on.
         ()
     }
+  }
+
+  // A plain scalar element term: await its one tree child, write its
+  // content, then advance the element-child position.
+  private def writeElementTerm(
+    elemUnp: ElementUnparserBase,
+    complex: DIComplex,
+    sharedCtx: UnparseSharedContext,
+    state: UState
+  ): Unit = {
+    val idx = state.childIndexStack.top.toInt
+    awaitRequiredTermChild(isGroupTerm = false, complex, idx, sharedCtx)
+    elemUnp.writeContent(complex.child(idx), state)
+    state.moveOverOneElementChildOnly()
+    complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
+  }
+
+  private def writeGroupTerm(
+    wu: WriteUnparser,
+    complex: DIComplex,
+    sharedCtx: UnparseSharedContext,
+    state: UState
+  ): Unit = {
+    val idx = state.childIndexStack.top.toInt
+    awaitRequiredTermChild(isGroupTerm = true, complex, idx, sharedCtx)
+    wu.writeContent(complex, state)
   }
 
   /**

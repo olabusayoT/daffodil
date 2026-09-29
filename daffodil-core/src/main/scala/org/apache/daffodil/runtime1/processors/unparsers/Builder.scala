@@ -35,11 +35,92 @@ import org.apache.daffodil.unparsers.runtime1.SequenceChildUnparser
  * content (elements, sequences, choices, hidden groups) contribute one, so
  * building the infoset never has to dispatch through the many write-only
  * wrapper unparsers (delimiters, escape schemes, layers, padding,
- * specified-length) that sit between them in the Unparser tree. Driven
- * exclusively from `BuildState`, never from a write-side `UState`.
+ * specified-length) that sit between them in the Unparser tree.
+ *
+ * A Builder is immutable compiled-schema state shared by every parse. The
+ * per-parse position lives in the BuildFrame it creates, on a BuildCursor's
+ * explicit stack, so building can stop after any step and continue later
+ * without holding a thread or a JVM call stack.
  */
 trait Builder extends Serializable {
-  def build(state: UState): Unit
+  def newFrame(): BuildFrame
+}
+
+/**
+ * One Builder's in-progress state for one parse. `step` performs one
+ * transition and must either push exactly one child frame onto the cursor
+ * (this frame is stepped again once that child pops) or pop itself from the
+ * cursor to signal it is complete.
+ */
+abstract class BuildFrame {
+  def step(cursor: BuildCursor): Unit
+}
+
+/**
+ * The explicit stack of BuildFrames that stands in for the call stack of a
+ * recursive build. `advance` runs it until the lead window is full, so a
+ * caller that needs more infoset tree can pull it forward directly. Driven
+ * against a `BuildState`, never a write-side `UState`.
+ */
+final class BuildCursor(root: Builder, val state: UState, ctx: UnparseSharedContext) {
+  private var stack = new Array[BuildFrame](32)
+  private var depth = 0
+  private var failure: Throwable = null
+
+  push(root.newFrame())
+
+  def push(frame: BuildFrame): Unit = {
+    if (depth == stack.length) {
+      stack = java.util.Arrays.copyOf(stack, depth * 2)
+    }
+    stack(depth) = frame
+    depth += 1
+  }
+
+  def pop(): Unit = {
+    depth -= 1
+    stack(depth) = null
+  }
+
+  def isFinished: Boolean = depth == 0
+
+  /**
+   * Steps until at least one more node has been built and either the lead
+   * window is full or too many suspensions are pending, or until building
+   * completes. A failure is captured and rethrown, here and on every later
+   * call, as a BuildAbortedException wrapping the original, so it is
+   * distinguishable from a failure of the write side that called this.
+   */
+  def advance(): Unit = {
+    if (failure != null) {
+      throw new BuildAbortedException(failure)
+    }
+    val startLead = ctx.currentLead
+    try {
+      while (depth > 0) {
+        stack(depth - 1).step(this)
+        if (
+          ctx.currentLead > startLead &&
+          (ctx.leadExceedsPrefetchLimit ||
+            ctx.suspensionTracker.pendingCount > ctx.pendingSuspensionTripLimit)
+        ) {
+          return
+        }
+      }
+    } catch {
+      case t: Throwable => {
+        failure = t
+        depth = 0
+        throw new BuildAbortedException(t)
+      }
+    }
+  }
+
+  def runToCompletion(): Unit = {
+    while (!isFinished) {
+      advance()
+    }
+  }
 }
 
 /**
@@ -48,7 +129,10 @@ trait Builder extends Serializable {
  * recorded without anything actually needing to happen.
  */
 object EmptyBuilder extends Builder {
-  override def build(state: UState): Unit = ()
+  private object EmptyFrame extends BuildFrame {
+    override def step(cursor: BuildCursor): Unit = cursor.pop()
+  }
+  override def newFrame(): BuildFrame = EmptyFrame
 }
 
 /**
@@ -57,22 +141,27 @@ object EmptyBuilder extends Builder {
  * content; the common case of at most one such child never needs this.
  */
 final class SeqCompBuilder(children: Array[Builder]) extends Builder {
-  override def build(state: UState): Unit = {
-    var i = 0
-    while (i < children.length) {
-      children(i).build(state)
-      i += 1
+  override def newFrame(): BuildFrame = new BuildFrame {
+    private var i = 0
+    override def step(cursor: BuildCursor): Unit = {
+      if (i < children.length) {
+        val child = children(i)
+        i += 1
+        cursor.push(child.newFrame())
+      } else {
+        cursor.pop()
+      }
     }
   }
 }
 
 /**
- * Builds one element's infoset node and, for complex types, recurses into
- * contentBuilder to build descendant nodes. unparseBegin/unparseEnd are the
+ * Builds one element's infoset node and, for complex types, builds
+ * descendant nodes via contentBuilder. unparseBegin/unparseEnd are the
  * same element-kind-specific (plain/nillable/OVC/etc.) node-creation logic
  * unparse() itself uses, including the bounded-lookahead lead-counter
  * hookup and the deferred simple-value finalization; only the "what does
- * this element contain" recursion is redirected to the builder tree instead
+ * this element contain" step is redirected to the builder tree instead
  * of back into the unparser tree.
  */
 final class ElementBuilder(
@@ -82,16 +171,28 @@ final class ElementBuilder(
   contentBuilder: Maybe[Builder]
 ) extends Builder {
 
-  override def build(state: UState): Unit = {
-    unparseBegin(state)
+  override def newFrame(): BuildFrame = new BuildFrame {
+    private var contentPushed = false
 
-    if (erd.isComplexType) {
-      state.pushTRD(erd.optComplexTypeModelGroupRuntimeData.get)
-      if (contentBuilder.isDefined) { contentBuilder.get.build(state) }
-      state.popTRD(erd.optComplexTypeModelGroupRuntimeData.get)
+    override def step(cursor: BuildCursor): Unit = {
+      val state = cursor.state
+      if (!contentPushed) {
+        unparseBegin(state)
+        if (erd.isComplexType) {
+          state.pushTRD(erd.optComplexTypeModelGroupRuntimeData.get)
+          if (contentBuilder.isDefined) {
+            contentPushed = true
+            cursor.push(contentBuilder.get.newFrame())
+            return
+          }
+        }
+      }
+      if (erd.isComplexType) {
+        state.popTRD(erd.optComplexTypeModelGroupRuntimeData.get)
+      }
+      unparseEnd(state)
+      cursor.pop()
     }
-
-    unparseEnd(state)
   }
 }
 
@@ -99,7 +200,7 @@ final class ElementBuilder(
  * Pairs a sequence child's existing occurs-count/array bookkeeping (reused
  * as-is from the Unparser tree, since it is cheap, pure state bookkeeping
  * unrelated to the tree-walking overhead this Builder tree exists to avoid)
- * with that same child's own Builder, which SequenceBuilder recurses into
+ * with that same child's own Builder, which SequenceBuilder builds
  * instead of the child's full Unparser.
  */
 final case class SequenceChildBuildInfo(
@@ -110,40 +211,55 @@ final case class SequenceChildBuildInfo(
 /**
  * Builds an entire sequence's children, scalar and array/optional alike.
  * Mirrors OrderedSequenceUnparserBase's own build loop exactly, except each
- * child's recursive build call targets its Builder rather than its full,
+ * child's build targets its Builder rather than its full,
  * write-only-wrapper-laden Unparser.
  */
 final class SequenceBuilder(children: IndexedSeq[SequenceChildBuildInfo]) extends Builder {
 
-  override def build(state: UState): Unit = {
-    state.groupIndexStack.push(1L)
+  override def newFrame(): BuildFrame = new SequenceFrame
 
-    var index = 0
-    val limit = children.length
-    while (index < limit) {
-      val info = children(index)
-      val cu = info.childUnparser
-      val trd = cu.trd
-      state.pushTRD(trd)
-      cu match {
-        case rep: RepeatingChildUnparser => {
-          state.arrayIterationIndexStack.push(1L)
-          state.occursIndexStack.push(1L)
-          val erd = rep.erd
-          var numOccurrences = 0
-          val maxReps = rep.maxRepeats(state)
+  private final class SequenceFrame extends BuildFrame {
+    // NextChild: between children. AfterScalar/AfterOccurrence: a child's
+    // frame just popped. InArray: array/optional loop is between occurrences.
+    private final val NextChild = 0
+    private final val AfterScalar = 1
+    private final val InArray = 2
+    private final val AfterOccurrence = 3
 
-          Assert.invariant(state.inspect, "No event for building.")
-          val ev = state.inspectAccessor
-          if (ev.erd eq erd) {
-            rep.startArrayOrOptional(state)
-            while (rep.shouldDoUnparser(rep, state)) {
-              info.childBuilder.build(state)
-              numOccurrences += 1
-              state.moveOverOneArrayIterationIndexOnly()
-              state.moveOverOneOccursIndexOnly()
-              state.moveOverOneGroupIndexOnly()
-            }
+    private var phase = NextChild
+    private var started = false
+    private var index = 0
+    private var rep: RepeatingChildUnparser = null
+    private var numOccurrences = 0
+    private var maxReps = 0L
+
+    override def step(cursor: BuildCursor): Unit = {
+      val state = cursor.state
+      if (!started) {
+        started = true
+        state.groupIndexStack.push(1L)
+      }
+      phase match {
+        case NextChild => nextChild(cursor, state)
+        case AfterScalar => {
+          children(index).childUnparser.trd match {
+            case erd: ElementRuntimeData if !erd.isRepresented => // ok, skip group advance
+            case _ => state.moveOverOneGroupIndexOnly()
+          }
+          finishChild(state)
+        }
+        case AfterOccurrence => {
+          numOccurrences += 1
+          state.moveOverOneArrayIterationIndexOnly()
+          state.moveOverOneOccursIndexOnly()
+          state.moveOverOneGroupIndexOnly()
+          phase = InArray
+        }
+        case InArray => {
+          if (rep.shouldDoUnparser(rep, state)) {
+            phase = AfterOccurrence
+            cursor.push(children(index).childBuilder.newFrame())
+          } else {
             rep.checkFinalOccursCountBetweenMinAndMaxOccurs(
               state,
               rep,
@@ -151,40 +267,72 @@ final class SequenceBuilder(children: IndexedSeq[SequenceChildBuildInfo]) extend
               maxReps,
               state.arrayIterationPos - 1
             )
-            rep.endArrayOrOptional(erd, state)
-          } else {
-            rep.checkFinalOccursCountBetweenMinAndMaxOccurs(
-              state,
-              rep,
-              numOccurrences,
-              maxReps,
-              0
-            )
-          }
-
-          state.arrayIterationIndexStack.pop()
-          state.occursIndexStack.pop()
-        }
-        case _ => {
-          info.childBuilder.build(state)
-          trd match {
-            case erd: ElementRuntimeData if !erd.isRepresented => // ok, skip group advance
-            case _ => state.moveOverOneGroupIndexOnly()
+            rep.endArrayOrOptional(rep.erd, state)
+            finishRepeating(state)
           }
         }
       }
-      state.popTRD(trd)
-      index += 1
     }
 
-    state.groupIndexStack.pop()
+    private def nextChild(cursor: BuildCursor, state: UState): Unit = {
+      if (index == children.length) {
+        state.groupIndexStack.pop()
+        cursor.pop()
+      } else {
+        val info = children(index)
+        val cu = info.childUnparser
+        state.pushTRD(cu.trd)
+        cu match {
+          case r: RepeatingChildUnparser => {
+            rep = r
+            state.arrayIterationIndexStack.push(1L)
+            state.occursIndexStack.push(1L)
+            numOccurrences = 0
+            maxReps = r.maxRepeats(state)
+
+            Assert.invariant(state.inspect, "No event for building.")
+            val ev = state.inspectAccessor
+            if (ev.erd eq r.erd) {
+              r.startArrayOrOptional(state)
+              phase = InArray
+            } else {
+              r.checkFinalOccursCountBetweenMinAndMaxOccurs(
+                state,
+                r,
+                numOccurrences,
+                maxReps,
+                0
+              )
+              finishRepeating(state)
+            }
+          }
+          case _ => {
+            phase = AfterScalar
+            cursor.push(info.childBuilder.newFrame())
+          }
+        }
+      }
+    }
+
+    private def finishRepeating(state: UState): Unit = {
+      state.arrayIterationIndexStack.pop()
+      state.occursIndexStack.pop()
+      rep = null
+      finishChild(state)
+    }
+
+    private def finishChild(state: UState): Unit = {
+      state.popTRD(children(index).childUnparser.trd)
+      index += 1
+      phase = NextChild
+    }
   }
 }
 
 /**
  * Builds just the one structurally-present branch of a choice. Mirrors
  * ChoiceCombinatorUnparser's own branch resolution exactly, except the
- * resolved branch's recursive build call targets its Builder rather than
+ * resolved branch's build targets its Builder rather than
  * its full Unparser.
  */
 final class ChoiceBuilder(
@@ -193,16 +341,9 @@ final class ChoiceBuilder(
   defaultBranch: Maybe[(TermRuntimeData, Builder)]
 ) extends Builder {
 
-  private def buildBranch(state: UState, branch: (TermRuntimeData, Builder)): Unit = {
-    val (trd, builder) = branch
-    state.pushTRD(trd)
-    builder.build(state)
-    state.popTRD(trd)
-  }
-
-  override def build(state: UState): Unit = {
+  private def resolveBranch(state: UState): (TermRuntimeData, Builder) = {
     if (state.withinHiddenNest) {
-      buildBranch(state, defaultBranch.get)
+      defaultBranch.get
     } else {
       state.pushTRD(mgrd)
       val event = state.inspectOrError
@@ -228,7 +369,24 @@ final class ChoiceBuilder(
         )
       }
       state.popTRD(mgrd)
-      buildBranch(state, resolved.get)
+      resolved.get
+    }
+  }
+
+  override def newFrame(): BuildFrame = new BuildFrame {
+    private var branchTRD: TermRuntimeData = null
+
+    override def step(cursor: BuildCursor): Unit = {
+      val state = cursor.state
+      if (branchTRD == null) {
+        val (trd, builder) = resolveBranch(state)
+        branchTRD = trd
+        state.pushTRD(trd)
+        cursor.push(builder.newFrame())
+      } else {
+        state.popTRD(branchTRD)
+        cursor.pop()
+      }
     }
   }
 }
@@ -240,12 +398,18 @@ final class ChoiceBuilder(
  * never exist.
  */
 final class HiddenGroupBuilder(bodyBuilder: Builder) extends Builder {
-  override def build(state: UState): Unit = {
-    try {
-      state.incrementHiddenDef()
-      bodyBuilder.build(state)
-    } finally {
-      state.decrementHiddenDef()
+  override def newFrame(): BuildFrame = new BuildFrame {
+    private var bodyPushed = false
+
+    override def step(cursor: BuildCursor): Unit = {
+      if (!bodyPushed) {
+        bodyPushed = true
+        cursor.state.incrementHiddenDef()
+        cursor.push(bodyBuilder.newFrame())
+      } else {
+        cursor.state.decrementHiddenDef()
+        cursor.pop()
+      }
     }
   }
 }
@@ -256,8 +420,16 @@ final class HiddenGroupBuilder(bodyBuilder: Builder) extends Builder {
  * resolving statically to either branch.
  */
 final class NilOrContentBuilder(contentBuilder: Builder) extends Builder {
-  override def build(state: UState): Unit = {
-    val inode = state.currentInfosetNode.asComplex
-    if (!inode.isNilled) { contentBuilder.build(state) }
+  override def newFrame(): BuildFrame = new BuildFrame {
+    private var contentPushed = false
+
+    override def step(cursor: BuildCursor): Unit = {
+      if (!contentPushed && !cursor.state.currentInfosetNode.asComplex.isNilled) {
+        contentPushed = true
+        cursor.push(contentBuilder.newFrame())
+      } else {
+        cursor.pop()
+      }
+    }
   }
 }

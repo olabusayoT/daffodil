@@ -29,8 +29,8 @@ import org.junit.Assert.*
 import org.junit.Test
 
 /**
- * Proves build pauses to let write catch up: with a small prefetchLimit,
- * the lead counter stays bounded mid-recursion, not equal to the full count.
+ * Proves build stops to let write catch up: with a small prefetchLimit,
+ * one advance() leaves the lead counter bounded, not equal to the full count.
  */
 class TestBoundedPrefetch {
 
@@ -41,8 +41,7 @@ class TestBoundedPrefetch {
     val prefetchLimit = 3L
 
     val sch = SchemaUtils.dfdlTestSchema(
-      <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
-      {
+      <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>, {
         <dfdl:format ref="tns:GeneralFormat"
           encoding="ascii"
           lengthUnits="bytes"/>
@@ -91,23 +90,19 @@ class TestBoundedPrefetch {
     writeState.getDataOutputStream.setPriorBitOrder(dp.ssrd.elementRuntimeData.defaultBitOrder)
 
     val rootUnparser = dp.ssrd.unparser.asInstanceOf[ElementUnparserBase]
-    UnparseSharedContextTestFixture.wireCoroutines(
-      sharedCtx,
-      buildInputter.documentElement,
-      rootUnparser,
-      writeState
-    )
 
     val buildState = new BuildState(buildInputter, sharedCtx, Nil, false)
+    val cursor = new BuildCursor(dp.ssrd.builder.get, buildState, sharedCtx)
+    sharedCtx.setBuildCursor(cursor)
 
-    dp.ssrd.builder.get.build(buildState)
+    cursor.advance()
 
-    // See class doc above for why this proves interleaving; numItems + 2
-    // (row + all items + marker) is what currentLead would equal here if
-    // resumeWrite never fired mid-recursion.
+    // numItems + 2 (row + all items + marker) is what currentLead would
+    // equal here if advance() ignored the prefetch limit.
+    assertFalse("expected build to stop with more left to build", cursor.isFinished)
     assertTrue(
-      s"expected lead close to prefetchLimit=$prefetchLimit after build, but was ${sharedCtx.currentLead} " +
-        s"(numItems=$numItems); build did not actually pause for write",
+      s"expected lead close to prefetchLimit=$prefetchLimit after advance, but was ${sharedCtx.currentLead} " +
+        s"(numItems=$numItems); build did not stop at the prefetch limit",
       sharedCtx.currentLead <= prefetchLimit + 1
     )
     assertTrue(
@@ -115,15 +110,12 @@ class TestBoundedPrefetch {
       sharedCtx.currentLead > 0
     )
 
-    // Drain the rest and confirm the output is byte-for-byte correct
-    // despite having been produced across many separate resumeWrite calls
-    // rather than a single one-shot write pass.
-    val finalSignal = sharedCtx.resumeWrite(BuildFinished)
-    finalSignal match {
-      case WriteDone(Some(t)) => throw t
-      case WriteDone(None) => // continue below
-      case other => fail(s"unexpected final signal: $other")
-    }
+    // Write pulls the rest of the tree forward as it needs it; confirm the
+    // output is byte-for-byte correct despite having been built across many
+    // separate advance() calls rather than a single one-shot build pass.
+    val rootNode = sharedCtx.awaitChild(buildInputter.documentElement, 0)
+    rootUnparser.writeContent(rootNode, writeState)
+    cursor.runToCompletion()
     writeState.evalSuspensions(isFinal = true)
     writeState.getDataOutputStream.setFinished(writeState)
 

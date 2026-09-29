@@ -363,7 +363,8 @@ class OrderedSeparatedSequenceUnparser(
     while (index < childUnparsers.length) {
       childUnparsers(index) match {
         case rep: RepeatingChildUnparser =>
-          writeRepeatingTerm(rep, complex, sharedCtx, state, sepState)
+          val repSep = rep.asInstanceOf[RepeatingChildUnparser with Separated]
+          writeRepeatingTerm(repSep, complex, sharedCtx, state, sepState)
         case cu =>
           writeRequiredTerm(cu, complex, sharedCtx, state, sepState)
       }
@@ -374,112 +375,117 @@ class OrderedSeparatedSequenceUnparser(
   }
 
   /**
-   * Writes an array/optional term: either its full occurrence loop (an
-   * actual `DIArray`, or a scalar optional's single occurrence) or, if the
-   * term produced no occurrences at all, its zero-occurrences separator
-   * bookkeeping.
+   * Writes an array/optional term: its occurrences if it produced any,
+   * otherwise its zero-occurrences separator bookkeeping.
    */
   private def writeRepeatingTerm(
-    rep: RepeatingChildUnparser,
+    rep: RepeatingChildUnparser with Separated,
     complex: DIComplex,
     sharedCtx: UnparseSharedContext,
     state: UState,
     sepState: SeparatorSuppressionState
   ): Unit = {
     val idx = state.childIndexStack.top.toInt
-    if (sharedCtx.childExistsOrFinal(complex, idx)) {
-      val next = complex.child(idx)
-      if (next.erd eq rep.erd) {
-        next match {
-          case arrayNode: DIArray =>
-            val repSep = rep.asInstanceOf[RepeatingChildUnparser with Separated]
-            // A dfdl:occursIndex() expression in the occurrence's content
-            // reads state.occursIndexStack.top, which must track it or
-            // every occurrence would evaluate as if it were the first.
-            state.pushOccurrenceIndices()
-            try {
-              var arrayOcc = 0
-              while (sharedCtx.childExistsOrFinal(arrayNode, arrayOcc)) {
-                val occNode = sharedCtx.awaitChild(arrayNode, arrayOcc)
-                // Postfix's separator comes after this occurrence's
-                // content; afterSeparator runs once it's written.
-                sepState.beforeSeparator(
-                  repSep.erd,
-                  repSep.isKnownStaticallyNotToSuppressSeparator
-                )
-                repSep.childUnparser
-                  .asInstanceOf[ElementUnparserBase]
-                  .writeContent(occNode, state)
-                sepState.afterSeparator()
-                arrayNode.freeChildIfNoLongerNeeded(arrayOcc, state.releaseUnneededInfoset)
-                arrayOcc += 1
-                state.moveOverOneArrayIterationIndexOnly()
-                state.moveOverOneOccursIndexOnly()
-              }
-              // this whole array term is done; it occupies exactly one
-              // slot among containerNode's own children, regardless of
-              // how many occurrences it held
-              complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
-              state.moveOverOneElementChildOnly()
-              if (ssp eq Never) {
-                sepState.writeExtraSeparatorsIfNeverSuppressed(repSep, arrayOcc)
-              } else {
-                sepState.writePositionallyRequiredSepsIfSuppressed(
-                  repSep,
-                  arrayOcc,
-                  stacksAlreadyPushed = true
-                )
-              }
-            } finally {
-              state.popOccurrenceIndices()
-            }
-          case scalarOptional =>
-            val repSep = rep.asInstanceOf[RepeatingChildUnparser with Separated]
-            val readyChild = sharedCtx.awaitChild(complex, idx)
-            // Same push as a true array's entry (see above); a
-            // scalar optional is still a RepeatingChildUnparser (just
-            // one that can never hold more than one occurrence).
-            state.pushOccurrenceIndices()
-            try {
-              // Postfix's separator comes after this element's
-              // content; afterSeparator runs once it's written.
-              sepState.beforeSeparator(
-                repSep.erd,
-                repSep.isKnownStaticallyNotToSuppressSeparator
-              )
-              repSep.childUnparser
-                .asInstanceOf[ElementUnparserBase]
-                .writeContent(readyChild, state)
-              sepState.afterSeparator()
-              state.moveOverOneElementChildOnly()
-              complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
-              // Matches the DIArray arm's own per-occurrence advancement:
-              // occursIndexStack.top must reflect the next (missing)
-              // occurrence's index before writePositionallyRequiredSepsIfSuppressed's
-              // loop runs, or its first separator would see index 1, not 2.
-              state.moveOverOneArrayIterationIndexOnly()
-              state.moveOverOneOccursIndexOnly()
-              if (ssp eq Never) {
-                sepState.writeExtraSeparatorsIfNeverSuppressed(repSep, 1)
-              } else {
-                sepState.writePositionallyRequiredSepsIfSuppressed(
-                  repSep,
-                  1,
-                  stacksAlreadyPushed = true
-                )
-              }
-            } finally {
-              state.popOccurrenceIndices()
-            }
-        }
-      } else {
-        // this term produced zero occurrences: a different term's
-        // child appeared in this tree position instead
-        sepState.zeroOccurrences(rep.asInstanceOf[RepeatingChildUnparser with Separated])
+    if (hasOccurrences(rep, complex, idx, sharedCtx)) {
+      complex.child(idx) match {
+        case arrayNode: DIArray =>
+          writeArrayOccurrences(rep, arrayNode, complex, idx, sharedCtx, state, sepState)
+        case _ =>
+          writeScalarOptionalOccurrence(rep, complex, idx, sharedCtx, state, sepState)
       }
     } else {
-      // no more children will ever come; this optional/array term is absent
-      sepState.zeroOccurrences(rep.asInstanceOf[RepeatingChildUnparser with Separated])
+      sepState.zeroOccurrences(rep)
+    }
+  }
+
+  private def writeArrayOccurrences(
+    rep: RepeatingChildUnparser with Separated,
+    arrayNode: DIArray,
+    complex: DIComplex,
+    idx: Int,
+    sharedCtx: UnparseSharedContext,
+    state: UState,
+    sepState: SeparatorSuppressionState
+  ): Unit = {
+    // A dfdl:occursIndex() expression in the occurrence's content reads
+    // state.occursIndexStack.top, which must track it or every occurrence
+    // would evaluate as if it were the first.
+    state.pushOccurrenceIndices()
+    try {
+      var arrayOcc = 0
+      while (sharedCtx.childExistsOrFinal(arrayNode, arrayOcc)) {
+        val occNode = sharedCtx.awaitChild(arrayNode, arrayOcc)
+        writeOccurrence(rep, occNode, state, sepState)
+        arrayNode.freeChildIfNoLongerNeeded(arrayOcc, state.releaseUnneededInfoset)
+        arrayOcc += 1
+        state.moveOverOneArrayIterationIndexOnly()
+        state.moveOverOneOccursIndexOnly()
+      }
+      // The whole array term occupies exactly one slot among
+      // containerNode's own children, however many occurrences it held.
+      complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
+      state.moveOverOneElementChildOnly()
+      finishRepeatingTerm(rep, arrayOcc, sepState)
+    } finally {
+      state.popOccurrenceIndices()
+    }
+  }
+
+  // A scalar optional is still a RepeatingChildUnparser, just one that can
+  // never hold more than one occurrence, so it pushes the same occurrence
+  // indices a true array does.
+  private def writeScalarOptionalOccurrence(
+    rep: RepeatingChildUnparser with Separated,
+    complex: DIComplex,
+    idx: Int,
+    sharedCtx: UnparseSharedContext,
+    state: UState,
+    sepState: SeparatorSuppressionState
+  ): Unit = {
+    val readyChild = sharedCtx.awaitChild(complex, idx)
+    state.pushOccurrenceIndices()
+    try {
+      writeOccurrence(rep, readyChild, state, sepState)
+      state.moveOverOneElementChildOnly()
+      complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
+      // Matches the array loop's own per-occurrence advancement:
+      // occursIndexStack.top must reflect the next (missing) occurrence's
+      // index before the positionally-required separators loop runs, or its
+      // first separator would see index 1, not 2.
+      state.moveOverOneArrayIterationIndexOnly()
+      state.moveOverOneOccursIndexOnly()
+      finishRepeatingTerm(rep, 1, sepState)
+    } finally {
+      state.popOccurrenceIndices()
+    }
+  }
+
+  // Postfix's separator comes after the occurrence's content;
+  // afterSeparator runs once it's written.
+  private def writeOccurrence(
+    rep: RepeatingChildUnparser with Separated,
+    occNode: DINode,
+    state: UState,
+    sepState: SeparatorSuppressionState
+  ): Unit = {
+    sepState.beforeSeparator(rep.erd, rep.isKnownStaticallyNotToSuppressSeparator)
+    rep.childUnparser.asInstanceOf[ElementUnparserBase].writeContent(occNode, state)
+    sepState.afterSeparator()
+  }
+
+  private def finishRepeatingTerm(
+    rep: RepeatingChildUnparser with Separated,
+    occurrences: Int,
+    sepState: SeparatorSuppressionState
+  ): Unit = {
+    if (ssp eq Never) {
+      sepState.writeExtraSeparatorsIfNeverSuppressed(rep, occurrences)
+    } else {
+      sepState.writePositionallyRequiredSepsIfSuppressed(
+        rep,
+        occurrences,
+        stacksAlreadyPushed = true
+      )
     }
   }
 
@@ -503,55 +509,63 @@ class OrderedSeparatedSequenceUnparser(
       case nvi: NewVariableInstanceEndUnparser =>
         nvi.unparse1(state)
       case align: AlignmentPrimUnparser =>
-        // Padding has no non-idempotent side effect (unlike assert/discriminator
-        // below), so re-running it here is required, not forbidden: build's
-        // own recursion only ran it against build's no-op-sink DOS. Always
-        // represented, and never suppressible since its content is deterministic.
-        if (cu.trd.isRepresented) {
-          sepState.beforeSeparator(cu.trd, staticallyNotSuppressible = true)
-        }
-        align.unparse1(state)
-        if (cu.trd.isRepresented) {
-          sepState.afterSeparator()
-        }
+        writeAlignmentTerm(cu, align, state, sepState)
       case statementOnly if !statementOnly.isInstanceOf[WriteUnparser] =>
         // No tree child, so no separator, and nothing to wait on.
         ()
       case _ =>
-        val idx = state.childIndexStack.top.toInt
-        // A nested bare group (e.g. a choice) may resolve to a branch with no
-        // infoset footprint at all; once build is done and no child showed up,
-        // let the group's own dispatch decide. A plain element term always
-        // needs an actual child, so it always waits unconditionally.
-        val isGroupTerm = !cu.childUnparser.isInstanceOf[ElementUnparserBase] &&
-          cu.childUnparser.isInstanceOf[WriteUnparser]
-        if (isGroupTerm) {
-          if (sharedCtx.childExistsOrFinal(complex, idx)) {
-            sharedCtx.awaitChild(complex, idx)
-          }
-        } else {
-          sharedCtx.awaitChild(complex, idx)
-        }
-        // A non-represented term gets no separator, so wroteAny must not
-        // flip true. Suppression only applies to terms whose presence is
-        // uncertain (array/optional, or a bare group not statically known
-        // to need it), never to a plain element's own content length.
-        val useSuppression = isGroupTerm && !cu.isKnownStaticallyNotToSuppressSeparator
-        if (cu.trd.isRepresented) {
-          sepState.beforeSeparator(cu.trd, staticallyNotSuppressible = !useSuppression)
-        }
-        cu.childUnparser match {
-          case elemUnp: ElementUnparserBase =>
-            elemUnp.writeContent(complex.child(idx), state)
-            sepState.afterSeparator()
-            state.moveOverOneElementChildOnly()
-            complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
-          case wu: WriteUnparser =>
-            wu.writeContent(complex, state)
-            sepState.afterSeparator()
-          case other =>
-            Assert.usageError(s"unhandled sequence term unparser type: $other")
-        }
+        writeElementOrGroupTerm(cu, complex, sharedCtx, state, sepState)
+    }
+  }
+
+  // Padding has no non-idempotent side effect (unlike assert/discriminator),
+  // so re-running it here is required, not forbidden: build's own traversal
+  // only ran it against build's no-op-sink DOS. Always represented, and
+  // never suppressible since its content is deterministic.
+  private def writeAlignmentTerm(
+    cu: SequenceChildUnparser with Separated,
+    align: AlignmentPrimUnparser,
+    state: UState,
+    sepState: SeparatorSuppressionState
+  ): Unit = {
+    if (cu.trd.isRepresented) {
+      sepState.beforeSeparator(cu.trd, staticallyNotSuppressible = true)
+    }
+    align.unparse1(state)
+    if (cu.trd.isRepresented) {
+      sepState.afterSeparator()
+    }
+  }
+
+  private def writeElementOrGroupTerm(
+    cu: SequenceChildUnparser with Separated,
+    complex: DIComplex,
+    sharedCtx: UnparseSharedContext,
+    state: UState,
+    sepState: SeparatorSuppressionState
+  ): Unit = {
+    val idx = state.childIndexStack.top.toInt
+    val isGroup = isGroupTerm(cu)
+    awaitRequiredTermChild(isGroup, complex, idx, sharedCtx)
+    // A non-represented term gets no separator, so wroteAny must not flip
+    // true. Suppression only applies to terms whose presence is uncertain
+    // (array/optional, or a bare group not statically known to need it),
+    // never to a plain element's own content length.
+    val useSuppression = isGroup && !cu.isKnownStaticallyNotToSuppressSeparator
+    if (cu.trd.isRepresented) {
+      sepState.beforeSeparator(cu.trd, staticallyNotSuppressible = !useSuppression)
+    }
+    cu.childUnparser match {
+      case elemUnp: ElementUnparserBase =>
+        elemUnp.writeContent(complex.child(idx), state)
+        sepState.afterSeparator()
+        state.moveOverOneElementChildOnly()
+        complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
+      case wu: WriteUnparser =>
+        wu.writeContent(complex, state)
+        sepState.afterSeparator()
+      case other =>
+        Assert.usageError(s"unhandled sequence term unparser type: $other")
     }
   }
 

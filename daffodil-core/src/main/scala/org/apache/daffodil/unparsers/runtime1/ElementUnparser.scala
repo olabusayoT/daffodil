@@ -32,7 +32,6 @@ import org.apache.daffodil.runtime1.processors.ElementRuntimeData
 import org.apache.daffodil.runtime1.processors.Evaluatable
 import org.apache.daffodil.runtime1.processors.UnparseTargetLengthInBitsEv
 import org.apache.daffodil.runtime1.processors.unparsers.*
-import org.apache.daffodil.runtime1.processors.unparsers.MoreTreeAvailable
 
 /**
  * Elements that, when unparsing, have no length specified.
@@ -71,35 +70,18 @@ sealed trait RepMoveMixin {
  * The build-side hookup for bounded lookahead: called once per node, only
  * from the Builder tree (via unparseBeginForBuild below), never from
  * write's or single-pass's own unparseBegin call. Increments the shared
- * lead counter, and once it exceeds the prefetch limit, or too many
- * suspensions are pending, resumes write's coroutine and blocks until it
- * yields back before continuing build's own recursion.
+ * lead counter; BuildCursor.advance is what stops building once the
+ * counter exceeds the prefetch limit.
  */
 private object BuildWriteLeadHookup {
 
   /**
    * Must be called after unparseBegin, not unparseEnd: an ancestor's
-   * increment must happen before any descendant's content is built. A
-   * write cascade triggered here can reach that ancestor before
-   * build's own recursive call into it returns; incrementing in
-   * unparseEnd instead would underflow the counter.
+   * increment must happen before any descendant's content is built, or
+   * write finishing that ancestor first would underflow the counter.
    */
   def afterNodeAdded(state: UState): Unit = {
-    val ctx = state.sharedContext.get
-    ctx.incrementLead()
-    // leadExceedsPrefetchLimit alone doesn't bound the retained
-    // memory of pending suspensions, so pendingSuspensionTripLimit
-    // separately caps total pendingCount; resuming write here can
-    // also resolve suspensions immediately.
-    if (
-      ctx.leadExceedsPrefetchLimit ||
-      ctx.suspensionTracker.pendingCount > ctx.pendingSuspensionTripLimit
-    ) {
-      // resumeWrite may legitimately send WriteDone here, not just
-      // WriteNeedsMore, and records that so nothing tries to resume an
-      // already-finished coroutine again later.
-      ctx.resumeWrite(MoreTreeAvailable)
-    }
+    state.sharedContext.get.incrementLead()
   }
 }
 
@@ -235,14 +217,7 @@ sealed abstract class ElementUnparserBase(
     dispatchContentUnparser(state)
   }
 
-  // Hoisted once per instance rather than passed inline at the unparse()
-  // call site below: a closure referencing instance fields/methods (erd,
-  // runContentUnparser) closes over `this`, so it allocates a fresh
-  // closure on every call otherwise, and unparse runs once per matching
-  // element in the infoset. writeContent's own dispatch closure is not
-  // hoisted the same way: it also captures containerNode, a per-call
-  // parameter, so a fresh closure there is unavoidable regardless.
-  private val funcUnparseDispatch: UState => Unit = { s =>
+  private def dispatchForUnparse(s: UState): Unit = {
     // We must push the TermRuntimeData for all model-groups, starting
     // from the complex type's model-group; simple types have none to
     // push. Only unparse's own event-driven dispatch needs this:
@@ -257,18 +232,36 @@ sealed abstract class ElementUnparserBase(
       s.popTRD(erd.optComplexTypeModelGroupRuntimeData.get)
   }
 
+  private def dispatchForWrite(containerNode: DINode, s: UState): Unit = {
+    contentSetup(s)
+    // eReptypeUnparser takes priority here too, matching
+    // dispatchContentUnparser: a repType'd element's raw eUnparser can
+    // itself be group-wrapped, and without this check would wrongly
+    // delegate to that raw content instead of converting via repType.
+    eUnparser.toOption match {
+      case Some(wu: WriteUnparser) if eReptypeUnparser.isEmpty =>
+        wu.writeContent(containerNode, s)
+      case _ =>
+        dispatchContentUnparser(s)
+    }
+  }
+
   /**
    * The steps identical whether reached via writeContent's already-built
    * containerNode or unparse's own event-consuming attach: before-content,
-   * the content dispatch itself, after-content, and setVariables. dispatch
-   * abstracts writeContent's WriteUnparser-bypass check (needed to reach a
-   * nested group's own writeContent) from unparse's plain, purely
-   * event-driven runContentUnparser.
+   * the content dispatch itself, after-content, and setVariables. A Nope
+   * containerNode selects unparse's purely event-driven dispatch; a One
+   * selects writeContent's, which must bypass to a nested group's own
+   * writeContent.
    */
-  private[runtime1] def runElementContent(state: UState, dispatch: UState => Unit): Unit = {
+  private[runtime1] def runElementContent(state: UState, containerNode: Maybe[DINode]): Unit = {
     captureRuntimeValuedExpressionValues(state)
     doBeforeContentUnparser(state)
-    dispatch(state)
+    if (containerNode.isEmpty) {
+      dispatchForUnparse(state)
+    } else {
+      dispatchForWrite(containerNode.get, state)
+    }
     doAfterContentUnparser(state)
     computeSetVariables(state)
   }
@@ -287,22 +280,7 @@ sealed abstract class ElementUnparserBase(
       // That's normally set by the ordinary unparse dispatch, which this
       // call bypasses entirely, so it's set explicitly here to match.
       state.setProcessor(this)
-      runElementContent(
-        state,
-        dispatch = { s =>
-          contentSetup(s)
-          // eReptypeUnparser takes priority here too, matching
-          // dispatchContentUnparser: a repType'd element's raw eUnparser can
-          // itself be group-wrapped, and without this check would wrongly
-          // delegate to that raw content instead of converting via repType.
-          eUnparser.toOption match {
-            case Some(wu: WriteUnparser) if eReptypeUnparser.isEmpty =>
-              wu.writeContent(containerNode, s)
-            case _ =>
-              dispatchContentUnparser(s)
-          }
-        }
-      )
+      runElementContent(state, One(containerNode))
       // Only a simple node needs finalizing here (complex/array nodes were
       // already finalized in build's unparseEnd; re-finalizing trips
       // setFinal()'s !isFinal assert). An OVC node may still be valueless
@@ -318,6 +296,7 @@ sealed abstract class ElementUnparserBase(
       // build's unparseEnd, or they pile up unresolved until the final
       // isFinal=true call instead of resolving as data becomes available.
       state.asInstanceOf[SuspensionCapableUState].evalSuspensions(isFinal = false)
+      if (state.sharedContext.isDefined) state.sharedContext.get.relieveSuspensionBacklog()
     } finally {
       // A stall (AwaitChildStalledException) or other exception mid-recursion
       // must still unwind this node's own push, or these stacks end up
@@ -334,7 +313,7 @@ sealed abstract class ElementUnparserBase(
 
     unparseBegin(state)
 
-    runElementContent(state, dispatch = funcUnparseDispatch)
+    runElementContent(state, Nope)
 
     unparseEnd(state, isBuild = false)
 

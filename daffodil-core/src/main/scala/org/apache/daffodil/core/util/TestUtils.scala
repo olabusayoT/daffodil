@@ -54,7 +54,6 @@ import org.apache.daffodil.runtime1.infoset.ScalaXMLInfosetOutputter
 import org.apache.daffodil.runtime1.processors.DataProcessor
 import org.apache.daffodil.runtime1.processors.SuspensionTracker
 import org.apache.daffodil.runtime1.processors.VariableMap
-import org.apache.daffodil.runtime1.processors.unparsers.BuildFinished
 import org.apache.daffodil.runtime1.processors.unparsers.UState
 import org.apache.daffodil.runtime1.processors.unparsers.UStateMain
 import org.apache.daffodil.runtime1.processors.unparsers.UnparseSharedContext
@@ -306,7 +305,6 @@ object TestUtils {
       dp.tunables,
       prefetchLimit
     )
-    sharedCtx.observeBuildSignal(BuildFinished)
     writeState.setSharedContext(sharedCtx)
 
     primeLeadCounter(sharedCtx, builtTree.child(0))

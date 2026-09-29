@@ -34,8 +34,7 @@ class TestBuildState {
 
   @Test def testBuildStateSurfacesCorrectEventSequence(): Unit = {
     val sch = SchemaUtils.dfdlTestSchema(
-      <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
-      {
+      <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>, {
         <dfdl:format ref="tns:GeneralFormat"
           encoding="ascii"
           lengthUnits="bytes"
@@ -81,12 +80,12 @@ class TestBuildState {
       UnparseSharedContextTestFixture.build(dp, prefetchLimit = 100)()
     val buildState = new BuildState(inputter, sharedCtx, Nil, false)
 
-    // Drives through the ACTUAL Builder recursion, not hand-driven
+    // Drives through the ACTUAL Builder frames, not hand-driven
     // advance() calls, since next-element resolution depends on the same
-    // TRD push/pop dance ElementBuilder.build performs. This schema's
+    // TRD push/pop dance ElementBuilder's frame performs. This schema's
     // separator never reaches BuildState at all: the Builder tree skips
     // straight past the delimiter-stack wrapper unparser entirely.
-    dp.ssrd.builder.get.build(buildState)
+    new BuildCursor(dp.ssrd.builder.get, buildState, sharedCtx).runToCompletion()
 
     assertEquals(5L, sharedCtx.currentLead) // row, name, age, city, marker
 

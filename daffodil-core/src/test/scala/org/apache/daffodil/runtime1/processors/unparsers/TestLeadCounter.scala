@@ -38,8 +38,7 @@ class TestLeadCounter {
 
   @Test def testLeadCounterIncrementsOnBuildAndDecrementsOnWrite(): Unit = {
     val sch = SchemaUtils.dfdlTestSchema(
-      <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
-      {
+      <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>, {
         <dfdl:format ref="tns:GeneralFormat"
           encoding="ascii"
           lengthUnits="bytes"/>
@@ -89,17 +88,11 @@ class TestLeadCounter {
     val buildState = new BuildState(buildInputter, sharedCtx, Nil, false)
 
     assertEquals(0L, sharedCtx.currentLead)
-    dp.ssrd.builder.get.build(buildState)
+    new BuildCursor(dp.ssrd.builder.get, buildState, sharedCtx).runToCompletion()
 
     // row itself, name, age, city, marker = 5 elements total, each
     // incrementing once via unparseBegin's actual hookup.
     assertEquals(5L, sharedCtx.currentLead)
-
-    // Build was driven directly (no coroutine handoff), so sharedCtx can't
-    // know build is done; tell it so write's awaitChild calls take the
-    // post-BuildFinished (suspension-retry) path instead of resuming a
-    // coroutine that was never set up.
-    sharedCtx.observeBuildSignal(BuildFinished)
 
     // Write phase: write the SAME already-built tree
     // (buildInputter.documentElement) against the SAME sharedCtx,

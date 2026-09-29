@@ -17,6 +17,9 @@
 
 package org.apache.daffodil.unparsers.runtime1
 
+import org.apache.daffodil.lib.util.Maybe
+import org.apache.daffodil.lib.util.Maybe.Nope
+import org.apache.daffodil.lib.util.Maybe.One
 import org.apache.daffodil.runtime1.infoset.DINode
 import org.apache.daffodil.runtime1.processors.ModelGroupRuntimeData
 import org.apache.daffodil.runtime1.processors.unparsers.*
@@ -35,31 +38,21 @@ class HiddenGroupCombinatorUnparser(ctxt: ModelGroupRuntimeData, bodyUnparser: U
 
   override val runtimeDependencies = Array()
 
-  // Hoisted once per instance rather than passed as `bodyUnparser.unparse1`
-  // at the unparse() call site below: an eta-expansion of an instance
-  // field's method closes over `this`, so it allocates a fresh closure on
-  // every call otherwise, and unparse runs once per matching element in
-  // the infoset.
-  private val funcBodyUnparserUnparse1: UState => Unit = bodyUnparser.unparse1
+  // The hidden-depth counter must stay incremented for the whole body,
+  // since anything the body writes needs it (e.g. choice-branch
+  // resolution branches on state.withinHiddenNest, and RepType conversion
+  // asserts it's never true).
+  private def run(containerNode: Maybe[DINode], start: UState): Unit = {
+    start.incrementHiddenDef()
+    try {
+      dispatchBody(containerNode, bodyUnparser, start)
+    } finally {
+      start.decrementHiddenDef()
+    }
+  }
 
-  // The hidden-depth counter must stay incremented across any pauses, since
-  // anything the body writes needs it (e.g. choice-branch resolution
-  // branches on state.withinHiddenNest, and RepType conversion asserts
-  // it's never true).
   override def writeContent(containerNode: DINode, start: UState): Unit =
-    writeWithPushPop(
-      containerNode,
-      bodyUnparser,
-      start,
-      setup = _.incrementHiddenDef(),
-      teardown = (start, _) => start.decrementHiddenDef()
-    )
+    run(One(containerNode), start)
 
-  def unparse(start: UState): Unit =
-    withPushPop(
-      start,
-      setup = _.incrementHiddenDef(),
-      dispatch = funcBodyUnparserUnparse1,
-      teardown = (start, _) => start.decrementHiddenDef()
-    )
+  def unparse(start: UState): Unit = run(Nope, start)
 }

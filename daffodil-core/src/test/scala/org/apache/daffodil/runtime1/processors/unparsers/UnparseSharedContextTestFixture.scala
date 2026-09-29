@@ -17,10 +17,8 @@
 
 package org.apache.daffodil.runtime1.processors.unparsers
 
-import org.apache.daffodil.runtime1.infoset.DIDocument
 import org.apache.daffodil.runtime1.processors.DataProcessor
 import org.apache.daffodil.runtime1.processors.SuspensionTracker
-import org.apache.daffodil.unparsers.runtime1.ElementUnparserBase
 
 /**
  * Shared BuildState construction for tests, mirroring production's `* 2`
@@ -37,34 +35,5 @@ object UnparseSharedContextTestFixture {
       dp.tunables,
       prefetchLimit
     )
-  }
-
-  /** Wires a BuildCoroutine/WriteCoroutine pair onto sharedCtx, mirroring
-    * production's WriteCoroutine, so mid-recursion resumeWrite calls do
-    * something; caller must still perform the final handoff afterward.
-    */
-  def wireCoroutines(
-    sharedCtx: UnparseSharedContext,
-    documentElement: DIDocument,
-    rootUnparser: ElementUnparserBase,
-    writeState: UState
-  ): Unit = {
-    val buildCoroutine = new BuildCoroutine()
-    val writeCoroutine = new WriteCoroutine({ (wc, firstSignal) =>
-      try {
-        sharedCtx.observeBuildSignal(firstSignal)
-        try {
-          val rootNode = sharedCtx.awaitChild(documentElement, 0)
-          rootUnparser.writeContent(rootNode, writeState)
-        } catch {
-          case _: AwaitChildStalledException =>
-        }
-        wc.resumeFinal(buildCoroutine, WriteDone(None))
-      } catch {
-        case t: Throwable =>
-          wc.resumeFinal(buildCoroutine, WriteDone(Some(t)))
-      }
-    })
-    sharedCtx.setCoroutines(buildCoroutine, writeCoroutine)
   }
 }

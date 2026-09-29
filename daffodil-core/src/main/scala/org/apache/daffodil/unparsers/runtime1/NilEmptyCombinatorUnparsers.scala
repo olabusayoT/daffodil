@@ -19,6 +19,7 @@ package org.apache.daffodil.unparsers.runtime1
 
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.util.Maybe
+import org.apache.daffodil.lib.util.Maybe.One
 import org.apache.daffodil.runtime1.infoset.DINode
 import org.apache.daffodil.runtime1.processors.ElementRuntimeData
 import org.apache.daffodil.runtime1.processors.unparsers.*
@@ -73,5 +74,5 @@ case class ComplexNilOrContentUnparser(
   // itself be a resumable group unparser expecting live InfosetInputter
   // events that don't exist yet (see SpecifiedLengthExplicitImplicitUnparser).
   override def writeContent(containerNode: DINode, state: UState): Unit =
-    writeWithPushPop(containerNode, chooseBodyUnparser(containerNode), state)
+    dispatchBody(One(containerNode), chooseBodyUnparser(containerNode), state)
 }

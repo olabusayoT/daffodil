@@ -17,79 +17,39 @@
 
 package org.apache.daffodil.unparsers.runtime1
 
+import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.runtime1.infoset.DINode
 import org.apache.daffodil.runtime1.processors.unparsers.*
 
 /**
  * Write-side dispatch for the build/write-prefetch unparse path, by
  * ordinary recursive calls, using `UnparseSharedContext.awaitChild` to
- * block (park write's coroutine thread, see `BuildWriteCoroutines.scala`)
- * wherever a needed child doesn't yet exist or isn't ready.
+ * advance build wherever a needed child doesn't yet exist or isn't ready.
  */
 trait WriteUnparser {
 
-  // Writes containerNode's content via direct recursive calls on write's
-  // own coroutine thread - "where we are" is just the JVM call stack, not
-  // a return-value state machine. May block (via awaitChild) until a
-  // needed child exists and is ready, then resumes where it left off.
+  // Writes containerNode's content via direct recursive calls - "where we
+  // are" is just the JVM call stack, not a return-value state machine. May
+  // advance build (via awaitChild) until a needed child exists and is
+  // ready, then continues where it left off.
   def writeContent(containerNode: DINode, state: UState): Unit
 
-  // Shared push-once/pop-once skeleton, used by both unparse() and
-  // writeContent() implementations that need one: setup runs before
-  // dispatch, teardown runs once dispatch returns (even on exception,
-  // e.g. a stall caught higher up and followed by finishWriteSide's
-  // invariant checks against this same state) with setup's result
-  // threaded through (e.g. a detached element from setup to teardown).
-  protected def withPushPop[A](
-    state: UState,
-    setup: UState => A,
-    dispatch: UState => Unit,
-    teardown: (UState, A) => Unit
-  ): Unit = {
-    val setupResult = setup(state)
-    try {
-      dispatch(state)
-    } finally {
-      teardown(state, setupResult)
-    }
-  }
-
-  // withPushPop specialized for writeContent's own dispatch: bodyUnparser
-  // is dispatched to writeContent if it's a WriteUnparser, else plain
-  // unparse1.
-  protected def writeWithPushPop[A](
-    containerNode: DINode,
-    bodyUnparser: Unparser,
-    state: UState,
-    setup: UState => A,
-    teardown: (UState, A) => Unit
-  ): Unit =
-    withPushPop(
-      state,
-      setup = setup,
-      dispatch = { s =>
-        bodyUnparser match {
-          case wu: WriteUnparser => wu.writeContent(containerNode, s)
-          case _ => bodyUnparser.unparse1(s)
-        }
-      },
-      teardown = teardown
-    )
-
-  /**
-   * `writeWithPushPop` for a combinator with nothing to push or pop; just
-   * the dispatch-to-`writeContent`-or-`unparse1` part.
-   */
-  protected def writeWithPushPop(
-    containerNode: DINode,
+  // The body dispatch shared by unparse() and writeContent() of a
+  // combinator that wraps one body unparser. A Nope containerNode means
+  // unparse's event-driven path; otherwise bodyUnparser is dispatched to
+  // writeContent if it's a WriteUnparser, else plain unparse1.
+  protected final def dispatchBody(
+    containerNode: Maybe[DINode],
     bodyUnparser: Unparser,
     state: UState
-  ): Unit =
-    writeWithPushPop(
-      containerNode,
-      bodyUnparser,
-      state,
-      setup = (_: UState) => (),
-      teardown = (_: UState, _: Unit) => ()
-    )
+  ): Unit = {
+    if (containerNode.isEmpty) {
+      bodyUnparser.unparse1(state)
+    } else {
+      bodyUnparser match {
+        case wu: WriteUnparser => wu.writeContent(containerNode.get, state)
+        case _ => bodyUnparser.unparse1(state)
+      }
+    }
+  }
 }

@@ -126,8 +126,7 @@ class TestBuildWriteArrayChoice {
   // its tree into write's writeContent (end-to-end build-then-write).
   @Test def testStandaloneBuildStateNavigatesArrayChoiceSeparator(): Unit = {
     val sch = SchemaUtils.dfdlTestSchema(
-      <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
-      {
+      <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>, {
         <dfdl:format ref="tns:GeneralFormat"
           encoding="ascii"
           lengthUnits="bytes"/>
@@ -180,7 +179,7 @@ class TestBuildWriteArrayChoice {
       UnparseSharedContextTestFixture.build(dp, prefetchLimit = 100)()
     val buildState = new BuildState(buildInputter, sharedCtx, Nil, false)
 
-    dp.ssrd.builder.get.build(buildState)
+    new BuildCursor(dp.ssrd.builder.get, buildState, sharedCtx).runToCompletion()
 
     // row, header, item x3, typeB, marker = 7 elements total.
     assertEquals(7L, sharedCtx.currentLead)
@@ -192,12 +191,6 @@ class TestBuildWriteArrayChoice {
     assertEquals(3, rootNode.child(1).asInstanceOf[DIArray].numChildren)
     assertEquals("typeB", rootNode.child(2).erd.name)
     assertEquals("marker", rootNode.child(3).erd.name)
-
-    // Build was driven directly (no coroutine handoff), so sharedCtx can't
-    // know build is done; tell it so write's awaitChild call takes the
-    // post-BuildFinished (suspension-retry) path instead of resuming a
-    // coroutine that was never set up.
-    sharedCtx.observeBuildSignal(BuildFinished)
 
     // Write phase: write the tree BuildState just constructed, confirming
     // it's a usable, fully-built tree, not just a navigation exercise.

@@ -20,6 +20,7 @@ package org.apache.daffodil.unparsers.runtime1
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.schema.annotation.props.gen.LengthUnits
 import org.apache.daffodil.lib.schema.annotation.props.gen.Representation
+import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.*
 import org.apache.daffodil.runtime1.infoset.DIElement
 import org.apache.daffodil.runtime1.infoset.DINode
@@ -71,33 +72,19 @@ final class SpecifiedLengthExplicitImplicitUnparser(
     }
   }
 
-  // Hoisted once per instance rather than passed at each call site below:
-  // an eta-expansion of an instance method (or field) closes over `this`,
-  // so it allocates a fresh closure on every call otherwise, and both
-  // writeContent and unparse run once per matching element in the infoset.
-  private val funcCheckVariableWidthComplexType: UState => Unit = checkVariableWidthComplexType
-  private val funcEUnparserUnparse1: UState => Unit = eUnparser.unparse1
-
-  override final def unparse(state: UState): Unit =
-    withPushPop(
-      state,
-      setup = funcCheckVariableWidthComplexType,
-      dispatch = funcEUnparserUnparse1,
-      teardown = (_, _) => ()
-    )
+  override final def unparse(state: UState): Unit = {
+    checkVariableWidthComplexType(state)
+    eUnparser.unparse1(state)
+  }
 
   // Without this, a SeqCompUnparser wrapping this class would treat
   // eUnparser as a synchronous call via its generic fallback, but
   // eUnparser can itself be a resumable group unparser expecting live
   // InfosetInputter events, desyncing build's event stream entirely.
-  override def writeContent(containerNode: DINode, state: UState): Unit =
-    writeWithPushPop(
-      containerNode,
-      eUnparser,
-      state,
-      setup = funcCheckVariableWidthComplexType,
-      teardown = (_, _) => ()
-    )
+  override def writeContent(containerNode: DINode, state: UState): Unit = {
+    checkVariableWidthComplexType(state)
+    dispatchBody(One(containerNode), eUnparser, state)
+  }
 }
 
 /**
@@ -174,46 +161,31 @@ class SpecifiedLengthPrefixedUnparser(
 
   override def childProcessors = Vector(prefixedLengthUnparser, eUnparser)
 
-  // Hoisted once per instance rather than passed at the unparse() call
-  // site below: an eta-expansion of an instance method (or field) closes
-  // over `this`, so it allocates a fresh closure on every call otherwise,
-  // and unparse runs once per matching element in the infoset.
-  // writeContent's own setup/teardown below are NOT hoisted the same way:
-  // its teardown also captures containerNode, a per-call parameter, so a
-  // fresh closure there is unavoidable regardless.
-  private val funcPushDetachedPrefixLengthElement: UState => DISimple =
-    pushDetachedPrefixLengthElement
-  private val funcEUnparserUnparse1: UState => Unit = eUnparser.unparse1
-  private val funcUnparseTeardown: (UState, DISimple) => Unit = { (state, plElem) =>
-    resolvePrefixLength(state, state.currentInfosetNode.asInstanceOf[DIElement], plElem)
+  private def run(containerNode: Maybe[DINode], state: UState): Unit = {
+    val plElem = pushDetachedPrefixLengthElement(state)
+    try {
+      dispatchBody(containerNode, eUnparser, state)
+    } finally {
+      if (containerNode.isEmpty) {
+        resolvePrefixLength(state, state.currentInfosetNode.asInstanceOf[DIElement], plElem)
+      } else {
+        // resolvePrefixLength (via assignPrefixLength/suspension.run)
+        // expects state.processor to already be set, normally done by
+        // Unparser.unparse1, which this recursive-dispatch path bypasses.
+        state.setProcessor(this)
+        resolvePrefixLength(state, containerNode.get.asInstanceOf[DIElement], plElem)
+      }
+    }
   }
 
-  override def unparse(state: UState): Unit =
-    withPushPop(
-      state,
-      setup = funcPushDetachedPrefixLengthElement,
-      dispatch = funcEUnparserUnparse1,
-      teardown = funcUnparseTeardown
-    )
+  override def unparse(state: UState): Unit = run(Nope, state)
 
   // Without this, WriteUnparser dispatch (a plain recursive-dispatch
   // fallback for a group-wrapped eUnparser) would call eUnparser.unparse1
   // synchronously, but it can itself be a resumable group unparser
   // expecting live InfosetInputter events.
   override def writeContent(containerNode: DINode, state: UState): Unit =
-    writeWithPushPop(
-      containerNode,
-      eUnparser,
-      state,
-      setup = funcPushDetachedPrefixLengthElement,
-      teardown = { (state, plElem) =>
-        // resolvePrefixLength (via assignPrefixLength/suspension.run)
-        // expects state.processor to already be set, normally done by
-        // Unparser.unparse1, which this recursive-dispatch path bypasses.
-        state.setProcessor(SpecifiedLengthPrefixedUnparser.this)
-        resolvePrefixLength(state, containerNode.asInstanceOf[DIElement], plElem)
-      }
-    )
+    run(One(containerNode), state)
 
   private def pushDetachedPrefixLengthElement(state: UState): DISimple = {
     // Create a "detached" DIDocument with a single child element that the

@@ -69,18 +69,15 @@ import org.apache.daffodil.runtime1.processors.parsers.PState
 import org.apache.daffodil.runtime1.processors.parsers.ParseError
 import org.apache.daffodil.runtime1.processors.parsers.Parser
 import org.apache.daffodil.runtime1.processors.unparsers.AwaitChildStalledException
-import org.apache.daffodil.runtime1.processors.unparsers.BuildCoroutine
-import org.apache.daffodil.runtime1.processors.unparsers.BuildFinished
-import org.apache.daffodil.runtime1.processors.unparsers.BuildSignal
+import org.apache.daffodil.runtime1.processors.unparsers.BuildAbortedException
+import org.apache.daffodil.runtime1.processors.unparsers.BuildCursor
 import org.apache.daffodil.runtime1.processors.unparsers.BuildState
 import org.apache.daffodil.runtime1.processors.unparsers.NotUnparsableUnparser
 import org.apache.daffodil.runtime1.processors.unparsers.SuspensionCapableUState
 import org.apache.daffodil.runtime1.processors.unparsers.UState
 import org.apache.daffodil.runtime1.processors.unparsers.UnparseError
 import org.apache.daffodil.runtime1.processors.unparsers.UnparseSharedContext
-import org.apache.daffodil.runtime1.processors.unparsers.WriteCoroutine
-import org.apache.daffodil.runtime1.processors.unparsers.WriteDone
-import org.apache.daffodil.runtime1.processors.unparsers.WriteSignal
+import org.apache.daffodil.runtime1.processors.unparsers.Unparser
 import org.apache.daffodil.unparsers.runtime1.ElementUnparserBase
 
 /**
@@ -532,11 +529,10 @@ class DataProcessor(
 
   /**
    * Build/write-prefetch unparse path (gated on `useBuildWritePrefetch`).
-   * `BuildState` builds the tree via the ordinary Unparser recursion.
-   * Only spawns write's own thread, recursing via `writeContent` and
-   * blocking on `awaitChild` via `Coroutine[T]`, if build's lead ever
-   * crosses the prefetch limit; otherwise write runs directly on this
-   * same thread afterward.
+   * `BuildState` builds the tree via a `BuildCursor`, while write recurses
+   * via `writeContent` and, whenever it needs tree that does not exist yet
+   * (`awaitChild`), advances the cursor directly. Everything runs on this
+   * one thread.
    */
   private def unparseViaBuildThenWrite(
     actualInputter: api.infoset.InfosetInputter,
@@ -552,84 +548,59 @@ class DataProcessor(
     }
     val inputter = new InfosetInputter(actualInputter)
     val rootUnparser = ssrd.unparser
-    var buildState: BuildState = null
-    // Cleaned up on write's OWN thread (inside runWriteThread below), not
-    // this method's outer finally block: it's only ever touched from
-    // write's thread (io.ThreadCheckMixin's affinity invariant), so
-    // cleaning it up elsewhere would violate that.
-    var writeState: UState with SuspensionCapableUState = null
-    // Null until buildState/writeState exists; the catch block below
-    // constructs a fallback UState to report through only if setup threw
-    // before either one was assigned here.
-    var activeState: UState = null
-    // Hoisted so the outer catch below can reach it (to abort write's
-    // thread if it's still parked) even when the exception came from
-    // partway through setup, before the try block's own local val would
-    // otherwise have gone out of scope.
-    var sharedCtx: UnparseSharedContext = null
-    val buildCoroutine = new BuildCoroutine()
 
-    // Constructs write's UState and wires it into sharedCtx. Must run on
-    // write's own coroutine thread: writeState's DataOutputStream exists
-    // 1-to-1 with threads (io.ThreadCheckMixin), so constructing it
-    // eagerly on build's thread would bind it to the wrong one.
-    def constructWriteSide(): Unit = {
-      writeState = UState.createInitialUState(outStream, this, inputter, areDebugging)
-      writeState.setSharedContext(sharedCtx)
-      if (areDebugging) writeState.notifyDebugging(true)
-      init(writeState, rootUnparser)
-      // Forces evaluation of non-constant defineVariable defaults, same
-      // as single-pass's doUnparse; write is the side that actually
-      // reads/writes variables here, so it needs this on its own copy.
-      writeState.initializeVariables()
-      writeState.getDataOutputStream.setPriorBitOrder(ssrd.elementRuntimeData.defaultBitOrder)
+    try {
+      inputter.initialize(ssrd.elementRuntimeData, tunables)
+    } catch {
+      // Safe before initialize() completes: creating the state only copies
+      // variableMap, never touching inputter.documentElement.
+      case t: Throwable =>
+        return unparseErrorResult(
+          UState.createInitialUState(outStream, this, inputter, areDebugging),
+          t
+        )
     }
 
-    // evalSuspensions(isFinal = true) runs BEFORE the stack-depth
-    // invariants below: one tripping first could mask the real
-    // SuspensionDeadlockException diagnostic this ordering exists to
-    // surface.
-    def finishWriteSide(): Unit = {
-      writeState.setProcessor(rootUnparser)
+    val sharedCtx = new UnparseSharedContext(
+      // Shared by build and write, which together tick this tracker at
+      // roughly twice the per-node rate a single traversal would;
+      // doubling both thresholds restores the intended sweep density.
+      new SuspensionTracker(
+        tunables.unparseSuspensionWaitYoung * 2,
+        tunables.unparseSuspensionWaitOld * 2
+      ),
+      this,
+      tunables,
+      prefetchLimit = tunables.unparsePrefetchWindowNodes
+    )
+    val buildState = new BuildState(inputter, sharedCtx, Nil, areDebugging)
 
-      // Routed via sharedCtx.suspensionTracker, the SAME tracker
-      // BuildState registered into, so both build-side and write-side
-      // suspensions get resolved here.
-      writeState.evalSuspensions(isFinal = true)
-
-      Assert.invariant(writeState.arrayIterationIndexStack.length == 1)
-      Assert.invariant(writeState.occursIndexStack.length == 1)
-      Assert.invariant(writeState.groupIndexStack.length == 1)
-      Assert.invariant(writeState.childIndexStack.length == 1)
-      Assert.invariant(writeState.currentInfosetNodeMaybe.isEmpty)
-      Assert.invariant(writeState.escapeSchemeEVCache.isEmpty)
-      Assert.invariant(writeState.maybeTopTRD().isEmpty)
-      Assert.invariant(!writeState.withinHiddenNest)
-
-      Assert.invariant(!writeState.getDataOutputStream.isFinished)
-      try {
-        writeState.getDataOutputStream.setFinished(writeState)
-      } catch {
-        case boc: BitOrderChangeException =>
-          writeState.SDE(boc)
-        case fio: FileIOException =>
-          writeState.SDE(fio)
+    try {
+      if (areDebugging) {
+        Assert.invariant(optDebugger.isDefined)
+        addEventHandler(debugger)
+        buildState.notifyDebugging(true)
       }
-    }
+      init(buildState, rootUnparser)
 
-    // The write side's actual work for one unparse call: constructs its
-    // own UState, walks the tree build has (or will have) produced via
-    // writeContent, then finalizes. Returns the failure (if any) rather
-    // than throwing, so both runWriteThread below and the
-    // no-coroutine-needed inline call further down can report it the
-    // same way.
-    def doWriteSide(firstSignal: BuildSignal): Option[Throwable] = {
+      // The root element always has a builder: it is exactly the case that
+      // gets ElementBuilder wrapped around it, regardless of schema content.
+      val cursor = new BuildCursor(ssrd.builder.get, buildState, sharedCtx)
+      sharedCtx.setBuildCursor(cursor)
+
+      val writeState = UState.createInitialUState(outStream, this, inputter, areDebugging)
       try {
-        // firstSignal may already be BuildFinished (build never crossed
-        // the prefetch-lead threshold) or BuildAborted (build failed
-        // early); observeBuildSignal handles either before any real work.
-        sharedCtx.observeBuildSignal(firstSignal)
-        constructWriteSide()
+        writeState.setSharedContext(sharedCtx)
+        if (areDebugging) writeState.notifyDebugging(true)
+        init(writeState, rootUnparser)
+        // Forces evaluation of non-constant defineVariable defaults, same
+        // as single-pass's doUnparse; write is the side that actually
+        // reads/writes variables here, so it needs this on its own copy.
+        writeState.initializeVariables()
+        writeState.getDataOutputStream.setPriorBitOrder(
+          ssrd.elementRuntimeData.defaultBitOrder
+        )
+
         val rootElemUnp = rootUnparser.asInstanceOf[ElementUnparserBase]
         try {
           val rootNode = sharedCtx.awaitChild(inputter.documentElement, 0)
@@ -640,134 +611,87 @@ class DataProcessor(
           // regardless of how this try block exits.
           case _: AwaitChildStalledException =>
         }
-        finishWriteSide()
-        None
+
+        // Write only ever advances build as far as it needs, so build may
+        // still have its trailing end events left to consume.
+        cursor.runToCompletion()
+        finishBuildSide(buildState, rootUnparser)
+        finishWriteSide(writeState, rootUnparser)
+
+        writeState.unparseResult
       } catch {
-        // Includes BuildAbortedException, when firstSignal is
-        // BuildAborted: build's own thread has already unwound via its
-        // own catch below by the time that fires, so this particular
-        // result is never actually read by anyone (see runWriteThread).
-        case t: Throwable => Some(t)
+        // Build's own failure is reported against buildState, as it always
+        // was, rather than against write's partially-written state.
+        case b: BuildAbortedException => unparseErrorResult(buildState, b.getCause)
+        case t: Throwable => unparseErrorResult(writeState, t)
       } finally {
-        if (writeState != null) writeState.getDataOutputStream.cleanUp()
+        writeState.getDataOutputStream.cleanUp()
       }
-    }
-
-    // Write's entire coroutine-thread body. Reports failure back through
-    // the coroutine handoff rather than throwing here, since resumeFinal
-    // must still run.
-    def runWriteThread(wc: WriteCoroutine, firstSignal: BuildSignal): Unit = {
-      // Computed before resumeFinal is called below (never in an outer
-      // finally): resumeFinal requires returning from run() immediately,
-      // so build's thread mustn't wake until write's cleanup has
-      // actually finished, or both threads would run at once. doWriteSide's
-      // own finally block already covers that cleanup before returning.
-      val result = WriteDone(doWriteSide(firstSignal))
-      wc.resumeFinal(buildCoroutine, result)
-    }
-
-    // Runs build's own structural recursion to completion, asserting its
-    // stacks end up balanced and the inputter has nothing left unconsumed.
-    def runBuildPhase(): Unit = {
-      buildState = new BuildState(inputter, sharedCtx, Nil, areDebugging)
-      activeState = buildState
-      if (areDebugging) {
-        Assert.invariant(optDebugger.isDefined)
-        addEventHandler(debugger)
-        buildState.notifyDebugging(true)
-      }
-      init(buildState, rootUnparser)
-
-      // The root element always has a builder: it is exactly the case that
-      // gets ElementBuilder wrapped around it, regardless of schema content.
-      ssrd.builder.get.build(buildState)
-      buildState.popTRD(rootUnparser.context.asInstanceOf[TermRuntimeData])
-      buildState.setProcessor(rootUnparser)
-
-      Assert.invariant(buildState.arrayIterationIndexStack.length == 1)
-      Assert.invariant(buildState.occursIndexStack.length == 1)
-      Assert.invariant(buildState.groupIndexStack.length == 1)
-      Assert.invariant(buildState.childIndexStack.length == 1)
-      Assert.invariant(buildState.currentInfosetNodeMaybe.isEmpty)
-      Assert.invariant(buildState.maybeTopTRD().isEmpty)
-
-      val remainingEvent = buildState.advanceMaybe
-      if (remainingEvent.isDefined) {
-        UnparseError(
-          Nope,
-          One(buildState.currentLocation),
-          "Expected no remaining events, but received %s.",
-          remainingEvent.get
-        )
-      }
-    }
-
-    try {
-      inputter.initialize(ssrd.elementRuntimeData, tunables)
-
-      sharedCtx = new UnparseSharedContext(
-        // Shared by build and write, which together tick this tracker at
-        // roughly twice the per-node rate a single traversal would;
-        // doubling both thresholds restores the intended sweep density.
-        new SuspensionTracker(
-          tunables.unparseSuspensionWaitYoung * 2,
-          tunables.unparseSuspensionWaitOld * 2
-        ),
-        this,
-        tunables,
-        prefetchLimit = tunables.unparsePrefetchWindowNodes
-      )
-
-      val writeCoroutine = new WriteCoroutine(runWriteThread)
-      sharedCtx.setCoroutines(buildCoroutine, writeCoroutine)
-
-      runBuildPhase()
-
-      // The tree is now entirely built, but some suspensions may still be
-      // pending. writeCoroutine.isStarted is false whenever build's lead
-      // never crossed the prefetch threshold, meaning write was never
-      // needed concurrently at all; run it directly on this thread rather
-      // than paying to spawn and hand off to a thread purely to give it
-      // one, first, and only signal. Either way the result is recorded
-      // into sharedCtx so a later abortWrite/resumeWrite sees write as
-      // finished, matching what resumeWrite itself already does.
-      val finalSignal: WriteSignal =
-        if (writeCoroutine.isStarted) {
-          sharedCtx.resumeWrite(BuildFinished)
-        } else {
-          val result = WriteDone(doWriteSide(BuildFinished))
-          sharedCtx.recordWriteDone(result)
-          result
-        }
-      // Only reassign once writeState is known-good: a null here means
-      // constructWriteSide() itself failed (reported via finalSignal
-      // below), so keep reporting through buildState instead.
-      if (writeState != null) activeState = writeState
-      finalSignal match {
-        case WriteDone(Some(t)) => throw t
-        case WriteDone(None) => // writeState.unparseResult below
-        case other =>
-          Assert.invariantFailed(
-            s"write coroutine yielded $other instead of signaling completion"
-          )
-      }
-
-      writeState.unparseResult
     } catch {
-      case t: Throwable =>
-        // If write's thread is still parked (this exception came from
-        // build's own recursion, before the normal resumeWrite(BuildFinished)
-        // handoff ran), wake it so it can clean up instead of leaking its
-        // thread and DOS temp files forever.
-        if (sharedCtx != null) sharedCtx.abortWrite()
-        // Safe before initialize(): it only copies variableMap, never
-        // touching inputter.documentElement.
-        val reportState =
-          if (activeState != null) activeState
-          else UState.createInitialUState(outStream, this, inputter, areDebugging)
-        unparseErrorResult(reportState, t)
+      // Only reached for a failure before write's state existed, or one
+      // unparseErrorResult itself rethrew (which it will rethrow again).
+      case t: Throwable => unparseErrorResult(buildState, t)
     } finally {
-      if (buildState != null) buildState.getDataOutputStream.cleanUp()
+      buildState.getDataOutputStream.cleanUp()
+    }
+  }
+
+  // evalSuspensions(isFinal = true) runs BEFORE the stack-depth
+  // invariants below: one tripping first could mask the real
+  // SuspensionDeadlockException diagnostic this ordering exists to
+  // surface.
+  private def finishWriteSide(
+    writeState: UState with SuspensionCapableUState,
+    rootUnparser: Unparser
+  ): Unit = {
+    writeState.setProcessor(rootUnparser)
+
+    // Routed via the shared SuspensionTracker, the SAME one BuildState
+    // registered into, so both build-side and write-side suspensions
+    // get resolved here.
+    writeState.evalSuspensions(isFinal = true)
+
+    Assert.invariant(writeState.arrayIterationIndexStack.length == 1)
+    Assert.invariant(writeState.occursIndexStack.length == 1)
+    Assert.invariant(writeState.groupIndexStack.length == 1)
+    Assert.invariant(writeState.childIndexStack.length == 1)
+    Assert.invariant(writeState.currentInfosetNodeMaybe.isEmpty)
+    Assert.invariant(writeState.escapeSchemeEVCache.isEmpty)
+    Assert.invariant(writeState.maybeTopTRD().isEmpty)
+    Assert.invariant(!writeState.withinHiddenNest)
+
+    Assert.invariant(!writeState.getDataOutputStream.isFinished)
+    try {
+      writeState.getDataOutputStream.setFinished(writeState)
+    } catch {
+      case boc: BitOrderChangeException =>
+        writeState.SDE(boc)
+      case fio: FileIOException =>
+        writeState.SDE(fio)
+    }
+  }
+
+  // Asserts build's stacks ended up balanced and the inputter has
+  // nothing left unconsumed.
+  private def finishBuildSide(buildState: BuildState, rootUnparser: Unparser): Unit = {
+    buildState.popTRD(rootUnparser.context.asInstanceOf[TermRuntimeData])
+    buildState.setProcessor(rootUnparser)
+
+    Assert.invariant(buildState.arrayIterationIndexStack.length == 1)
+    Assert.invariant(buildState.occursIndexStack.length == 1)
+    Assert.invariant(buildState.groupIndexStack.length == 1)
+    Assert.invariant(buildState.childIndexStack.length == 1)
+    Assert.invariant(buildState.currentInfosetNodeMaybe.isEmpty)
+    Assert.invariant(buildState.maybeTopTRD().isEmpty)
+
+    val remainingEvent = buildState.advanceMaybe
+    if (remainingEvent.isDefined) {
+      UnparseError(
+        Nope,
+        One(buildState.currentLocation),
+        "Expected no remaining events, but received %s.",
+        remainingEvent.get
+      )
     }
   }
 
