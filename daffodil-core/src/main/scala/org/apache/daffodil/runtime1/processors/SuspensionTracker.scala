@@ -30,6 +30,13 @@ class SuspensionTracker(suspensionWaitYoung: Int, suspensionWaitOld: Int) {
 
   def suspensions: Seq[Suspension] = suspensionsYoung.toSeq ++ suspensionsOld.toSeq
 
+  /**
+   * Total not-yet-done suspensions, counted without allocating, so cheap
+   * enough to check once per node as a throttle signal for the pending
+   * backlog.
+   */
+  def pendingCount: Int = suspensionsYoung.length + suspensionsOld.length
+
   private var count: Int = 0
 
   private var suspensionStatTracked: Int = 0
@@ -47,12 +54,23 @@ class SuspensionTracker(suspensionWaitYoung: Int, suspensionWaitOld: Int) {
    * suspensions, we attempt to evaluate them first, with the hope that their
    * resolution might make the young suspensions more likely to evaluate.
    */
-  def evalSuspensions(): Unit = {
+  def evalSuspensions(): Unit = evalSuspensionsThrottled(buildResolvableOnly = false)
+
+  /**
+   * Same cadence as evalSuspensions, but a suspension whose
+   * canResolveWithoutWriting is false is skipped and requeued instead of
+   * genuinely attempted, since it is usually unresolvable against a no-op
+   * sink; it stays pending for a later unfiltered sweep.
+   */
+  def evalBuildResolvableSuspensions(): Unit =
+    evalSuspensionsThrottled(buildResolvableOnly = true)
+
+  private def evalSuspensionsThrottled(buildResolvableOnly: Boolean): Unit = {
     if (count % suspensionWaitOld == 0) {
-      evalSuspensionQueue(suspensionsOld)
+      evalSuspensionQueue(suspensionsOld, buildResolvableOnly = buildResolvableOnly)
     }
     if (count % suspensionWaitYoung == 0) {
-      evalSuspensionQueue(suspensionsYoung)
+      evalSuspensionQueue(suspensionsYoung, buildResolvableOnly = buildResolvableOnly)
       while (suspensionsYoung.nonEmpty) {
         suspensionsOld.enqueue(suspensionsYoung.dequeue())
       }
@@ -62,6 +80,20 @@ class SuspensionTracker(suspensionWaitYoung: Int, suspensionWaitOld: Int) {
       count = 0
     } else {
       count += 1
+    }
+  }
+
+  /**
+   * Attempts every currently-tracked suspension once, bypassing throttling,
+   * without treating remaining blocks as an error. Intended for a caller
+   * whose own traversal has fully finished and needs an already-resolvable
+   * suspension to actually resolve before it can continue.
+   */
+  def evalSuspensionsUnthrottled(): Unit = {
+    evalSuspensionQueue(suspensionsOld)
+    evalSuspensionQueue(suspensionsYoung)
+    while (suspensionsYoung.nonEmpty) {
+      suspensionsOld.enqueue(suspensionsYoung.dequeue())
     }
   }
 
@@ -94,23 +126,30 @@ class SuspensionTracker(suspensionWaitYoung: Int, suspensionWaitOld: Int) {
   }
 
   /**
-   * Attempt to evaluate suspensions on the provie queue. Keep repeating the
-   * evaluates as long as some progress is being made. Suspensions that
-   * evaluate sucessfully are removed from the queue. Once suspensions make no
-   * further progress and are all blocked, we return. Blocked suspensions put
-   * back on the same queue.
+   * Attempts to evaluate the suspensions on the provided queue, repeating
+   * while progress is made: successes are removed and blocked ones stay on
+   * the queue. buildResolvableOnly skips and requeues a suspension whose
+   * canResolveWithoutWriting is false instead of genuinely attempting it.
    */
-  private def evalSuspensionQueue(queue: Queue[Suspension]): Unit = {
+  private def evalSuspensionQueue(
+    queue: Queue[Suspension],
+    buildResolvableOnly: Boolean = false
+  ): Unit = {
     var countOfNotMakingProgress = 0
     while (!queue.isEmpty && countOfNotMakingProgress < queue.length) {
       val s = queue.dequeue()
-      suspensionStatRuns += 1
-      s.runSuspension()
-      if (!s.isDone) queue.enqueue(s)
-      if (s.isDone || s.isMakingProgress) {
-        countOfNotMakingProgress = 0
-      } else {
+      if (buildResolvableOnly && !s.canResolveWithoutWriting) {
+        queue.enqueue(s)
         countOfNotMakingProgress += 1
+      } else {
+        suspensionStatRuns += 1
+        s.runSuspension()
+        if (!s.isDone) queue.enqueue(s)
+        if (s.isDone || s.isMakingProgress) {
+          countOfNotMakingProgress = 0
+        } else {
+          countOfNotMakingProgress += 1
+        }
       }
     }
   }

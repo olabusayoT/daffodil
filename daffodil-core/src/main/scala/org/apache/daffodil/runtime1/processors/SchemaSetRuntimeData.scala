@@ -18,22 +18,30 @@
 package org.apache.daffodil.runtime1.processors
 
 import org.apache.daffodil.lib.exceptions.ThrowsSDE
+import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.runtime1.layers.LayerRuntimeCompiler
 import org.apache.daffodil.runtime1.layers.LayerRuntimeData
 import org.apache.daffodil.runtime1.layers.LayerVarsRuntime
 import org.apache.daffodil.runtime1.processors.parsers.Parser
+import org.apache.daffodil.runtime1.processors.unparsers.Builder
 import org.apache.daffodil.runtime1.processors.unparsers.Unparser
 
 final class SchemaSetRuntimeData(
   val parser: Parser,
   val unparser: Unparser,
+  val builder: Maybe[Builder],
   val elementRuntimeData: ElementRuntimeData,
   /*
    * The original variables determined by the schema compiler.
    */
   variables: VariableMap,
   allLayers: Seq[LayerRuntimeData],
-  @transient layerRuntimeCompilerArg: LayerRuntimeCompiler
+  @transient layerRuntimeCompilerArg: LayerRuntimeCompiler,
+  /** True if useBuildWritePrefetch is on and this schema has an
+   * outputValueCalc element whose value could resolve without writing;
+   * baked in at compile time. Otherwise unparsing falls back to
+   * single-pass. */
+  val isPrefetchInUse: Boolean
 ) extends Serializable
   with ThrowsSDE {
 
