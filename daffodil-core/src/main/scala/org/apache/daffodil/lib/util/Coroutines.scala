@@ -30,21 +30,13 @@ import org.apache.daffodil.lib.exceptions.UnsuppressableException
 object Coroutine {
 
   /**
-    * This execution context should be used when creating Coroutine threads to
-    * improve performance. Creating threads has high overhead, but getting
-    * threads from a thread pool we reduce some of that overhead.
-    *
-    * This thread pool is a cached thread pool, which means unused threads are
-    * closed after 60 seconds of unuse. This also places no limits on the
-    * number of threads that will be created, so if many coroutines are created
-    * at the same time we could potentially starve the system of
-    * threads/processing. However, we only create one thread per coroutine, and
-    * we currently only create one coroutine per SAX unparse, and it is
-    * hopefully unlikely that a user will create enough parallel SAX unparse
-    * calls to cause issues.
+    * This execution context should be used when creating Coroutine threads.
+    * Each coroutine runs on its own virtual thread, which is cheap to create
+    * and cheap to park while waiting for its peer to resume it, so no pooling
+    * is needed and the number of coroutines is not bounded by OS threads.
     */
   val executionContext = new ExecutionContext {
-    private val threadPool = Executors.newCachedThreadPool()
+    private val threadPool = Executors.newVirtualThreadPerTaskExecutor()
     def execute(runnable: Runnable): Unit = threadPool.submit(runnable)
 
     // $COVERAGE-OFF$

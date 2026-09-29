@@ -40,7 +40,7 @@ For more information about Daffodil, see <https://daffodil.apache.org/>.
 
 ## Build Requirements
 
-* Java 8 or higher
+* Java 21 or higher
 * sbt 0.13.8 or higher
 * C compiler C99 or higher
 * Mini-XML Version 3.0 or higher

@@ -176,7 +176,7 @@ lazy val testStdLayout = Project("daffodil-test-stdLayout", file("test-stdLayout
   .settings(commonSettings, nopublish)
 
 // Choices here are Java LTS versions, 17, 21,...
-val minSupportedJavaVersion: String = "17"
+val minSupportedJavaVersion: String = "21"
 
 lazy val commonSettings = Seq(
   organization := "org.apache.daffodil",
