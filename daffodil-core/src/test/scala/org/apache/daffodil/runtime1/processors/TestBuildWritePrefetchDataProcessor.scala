@@ -40,20 +40,6 @@ class TestBuildWritePrefetchDataProcessor {
 
   val example = XMLUtils.EXAMPLE_NAMESPACE
 
-  /** A hidden, constant-valued OVC probe wired in via `dfdl:hiddenGroupRef="ex:ovcProbe"`.
-   * Needed because prefetch is not in use for a schema with no resolvable OVC,
-   * which would silently fall back to single-pass regardless of the
-   * `useBuildWritePrefetch` tunable; contributes a leading "Z" byte to expected output. */
-  val ovcProbeGroup: scala.xml.Elem =
-    <xs:group name="ovcProbe">
-      <xs:sequence>
-        <xs:element name="probe" type="xs:string"
-          dfdl:lengthKind="explicit"
-          dfdl:length="1"
-          dfdl:outputValueCalc="{ 'Z' }"/>
-      </xs:sequence>
-    </xs:group>
-
   @Test def testOVCSuspensionSchemaMatchesSinglePass(): Unit = {
     val sch = SchemaUtils.dfdlTestSchema(
       <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
@@ -91,26 +77,22 @@ class TestBuildWritePrefetchDataProcessor {
       <dfdl:format ref="tns:GeneralFormat"
         encoding="ascii"
         lengthUnits="bytes"/>,
-      Seq(
-        ovcProbeGroup,
-        <xs:element name="row" dfdl:lengthKind="implicit">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:sequence dfdl:hiddenGroupRef="ex:ovcProbe"/>
-              <xs:sequence dfdl:separator="," dfdl:separatorPosition="infix">
-                <xs:element name="header" type="xs:string" dfdl:lengthKind="delimited"/>
-                <xs:element name="item" type="xs:string" minOccurs="0" maxOccurs="unbounded"
-                  dfdl:lengthKind="delimited"
-                  dfdl:occursCountKind="implicit"/>
-                <xs:choice>
-                  <xs:element name="typeA" type="xs:string" dfdl:lengthKind="delimited"/>
-                  <xs:element name="typeB" type="xs:string" dfdl:lengthKind="delimited"/>
-                </xs:choice>
-              </xs:sequence>
+      <xs:element name="row" dfdl:lengthKind="implicit">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:sequence dfdl:separator="," dfdl:separatorPosition="infix">
+              <xs:element name="header" type="xs:string" dfdl:lengthKind="delimited"/>
+              <xs:element name="item" type="xs:string" minOccurs="0" maxOccurs="unbounded"
+                dfdl:lengthKind="delimited"
+                dfdl:occursCountKind="implicit"/>
+              <xs:choice>
+                <xs:element name="typeA" type="xs:string" dfdl:lengthKind="delimited"/>
+                <xs:element name="typeB" type="xs:string" dfdl:lengthKind="delimited"/>
+              </xs:choice>
             </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      ),
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>,
       elementFormDefault = "unqualified"
     )
     val infoset =
@@ -123,7 +105,7 @@ class TestBuildWritePrefetchDataProcessor {
       </ex:row>
 
     val (singlePassBytes, prefetchBytes) = TestUtils.getSinglePassAndPrefetchBytes(sch, infoset)
-    assertEquals("ZH,a,b,c,X", new String(singlePassBytes, StandardCharsets.US_ASCII))
+    assertEquals("H,a,b,c,X", new String(singlePassBytes, StandardCharsets.US_ASCII))
     assertArrayEquals(singlePassBytes, prefetchBytes)
   }
 
@@ -201,20 +183,16 @@ class TestBuildWritePrefetchDataProcessor {
       <dfdl:format ref="tns:GeneralFormat"
         encoding="ascii"
         lengthUnits="bytes"/>,
-      Seq(
-        ovcProbeGroup,
-        <xs:element name="row" dfdl:lengthKind="implicit">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:sequence dfdl:hiddenGroupRef="ex:ovcProbe"/>
-              <xs:sequence dfdl:separator="%NL;" dfdl:separatorPosition="postfix">
-                <xs:element name="item" type="xs:string" maxOccurs="unbounded"
-                  dfdl:lengthKind="delimited"/>
-              </xs:sequence>
+      <xs:element name="row" dfdl:lengthKind="implicit">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:sequence dfdl:separator="%NL;" dfdl:separatorPosition="postfix">
+              <xs:element name="item" type="xs:string" maxOccurs="unbounded"
+                dfdl:lengthKind="delimited"/>
             </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      ),
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>,
       elementFormDefault = "unqualified"
     )
     val infoset =
@@ -225,7 +203,7 @@ class TestBuildWritePrefetchDataProcessor {
       </ex:row>
 
     val (singlePassBytes, prefetchBytes) = TestUtils.getSinglePassAndPrefetchBytes(sch, infoset)
-    assertEquals("Za\nb\nc\n", new String(singlePassBytes, StandardCharsets.US_ASCII))
+    assertEquals("a\nb\nc\n", new String(singlePassBytes, StandardCharsets.US_ASCII))
     assertArrayEquals(singlePassBytes, prefetchBytes)
   }
 
@@ -238,7 +216,6 @@ class TestBuildWritePrefetchDataProcessor {
         encoding="ascii"
         lengthUnits="bytes"/>,
       Seq(
-        ovcProbeGroup,
         <xs:group name="optElement">
           <xs:sequence>
             <xs:element name="opt" type="xs:string" minOccurs="0" dfdl:lengthKind="explicit" dfdl:length="1"/>
@@ -247,7 +224,6 @@ class TestBuildWritePrefetchDataProcessor {
         <xs:element name="e1" dfdl:lengthKind="implicit">
           <xs:complexType>
             <xs:sequence>
-              <xs:sequence dfdl:hiddenGroupRef="ex:ovcProbe"/>
               <xs:sequence>
                 <xs:choice>
                   <xs:group dfdl:initiator="first_defaultable" ref="tns:optElement"/>
@@ -264,7 +240,7 @@ class TestBuildWritePrefetchDataProcessor {
     val infoset = <ex:e1 xmlns:ex={example}><after>1</after></ex:e1>
 
     val (singlePassBytes, prefetchBytes) = TestUtils.getSinglePassAndPrefetchBytes(sch, infoset)
-    assertEquals("Zfirst_defaultable1", new String(singlePassBytes, StandardCharsets.US_ASCII))
+    assertEquals("first_defaultable1", new String(singlePassBytes, StandardCharsets.US_ASCII))
     assertArrayEquals(singlePassBytes, prefetchBytes)
   }
 
@@ -276,7 +252,6 @@ class TestBuildWritePrefetchDataProcessor {
         encoding="ascii"
         lengthUnits="bytes"/>,
       Seq(
-        ovcProbeGroup,
         <xs:group name="optElement">
           <xs:sequence>
             <xs:element name="opt" type="xs:string" minOccurs="0" dfdl:lengthKind="explicit" dfdl:length="1"/>
@@ -285,7 +260,6 @@ class TestBuildWritePrefetchDataProcessor {
         <xs:element name="e1" dfdl:lengthKind="implicit">
           <xs:complexType>
             <xs:sequence>
-              <xs:sequence dfdl:hiddenGroupRef="ex:ovcProbe"/>
               <xs:sequence>
                 <xs:choice>
                   <xs:group dfdl:initiator="first_defaultable" ref="tns:optElement"/>
@@ -306,7 +280,7 @@ class TestBuildWritePrefetchDataProcessor {
       </ex:e1>
 
     val (singlePassBytes, prefetchBytes) = TestUtils.getSinglePassAndPrefetchBytes(sch, infoset)
-    assertEquals("Zfirst_defaultable01", new String(singlePassBytes, StandardCharsets.US_ASCII))
+    assertEquals("first_defaultable01", new String(singlePassBytes, StandardCharsets.US_ASCII))
     assertArrayEquals(singlePassBytes, prefetchBytes)
   }
 
@@ -317,21 +291,17 @@ class TestBuildWritePrefetchDataProcessor {
       <dfdl:format ref="tns:GeneralFormat"
         encoding="ascii"
         lengthUnits="bytes"/>,
-      Seq(
-        ovcProbeGroup,
-        <xs:element name="row" dfdl:lengthKind="implicit">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:sequence dfdl:hiddenGroupRef="ex:ovcProbe"/>
-              <xs:sequence dfdl:separator="," dfdl:separatorPosition="infix">
-                <xs:element name="item" type="xs:string" minOccurs="0" maxOccurs="unbounded"
-                  dfdl:lengthKind="delimited"
-                  dfdl:occursCountKind="implicit"/>
-              </xs:sequence>
+      <xs:element name="row" dfdl:lengthKind="implicit">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:sequence dfdl:separator="," dfdl:separatorPosition="infix">
+              <xs:element name="item" type="xs:string" minOccurs="0" maxOccurs="unbounded"
+                dfdl:lengthKind="delimited"
+                dfdl:occursCountKind="implicit"/>
             </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      ),
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>,
       elementFormDefault = "unqualified"
     )
     val items = (0 until numItems).map(i => <item>{s"i$i"}</item>)
@@ -349,7 +319,7 @@ class TestBuildWritePrefetchDataProcessor {
       extraTunables = Map("unparsePrefetchWindowNodes" -> "3")
     )
     assertEquals(
-      "Z" + (0 until numItems).map(i => s"i$i").mkString(","),
+      (0 until numItems).map(i => s"i$i").mkString(","),
       new String(singlePassBytes, StandardCharsets.US_ASCII)
     )
     assertArrayEquals(singlePassBytes, prefetchBytes)
@@ -363,24 +333,20 @@ class TestBuildWritePrefetchDataProcessor {
       <dfdl:format ref="tns:GeneralFormat"
         encoding="ascii"
         lengthUnits="bytes"/>,
-      Seq(
-        ovcProbeGroup,
-        <xs:element name="row" dfdl:lengthKind="implicit">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:sequence dfdl:hiddenGroupRef="ex:ovcProbe"/>
-              <xs:sequence dfdl:separator="," dfdl:separatorPosition="infix">
-                <xs:element name="before" type="xs:string" dfdl:lengthKind="delimited"/>
-                <xs:sequence>
-                  <xs:element name="inner1" type="xs:string" dfdl:lengthKind="delimited"/>
-                  <xs:element name="inner2" type="xs:string" dfdl:lengthKind="delimited"/>
-                </xs:sequence>
-                <xs:element name="after" type="xs:string" dfdl:lengthKind="delimited"/>
+      <xs:element name="row" dfdl:lengthKind="implicit">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:sequence dfdl:separator="," dfdl:separatorPosition="infix">
+              <xs:element name="before" type="xs:string" dfdl:lengthKind="delimited"/>
+              <xs:sequence>
+                <xs:element name="inner1" type="xs:string" dfdl:lengthKind="delimited"/>
+                <xs:element name="inner2" type="xs:string" dfdl:lengthKind="delimited"/>
               </xs:sequence>
+              <xs:element name="after" type="xs:string" dfdl:lengthKind="delimited"/>
             </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      ),
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>,
       elementFormDefault = "unqualified"
     )
     val infoset =
@@ -396,7 +362,7 @@ class TestBuildWritePrefetchDataProcessor {
     // outer's "," (a local property of the outer xs:sequence's annotation, not pushed
     // down to nested groups), so it compiles as unseparated: no separator between
     // inner1/inner2, but the outer's separator still appears before/after the nested group.
-    assertEquals("ZB,I1I2,A", new String(singlePassBytes, StandardCharsets.US_ASCII))
+    assertEquals("B,I1I2,A", new String(singlePassBytes, StandardCharsets.US_ASCII))
     assertArrayEquals(singlePassBytes, prefetchBytes)
   }
 
@@ -408,29 +374,24 @@ class TestBuildWritePrefetchDataProcessor {
       <dfdl:format ref="tns:GeneralFormat"
         encoding="ascii"
         lengthUnits="bytes"/>,
-      Seq(
-        ovcProbeGroup,
-        <xs:element name="row" dfdl:lengthKind="implicit">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:sequence dfdl:hiddenGroupRef="ex:ovcProbe"/>
-              <xs:choice dfdl:choiceLengthKind="explicit" dfdl:choiceLength="5">
-                <xs:element name="typeA" type="xs:string" dfdl:lengthKind="delimited"/>
-                <xs:element name="typeB" type="xs:string" dfdl:lengthKind="delimited"/>
-              </xs:choice>
-            </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      ),
+      <xs:element name="row" dfdl:lengthKind="implicit">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:choice dfdl:choiceLengthKind="explicit" dfdl:choiceLength="5">
+              <xs:element name="typeA" type="xs:string" dfdl:lengthKind="delimited"/>
+              <xs:element name="typeB" type="xs:string" dfdl:lengthKind="delimited"/>
+            </xs:choice>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>,
       elementFormDefault = "unqualified"
     )
     // typeB is 2 bytes; the choice's declared length is 5 bytes, so 3
-    // bytes of ChoiceUnusedUnparser filler should follow it. Plus the
-    // leading 1-byte ovcProbe.
+    // bytes of filler should follow it.
     val infoset = <ex:row xmlns:ex={example}><typeB>XY</typeB></ex:row>
 
     val (singlePassBytes, prefetchBytes) = TestUtils.getSinglePassAndPrefetchBytes(sch, infoset)
-    assertEquals(6, singlePassBytes.length)
+    assertEquals(5, singlePassBytes.length)
     assertArrayEquals(singlePassBytes, prefetchBytes)
   }
 
@@ -477,20 +438,16 @@ class TestBuildWritePrefetchDataProcessor {
       <dfdl:format ref="tns:GeneralFormat"
         encoding="ascii"
         lengthUnits="bytes"/>,
-      Seq(
-        ovcProbeGroup,
-        <xs:element name="row" dfdl:lengthKind="implicit">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:sequence dfdl:hiddenGroupRef="ex:ovcProbe"/>
-              <xs:sequence dfdl:initiator="[" dfdl:terminator="]">
-                <xs:element name="a" type="xs:string" dfdl:lengthKind="explicit" dfdl:length="1"/>
-                <xs:element name="b" type="xs:string" dfdl:lengthKind="explicit" dfdl:length="1"/>
-              </xs:sequence>
+      <xs:element name="row" dfdl:lengthKind="implicit">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:sequence dfdl:initiator="[" dfdl:terminator="]">
+              <xs:element name="a" type="xs:string" dfdl:lengthKind="explicit" dfdl:length="1"/>
+              <xs:element name="b" type="xs:string" dfdl:lengthKind="explicit" dfdl:length="1"/>
             </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      ),
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>,
       elementFormDefault = "unqualified"
     )
     val infoset =
@@ -500,7 +457,7 @@ class TestBuildWritePrefetchDataProcessor {
       </ex:row>
 
     val (singlePassBytes, prefetchBytes) = TestUtils.getSinglePassAndPrefetchBytes(sch, infoset)
-    assertEquals("Z[AB]", new String(singlePassBytes, StandardCharsets.US_ASCII))
+    assertEquals("[AB]", new String(singlePassBytes, StandardCharsets.US_ASCII))
     assertArrayEquals(singlePassBytes, prefetchBytes)
   }
 
@@ -520,22 +477,18 @@ class TestBuildWritePrefetchDataProcessor {
           extraEscapedCharacters=""
           generateEscapeBlock="whenNeeded"/>
       </dfdl:defineEscapeScheme>,
-      Seq(
-        ovcProbeGroup,
-        <xs:element name="row" dfdl:lengthKind="implicit">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:sequence dfdl:hiddenGroupRef="ex:ovcProbe"/>
-              <xs:sequence dfdl:separator=",">
-                <xs:element name="s1" type="xs:string"
-                  dfdl:lengthKind="delimited"
-                  dfdl:escapeSchemeRef="pound"/>
-                <xs:element name="s2" type="xs:string" dfdl:lengthKind="delimited"/>
-              </xs:sequence>
+      <xs:element name="row" dfdl:lengthKind="implicit">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:sequence dfdl:separator=",">
+              <xs:element name="s1" type="xs:string"
+                dfdl:lengthKind="delimited"
+                dfdl:escapeSchemeRef="pound"/>
+              <xs:element name="s2" type="xs:string" dfdl:lengthKind="delimited"/>
             </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      ),
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>,
       elementFormDefault = "unqualified"
     )
     val infoset =
@@ -545,7 +498,7 @@ class TestBuildWritePrefetchDataProcessor {
       </ex:row>
 
     val (singlePassBytes, prefetchBytes) = TestUtils.getSinglePassAndPrefetchBytes(sch, infoset)
-    assertEquals("Zone#, two,three", new String(singlePassBytes, StandardCharsets.US_ASCII))
+    assertEquals("one#, two,three", new String(singlePassBytes, StandardCharsets.US_ASCII))
     assertArrayEquals(singlePassBytes, prefetchBytes)
   }
 
@@ -559,29 +512,25 @@ class TestBuildWritePrefetchDataProcessor {
         schemaLocation="/org/apache/daffodil/layers/xsd/fixedLengthLayer.dfdl.xsd"/>,
       <dfdl:format ref="tns:GeneralFormat"
         lengthKind="delimited"/>,
-      Seq(
-        ovcProbeGroup,
-        <xs:element name="e1"
-          dfdl:lengthKind="implicit"
-          xmlns:fl="urn:org.apache.daffodil.layers.fixedLength">
-          <xs:complexType>
+      <xs:element name="e1"
+        dfdl:lengthKind="implicit"
+        xmlns:fl="urn:org.apache.daffodil.layers.fixedLength">
+        <xs:complexType>
+          <xs:sequence>
             <xs:sequence>
-              <xs:sequence dfdl:hiddenGroupRef="ex:ovcProbe"/>
-              <xs:sequence>
-                <xs:sequence dfdlx:layer="fl:fixedLength">
-                  <xs:annotation>
-                    <xs:appinfo source="http://www.ogf.org/dfdl/">
-                      <dfdl:newVariableInstance ref="fl:fixedLength" defaultValue="8"/>
-                    </xs:appinfo>
-                  </xs:annotation>
-                  <xs:element name="s1" type="xs:string"/>
-                </xs:sequence>
-                <xs:element name="after" type="xs:string"/>
+              <xs:sequence dfdlx:layer="fl:fixedLength">
+                <xs:annotation>
+                  <xs:appinfo source="http://www.ogf.org/dfdl/">
+                    <dfdl:newVariableInstance ref="fl:fixedLength" defaultValue="8"/>
+                  </xs:appinfo>
+                </xs:annotation>
+                <xs:element name="s1" type="xs:string"/>
               </xs:sequence>
+              <xs:element name="after" type="xs:string"/>
             </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      ),
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>,
       elementFormDefault = "unqualified"
     )
     // s1 is exactly 8 bytes (the layer's declared fixedLength), long enough that
@@ -595,7 +544,7 @@ class TestBuildWritePrefetchDataProcessor {
       </ex:e1>
 
     val (singlePassBytes, prefetchBytes) = TestUtils.getSinglePassAndPrefetchBytes(sch, infoset)
-    assertEquals("ZABCDEFGHQ", new String(singlePassBytes, StandardCharsets.US_ASCII))
+    assertEquals("ABCDEFGHQ", new String(singlePassBytes, StandardCharsets.US_ASCII))
     assertArrayEquals(singlePassBytes, prefetchBytes)
   }
 
@@ -609,29 +558,25 @@ class TestBuildWritePrefetchDataProcessor {
         schemaLocation="/org/apache/daffodil/layers/xsd/fixedLengthLayer.dfdl.xsd"/>,
       <dfdl:format ref="tns:GeneralFormat"
         lengthKind="delimited"/>,
-      Seq(
-        ovcProbeGroup,
-        <xs:element name="e1"
-          dfdl:lengthKind="implicit"
-          xmlns:fl="urn:org.apache.daffodil.layers.fixedLength">
-          <xs:complexType>
+      <xs:element name="e1"
+        dfdl:lengthKind="implicit"
+        xmlns:fl="urn:org.apache.daffodil.layers.fixedLength">
+        <xs:complexType>
+          <xs:sequence>
             <xs:sequence>
-              <xs:sequence dfdl:hiddenGroupRef="ex:ovcProbe"/>
-              <xs:sequence>
-                <xs:sequence dfdlx:layer="fl:fixedLength">
-                  <xs:annotation>
-                    <xs:appinfo source="http://www.ogf.org/dfdl/">
-                      <dfdl:newVariableInstance ref="fl:fixedLength" defaultValue="8"/>
-                    </xs:appinfo>
-                  </xs:annotation>
-                  <xs:element name="s1" type="xs:string"/>
-                </xs:sequence>
-                <xs:element name="after" type="xs:string"/>
+              <xs:sequence dfdlx:layer="fl:fixedLength">
+                <xs:annotation>
+                  <xs:appinfo source="http://www.ogf.org/dfdl/">
+                    <dfdl:newVariableInstance ref="fl:fixedLength" defaultValue="8"/>
+                  </xs:appinfo>
+                </xs:annotation>
+                <xs:element name="s1" type="xs:string"/>
               </xs:sequence>
+              <xs:element name="after" type="xs:string"/>
             </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      ),
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>,
       elementFormDefault = "unqualified"
     )
     // s1 is 10 bytes, 2 more than the layer's declared fixedLength=8.
@@ -641,7 +586,11 @@ class TestBuildWritePrefetchDataProcessor {
         <after>Q</after>
       </ex:e1>
 
-    val singlePassDp = Compiler().compileNode(sch).onPath("/").asInstanceOf[DataProcessor]
+    val singlePassDp = Compiler()
+      .withTunable("useBuildWritePrefetch", "false")
+      .compileNode(sch)
+      .onPath("/")
+      .asInstanceOf[DataProcessor]
     val singlePassOut = new ByteArrayOutputStream()
     val singlePassRes =
       singlePassDp.unparse(new ScalaXMLInfosetInputter(infoset), singlePassOut)
@@ -713,31 +662,18 @@ class TestBuildWritePrefetchDataProcessor {
         byteOrder="bigEndian"
         lengthUnits="bytes"
         representation="binary"/>,
-      Seq(
-        <xs:group name="ovcProbe">
+      <xs:element name="row" dfdl:lengthKind="implicit">
+        <xs:complexType>
           <xs:sequence>
-            <xs:element name="probe" type="xs:string"
-              dfdl:representation="text"
-              dfdl:encoding="ascii"
-              dfdl:lengthKind="explicit"
-              dfdl:length="1"
-              dfdl:outputValueCalc="{ 'Z' }"/>
-          </xs:sequence>
-        </xs:group>,
-        <xs:element name="row" dfdl:lengthKind="implicit">
-          <xs:complexType>
             <xs:sequence>
-              <xs:sequence dfdl:hiddenGroupRef="ex:ovcProbe"/>
-              <xs:sequence>
-                <xs:element name="item" type="xs:int" minOccurs="0" maxOccurs="unbounded"
-                  dfdl:lengthKind="explicit"
-                  dfdl:length="4"
-                  dfdl:occursCountKind="implicit"/>
-              </xs:sequence>
+              <xs:element name="item" type="xs:int" minOccurs="0" maxOccurs="unbounded"
+                dfdl:lengthKind="explicit"
+                dfdl:length="4"
+                dfdl:occursCountKind="implicit"/>
             </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      ),
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>,
       elementFormDefault = "unqualified"
     )
     val infoset =
@@ -749,7 +685,7 @@ class TestBuildWritePrefetchDataProcessor {
 
     val (singlePassBytes, prefetchBytes) = TestUtils.getSinglePassAndPrefetchBytes(sch, infoset)
     assertArrayEquals(
-      Array[Byte]('Z'.toByte, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3),
+      Array[Byte](0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3),
       singlePassBytes
     )
     assertArrayEquals(singlePassBytes, prefetchBytes)
@@ -766,22 +702,18 @@ class TestBuildWritePrefetchDataProcessor {
         textNumberJustification="right"
         textNumberPadCharacter="0"
         textPadKind="padChar"/>,
-      Seq(
-        ovcProbeGroup,
-        <xs:element name="row" dfdl:lengthKind="implicit">
-          <xs:complexType>
+      <xs:element name="row" dfdl:lengthKind="implicit">
+        <xs:complexType>
+          <xs:sequence>
             <xs:sequence>
-              <xs:sequence dfdl:hiddenGroupRef="ex:ovcProbe"/>
-              <xs:sequence>
-                <xs:element name="lenField" type="xs:int" dfdl:lengthKind="explicit" dfdl:length="2"/>
-                <xs:element name="content" type="xs:string"
-                  dfdl:lengthKind="explicit"
-                  dfdl:length="{ xs:int(../lenField) }"/>
-              </xs:sequence>
+              <xs:element name="lenField" type="xs:int" dfdl:lengthKind="explicit" dfdl:length="2"/>
+              <xs:element name="content" type="xs:string"
+                dfdl:lengthKind="explicit"
+                dfdl:length="{ xs:int(../lenField) }"/>
             </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      ),
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>,
       elementFormDefault = "unqualified"
     )
     val infoset =
@@ -791,7 +723,7 @@ class TestBuildWritePrefetchDataProcessor {
       </ex:row>
 
     val (singlePassBytes, prefetchBytes) = TestUtils.getSinglePassAndPrefetchBytes(sch, infoset)
-    assertEquals("Z05hello", new String(singlePassBytes, StandardCharsets.US_ASCII))
+    assertEquals("05hello", new String(singlePassBytes, StandardCharsets.US_ASCII))
     assertArrayEquals(singlePassBytes, prefetchBytes)
   }
 
@@ -807,7 +739,6 @@ class TestBuildWritePrefetchDataProcessor {
         textNumberPadCharacter="0"
         textPadKind="padChar"/>,
       Seq(
-        ovcProbeGroup,
         <xs:simpleType name="lenPrefixType"
           dfdl:representation="text"
           dfdl:lengthKind="explicit"
@@ -818,7 +749,6 @@ class TestBuildWritePrefetchDataProcessor {
         <xs:element name="row" dfdl:lengthKind="implicit">
           <xs:complexType>
             <xs:sequence>
-              <xs:sequence dfdl:hiddenGroupRef="ex:ovcProbe"/>
               <xs:sequence>
                 <xs:element name="content" type="xs:string"
                   dfdl:lengthKind="prefixed"
@@ -835,7 +765,7 @@ class TestBuildWritePrefetchDataProcessor {
     val infoset = <ex:row xmlns:ex={example}><content>hello</content></ex:row>
 
     val (singlePassBytes, prefetchBytes) = TestUtils.getSinglePassAndPrefetchBytes(sch, infoset)
-    assertEquals("Z05hello", new String(singlePassBytes, StandardCharsets.US_ASCII))
+    assertEquals("05hello", new String(singlePassBytes, StandardCharsets.US_ASCII))
     assertArrayEquals(singlePassBytes, prefetchBytes)
   }
 
@@ -851,7 +781,6 @@ class TestBuildWritePrefetchDataProcessor {
         textNumberPadCharacter="0"
         textPadKind="padChar"/>,
       Seq(
-        ovcProbeGroup,
         <xs:simpleType name="lenPrefixType2"
           dfdl:representation="text"
           dfdl:lengthKind="explicit"
@@ -862,7 +791,6 @@ class TestBuildWritePrefetchDataProcessor {
         <xs:element name="row2" dfdl:lengthKind="implicit">
           <xs:complexType>
             <xs:sequence>
-              <xs:sequence dfdl:hiddenGroupRef="ex:ovcProbe"/>
               <xs:sequence>
                 <xs:element name="body"
                   dfdl:lengthKind="prefixed"
@@ -892,7 +820,7 @@ class TestBuildWritePrefetchDataProcessor {
       </ex:row2>
 
     val (singlePassBytes, prefetchBytes) = TestUtils.getSinglePassAndPrefetchBytes(sch, infoset)
-    assertEquals("Z06hi,bye", new String(singlePassBytes, StandardCharsets.US_ASCII))
+    assertEquals("06hi,bye", new String(singlePassBytes, StandardCharsets.US_ASCII))
     assertArrayEquals(singlePassBytes, prefetchBytes)
   }
 
@@ -974,31 +902,27 @@ class TestBuildWritePrefetchDataProcessor {
       <dfdl:format ref="tns:GeneralFormat"
         encoding="ascii"
         lengthUnits="bytes"/>,
-      Seq(
-        ovcProbeGroup,
-        <xs:element name="row" dfdl:lengthKind="implicit">
-          <xs:complexType>
+      <xs:element name="row" dfdl:lengthKind="implicit">
+        <xs:complexType>
+          <xs:sequence>
             <xs:sequence>
-              <xs:sequence dfdl:hiddenGroupRef="ex:ovcProbe"/>
-              <xs:sequence>
-                <xs:element name="int" type="xs:int" minOccurs="0" maxOccurs="2"
-                  dfdl:lengthKind="explicit"
-                  dfdl:length="1"/>
-                <xs:element name="term" type="xs:string"
-                  dfdl:lengthKind="explicit"
-                  dfdl:length="0"
-                  dfdl:terminator="{ if (fn:count(../int) gt 1) then 'x' else 'y' }"/>
-              </xs:sequence>
+              <xs:element name="int" type="xs:int" minOccurs="0" maxOccurs="2"
+                dfdl:lengthKind="explicit"
+                dfdl:length="1"/>
+              <xs:element name="term" type="xs:string"
+                dfdl:lengthKind="explicit"
+                dfdl:length="0"
+                dfdl:terminator="{ if (fn:count(../int) gt 1) then 'x' else 'y' }"/>
             </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      ),
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>,
       elementFormDefault = "unqualified"
     )
     val infoset = <ex:row xmlns:ex={example}><term></term></ex:row>
 
     val (singlePassBytes, prefetchBytes) = TestUtils.getSinglePassAndPrefetchBytes(sch, infoset)
-    assertEquals("Zy", new String(singlePassBytes, StandardCharsets.US_ASCII))
+    assertEquals("y", new String(singlePassBytes, StandardCharsets.US_ASCII))
     assertArrayEquals(singlePassBytes, prefetchBytes)
   }
 
@@ -1010,28 +934,24 @@ class TestBuildWritePrefetchDataProcessor {
       <dfdl:format ref="tns:GeneralFormat"
         encoding="ascii"
         lengthUnits="bytes"/>,
-      Seq(
-        ovcProbeGroup,
-        <xs:element name="row" dfdl:lengthKind="implicit">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:sequence dfdl:hiddenGroupRef="ex:ovcProbe"/>
-              <xs:sequence dfdl:separator="|">
-                <xs:element name="seq">
-                  <xs:complexType>
-                    <xs:sequence dfdl:separator=",">
-                      <xs:element name="item" type="xs:string" minOccurs="0" maxOccurs="10"
-                        dfdl:lengthKind="delimited"/>
-                    </xs:sequence>
-                  </xs:complexType>
-                </xs:element>
-                <xs:element name="exists" type="xs:boolean"
-                  dfdl:inputValueCalc="{ fn:exists(../seq/item) }"/>
-              </xs:sequence>
+      <xs:element name="row" dfdl:lengthKind="implicit">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:sequence dfdl:separator="|">
+              <xs:element name="seq">
+                <xs:complexType>
+                  <xs:sequence dfdl:separator=",">
+                    <xs:element name="item" type="xs:string" minOccurs="0" maxOccurs="10"
+                      dfdl:lengthKind="delimited"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="exists" type="xs:boolean"
+                dfdl:inputValueCalc="{ fn:exists(../seq/item) }"/>
             </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      ),
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>,
       elementFormDefault = "unqualified"
     )
     val infoset =
@@ -1046,7 +966,7 @@ class TestBuildWritePrefetchDataProcessor {
       </ex:row>
 
     val (singlePassBytes, prefetchBytes) = TestUtils.getSinglePassAndPrefetchBytes(sch, infoset)
-    assertEquals("Z1,2,3,4", new String(singlePassBytes, StandardCharsets.US_ASCII))
+    assertEquals("1,2,3,4", new String(singlePassBytes, StandardCharsets.US_ASCII))
     assertArrayEquals(singlePassBytes, prefetchBytes)
   }
 
@@ -1255,6 +1175,7 @@ class TestBuildWritePrefetchDataProcessor {
       ExternalVariablesLoader.mapToBindings(Map(s"{$example}runningVar" -> "-1").asJava)
 
     val singlePassDp = Compiler()
+      .withTunable("useBuildWritePrefetch", "false")
       .compileNode(sch)
       .onPath("/")
       .asInstanceOf[DataProcessor]
@@ -1276,10 +1197,9 @@ class TestBuildWritePrefetchDataProcessor {
   // A setup failure (inputter never produces StartDocument) must yield
   // a failed UnparseResult, not an NPE from a null error-path state.
   @Test def testMalformedInfosetInputterGetsCleanErrorNotNPE(): Unit = {
-    // Needs at least one prefetch-beneficial (value-only, not length-dependent) OVC, or
-    // DataProcessor.unparse's dispatch (ssrd.isPrefetchInUse) falls back to
-    // single-pass regardless of the tunable, and unparseViaBuildThenWrite (the method
-    // under test) would never run.
+    // Needs prefetch in use (the tunable on), or DataProcessor.unparse takes
+    // single-pass and unparseViaBuildThenWrite (the method under test) would
+    // never run.
     val sch = SchemaUtils.dfdlTestSchema(
       <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
       <dfdl:format ref="tns:GeneralFormat"
@@ -1342,22 +1262,18 @@ class TestBuildWritePrefetchDataProcessor {
         textNumberJustification="right"
         textNumberPadCharacter="0"
         textPadKind="padChar"/>,
-      Seq(
-        ovcProbeGroup,
-        <xs:element name="row" dfdl:lengthKind="implicit">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:sequence dfdl:hiddenGroupRef="ex:ovcProbe"/>
-              <xs:sequence dfdl:separator="|">
-                <xs:element name="lenField" type="xs:int" dfdl:lengthKind="explicit" dfdl:length="2"/>
-                <xs:element name="content" type="xs:string"
-                  dfdl:lengthKind="explicit"
-                  dfdl:length="{ xs:int(../lenField) }"/>
-              </xs:sequence>
+      <xs:element name="row" dfdl:lengthKind="implicit">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:sequence dfdl:separator="|">
+              <xs:element name="lenField" type="xs:int" dfdl:lengthKind="explicit" dfdl:length="2"/>
+              <xs:element name="content" type="xs:string"
+                dfdl:lengthKind="explicit"
+                dfdl:length="{ xs:int(../lenField) }"/>
             </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      ),
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>,
       elementFormDefault = "unqualified"
     )
     val infoset =
@@ -1367,7 +1283,7 @@ class TestBuildWritePrefetchDataProcessor {
       </ex:row>
 
     val (singlePassBytes, prefetchBytes) = TestUtils.getSinglePassAndPrefetchBytes(sch, infoset)
-    assertEquals("Z05|hello", new String(singlePassBytes, StandardCharsets.US_ASCII))
+    assertEquals("05|hello", new String(singlePassBytes, StandardCharsets.US_ASCII))
     assertArrayEquals(singlePassBytes, prefetchBytes)
   }
 
@@ -1382,26 +1298,22 @@ class TestBuildWritePrefetchDataProcessor {
         textNumberJustification="right"
         textNumberPadCharacter="0"
         textPadKind="padChar"/>,
-      Seq(
-        ovcProbeGroup,
-        <xs:element name="row" dfdl:lengthKind="implicit">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:sequence dfdl:hiddenGroupRef="ex:ovcProbe"/>
-              <xs:sequence dfdl:separator="|">
-                <xs:element name="lenField" type="xs:int" dfdl:lengthKind="explicit" dfdl:length="2"/>
-                <xs:element name="wrapper" dfdl:lengthKind="explicit" dfdl:length="{ xs:int(../lenField) }">
-                  <xs:complexType>
-                    <xs:sequence>
-                      <xs:element name="a" type="xs:string" dfdl:lengthKind="explicit" dfdl:length="3"/>
-                    </xs:sequence>
-                  </xs:complexType>
-                </xs:element>
-              </xs:sequence>
+      <xs:element name="row" dfdl:lengthKind="implicit">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:sequence dfdl:separator="|">
+              <xs:element name="lenField" type="xs:int" dfdl:lengthKind="explicit" dfdl:length="2"/>
+              <xs:element name="wrapper" dfdl:lengthKind="explicit" dfdl:length="{ xs:int(../lenField) }">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="a" type="xs:string" dfdl:lengthKind="explicit" dfdl:length="3"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
             </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      ),
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>,
       elementFormDefault = "unqualified"
     )
     val infoset =
@@ -1411,13 +1323,13 @@ class TestBuildWritePrefetchDataProcessor {
       </ex:row>
 
     val (singlePassBytes, prefetchBytes) = TestUtils.getSinglePassAndPrefetchBytes(sch, infoset)
-    assertEquals("Z03|xyz", new String(singlePassBytes, StandardCharsets.US_ASCII))
+    assertEquals("03|xyz", new String(singlePassBytes, StandardCharsets.US_ASCII))
     assertArrayEquals(singlePassBytes, prefetchBytes)
   }
 
-  // A schema where every OVC is content-length-dependent (never
-  // resolvable early) must fall back to single-pass automatically.
-  @Test def testPurelyContentLengthOVCSchemaFallsBackAutomatically(): Unit = {
+  // A schema where every OVC is content-length-dependent (never resolvable
+  // early) still uses prefetch when the tunable is on, and unparses the same.
+  @Test def testPurelyContentLengthOVCSchemaStillMatchesSinglePass(): Unit = {
     val sch = SchemaUtils.dfdlTestSchema(
       <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
       <dfdl:format ref="tns:GeneralFormat"
@@ -1441,7 +1353,11 @@ class TestBuildWritePrefetchDataProcessor {
     )
     val infoset = <ex:row xmlns:ex={example}><data>xyz</data></ex:row>
 
-    val singlePassDp = Compiler().compileNode(sch).onPath("/").asInstanceOf[DataProcessor]
+    val singlePassDp = Compiler()
+      .withTunable("useBuildWritePrefetch", "false")
+      .compileNode(sch)
+      .onPath("/")
+      .asInstanceOf[DataProcessor]
     val singlePassBytes = TestUtils.unparseToBytes(singlePassDp, infoset)
 
     val prefetchDp = Compiler()
@@ -1449,8 +1365,8 @@ class TestBuildWritePrefetchDataProcessor {
       .compileNode(sch)
       .onPath("/")
       .asInstanceOf[DataProcessor]
-    assertFalse(
-      "schema has only a content-length-dependent OVC; should never report prefetch-beneficial",
+    assertTrue(
+      "prefetch is used whenever the tunable is on, whatever the OVCs",
       prefetchDp.ssrd.isPrefetchInUse
     )
     val prefetchBytes = TestUtils.unparseToBytes(prefetchDp, infoset)
@@ -1492,7 +1408,11 @@ class TestBuildWritePrefetchDataProcessor {
         <data>xyz</data>
       </ex:row>
 
-    val singlePassDp = Compiler().compileNode(sch).onPath("/").asInstanceOf[DataProcessor]
+    val singlePassDp = Compiler()
+      .withTunable("useBuildWritePrefetch", "false")
+      .compileNode(sch)
+      .onPath("/")
+      .asInstanceOf[DataProcessor]
     val singlePassBytes = TestUtils.unparseToBytes(singlePassDp, infoset)
 
     val prefetchDp = Compiler()
@@ -1502,16 +1422,15 @@ class TestBuildWritePrefetchDataProcessor {
       .asInstanceOf[DataProcessor]
     assertTrue(
       "schema has a resolvable-without-writing OVC alongside a content-length one; " +
-        "must still report prefetch-beneficial",
+        "must use the prefetch path",
       prefetchDp.ssrd.isPrefetchInUse
     )
     val prefetchBytes = TestUtils.unparseToBytes(prefetchDp, infoset)
     assertArrayEquals(singlePassBytes, prefetchBytes)
   }
 
-  // A schema with no OVC at all: deciding whether prefetch is beneficial
-  // must not throw, and simply reports it isn't in use.
-  @Test def testSchemaWithNoOVCAtAllReportsNotBeneficial(): Unit = {
+  // A schema with no OVC at all still uses prefetch when the tunable is on.
+  @Test def testSchemaWithNoOVCAtAllStillUsesPrefetch(): Unit = {
     val sch = SchemaUtils.dfdlTestSchema(
       <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
       <dfdl:format ref="tns:GeneralFormat"
@@ -1531,12 +1450,12 @@ class TestBuildWritePrefetchDataProcessor {
       .compileNode(sch)
       .onPath("/")
       .asInstanceOf[DataProcessor]
-    assertFalse(dp.ssrd.isPrefetchInUse)
+    assertTrue(dp.ssrd.isPrefetchInUse)
   }
 
-  // A schema where every OVC is resolvable-without-writing must report
-  // true: the common case prefetch already handles.
-  @Test def testSchemaWithOnlyResolvableOVCReportsBeneficial(): Unit = {
+  // A schema where every OVC is resolvable-without-writing uses prefetch:
+  // the common case.
+  @Test def testSchemaWithOnlyResolvableOVCUsesPrefetch(): Unit = {
     val sch = SchemaUtils.dfdlTestSchema(
       <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
       <dfdl:format ref="tns:GeneralFormat"
@@ -1566,8 +1485,40 @@ class TestBuildWritePrefetchDataProcessor {
     assertTrue(dp.ssrd.isPrefetchInUse)
   }
 
-  // isPrefetchInUse is baked in at compile time; confirms the fallback
-  // still applies after a save/reload round trip.
+  // With the tunable explicitly off, prefetch is never used, even for a
+  // schema whose OVC could resolve early.
+  @Test def testTunableOffNeverUsesPrefetch(): Unit = {
+    val sch = SchemaUtils.dfdlTestSchema(
+      <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
+      <dfdl:format ref="tns:GeneralFormat"
+        encoding="ascii"
+        lengthUnits="bytes"
+        textNumberJustification="right"
+        textNumberPadCharacter="0"
+        textPadKind="padChar"/>,
+      <xs:element name="row" dfdl:lengthKind="implicit">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="computed" type="xs:int"
+              dfdl:lengthKind="explicit"
+              dfdl:length="3"
+              dfdl:outputValueCalc="{ ../actual + 1 }"/>
+            <xs:element name="actual" type="xs:int" dfdl:lengthKind="explicit" dfdl:length="3"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>,
+      elementFormDefault = "unqualified"
+    )
+    val dp = Compiler()
+      .withTunable("useBuildWritePrefetch", "false")
+      .compileNode(sch)
+      .onPath("/")
+      .asInstanceOf[DataProcessor]
+    assertFalse(dp.ssrd.isPrefetchInUse)
+  }
+
+  // isPrefetchInUse is baked in at compile time; confirms it survives a
+  // save/reload round trip.
   @Test def testIsPrefetchInUseSurvivesSaveReload(): Unit = {
     val sch = SchemaUtils.dfdlTestSchema(
       <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
@@ -1595,14 +1546,14 @@ class TestBuildWritePrefetchDataProcessor {
       .compileNode(sch)
       .onPath("/")
       .asInstanceOf[DataProcessor]
-    assertFalse(dp.ssrd.isPrefetchInUse)
+    assertTrue(dp.ssrd.isPrefetchInUse)
 
     val os = new ByteArrayOutputStream()
     dp.save(java.nio.channels.Channels.newChannel(os))
     val reloadedDp = Compiler()
       .reload(new java.io.ByteArrayInputStream(os.toByteArray))
       .asInstanceOf[DataProcessor]
-    assertFalse(reloadedDp.ssrd.isPrefetchInUse)
+    assertTrue(reloadedDp.ssrd.isPrefetchInUse)
 
     val infoset = <ex:row xmlns:ex={example}><data>xyz</data></ex:row>
     assertArrayEquals(

@@ -30,36 +30,28 @@ import org.junit.Test
 
 /**
  * Proves build stops to let write catch up: with a small prefetchLimit,
- * one advance() leaves the lead counter bounded, not equal to the full count.
+ * one advance() leaves the lead counter just past it, and the lead never
+ * goes further across the refills write triggers while it runs.
  */
 class TestBoundedPrefetch {
 
   val example = XMLUtils.EXAMPLE_NAMESPACE
 
-  @Test def testBuildLeadStaysBoundedDuringRecursion(): Unit = {
+  @Test def testBuildStopsAtPrefetchLimit(): Unit = {
     val numItems = 40
     val prefetchLimit = 3L
 
     val sch = SchemaUtils.dfdlTestSchema(
-      <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>, {
-        <dfdl:format ref="tns:GeneralFormat"
-          encoding="ascii"
-          lengthUnits="bytes"/>
-        <dfdl:defineVariable name="marker" type="xs:string" defaultValue="M"/>
-      },
+      <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
+      <dfdl:format ref="tns:GeneralFormat"
+        encoding="ascii"
+        lengthUnits="bytes"/>,
       <xs:element name="row" dfdl:lengthKind="implicit">
         <xs:complexType>
           <xs:sequence dfdl:separator="," dfdl:separatorPosition="infix">
             <xs:element name="item" type="xs:string" minOccurs="0" maxOccurs="unbounded"
               dfdl:lengthKind="delimited"
               dfdl:occursCountKind="implicit"/>
-            <!-- A variable reference: no element references
-                 (canResolveWithoutWriting) and not a compile-time
-                 constant (unlike a literal, which the compiler folds to
-                 isConstant=true) - the only kind hasAnyPrefetchBeneficialOVC
-                 counts, so builder actually gets constructed here. -->
-            <xs:element name="marker" type="xs:string" dfdl:lengthKind="delimited"
-              dfdl:outputValueCalc="{ $ex:marker }"/>
           </xs:sequence>
         </xs:complexType>
       </xs:element>,
@@ -71,7 +63,7 @@ class TestBoundedPrefetch {
       <ex:row xmlns:ex={example}>
         {items}
       </ex:row>
-    val expectedBytes = (0 until numItems).map(i => s"i$i").mkString(",") + ",M"
+    val expectedBytes = (0 until numItems).map(i => s"i$i").mkString(",")
 
     val dp = TestUtils.compileForUnparse(
       sch,
@@ -97,17 +89,15 @@ class TestBoundedPrefetch {
 
     cursor.advance()
 
-    // numItems + 2 (row + all items + marker) is what currentLead would
-    // equal here if advance() ignored the prefetch limit.
+    // numItems + 1 (row + all items) is what currentLead would equal here
+    // if advance() ignored the prefetch limit. It counts one node per
+    // element, so it stops at the first node past the limit.
     assertFalse("expected build to stop with more left to build", cursor.isFinished)
-    assertTrue(
-      s"expected lead close to prefetchLimit=$prefetchLimit after advance, but was ${sharedCtx.currentLead} " +
-        s"(numItems=$numItems); build did not stop at the prefetch limit",
-      sharedCtx.currentLead <= prefetchLimit + 1
-    )
-    assertTrue(
-      "expected build to have gotten ahead of write by at least one node",
-      sharedCtx.currentLead > 0
+    assertEquals(
+      s"expected build to stop as soon as the lead passed prefetchLimit=$prefetchLimit " +
+        s"(numItems=$numItems)",
+      prefetchLimit + 1,
+      sharedCtx.currentLead
     )
 
     // Write pulls the rest of the tree forward as it needs it; confirm the
@@ -120,5 +110,9 @@ class TestBoundedPrefetch {
     writeState.getDataOutputStream.setFinished(writeState)
 
     assertEquals(expectedBytes, new String(walkerOut.toByteArray, StandardCharsets.US_ASCII))
+
+    // Every refill write triggered stopped at the same point, so the lead
+    // never went past one node beyond the window, and did reach it.
+    assertEquals(prefetchLimit + 1, sharedCtx.peakLead)
   }
 }
