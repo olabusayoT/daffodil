@@ -62,7 +62,7 @@ class ElementUnspecifiedLengthUnparser(
 
 sealed trait RepMoveMixin {
   def move(start: UState): Unit = {
-    start.childIndexStack.setTop(start.childIndexStack.top + 1)
+    start.moveOverOneElementChildOnly()
   }
 }
 
@@ -105,7 +105,7 @@ class ElementUnparserInputValueCalc(erd: ElementRuntimeData, setVarUnparsers: Ar
    * This avoids separators for this IVC element.
    */
   override def move(state: UState): Unit = {
-    state.childIndexStack.setTop(state.childIndexStack.top + 1)
+    state.moveOverOneElementChildOnly()
   }
 }
 

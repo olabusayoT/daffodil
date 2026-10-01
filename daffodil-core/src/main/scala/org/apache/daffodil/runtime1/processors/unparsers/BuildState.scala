@@ -24,6 +24,7 @@ import org.apache.daffodil.io.DirectOrBufferedDataOutputStream
 import org.apache.daffodil.io.StringDataInputStreamForUnparse
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.util.LocalStack
+import org.apache.daffodil.lib.util.MStackOfLong
 import org.apache.daffodil.lib.util.MStackOfMaybe
 import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.Nope
@@ -50,9 +51,9 @@ import org.apache.daffodil.runtime1.processors.dfa.DFADelimiter
  * build never writes content.
  *
  * `getDataOutputStream` is NOT stubbed: generic `UState` utility methods
- * (toString, currentLocation, bitPos0b) call into it unconditionally, so
- * `BuildState` constructs an actual DOS wrapping a no-op sink purely to
- * satisfy that.
+ * (toString, currentLocation, bitPos0b) call into it, so `BuildState`
+ * lazily constructs an actual DOS wrapping a no-op sink purely to satisfy
+ * that.
  *
  * Used only when the `useBuildWritePrefetch` tunable is enabled (default
  * false); otherwise unused, and unparsing constructs `UStateMain`
@@ -79,9 +80,12 @@ final class BuildState(
   setSharedContext(sharedCtx)
 
   // Purely so generic UState utility methods (toString, currentLocation,
-  // bitPos0b) have something non-null to call into; never actually
-  // written to for real output.
-  setDataOutputStream(
+  // bitPos0b) have something non-null to call into; never written to for
+  // real output. Created only if one of them is actually called, which an
+  // ordinary build never does.
+  private var dosCreated = false
+  private lazy val noOpDataOutputStream = {
+    dosCreated = true
     DirectOrBufferedDataOutputStream(
       new java.io.OutputStream { override def write(b: Int): Unit = () },
       null,
@@ -90,7 +94,15 @@ final class BuildState(
       sharedCtx.tunable.maxByteArrayOutputStreamBufferSizeInBytes,
       sharedCtx.tunable.tempFilePath
     )
-  )
+  }
+
+  override def getDataOutputStream: DirectOrBufferedDataOutputStream = noOpDataOutputStream
+
+  def cleanUp(): Unit = {
+    if (dosCreated) {
+      noOpDataOutputStream.cleanUp()
+    }
+  }
 
   // Build runs ahead of write, so freeing a node here would null out a
   // child reference write hasn't read yet; write still frees as normal.
@@ -108,6 +120,11 @@ final class BuildState(
   override def localDelimiters: DelimiterStackUnparseNode = writeOnly
   override def pushDelimiters(node: DelimiterStackUnparseNode): Unit = writeOnly
   override def popDelimiters(): Unit = writeOnly
+
+  // Build tracks child position in its own frames, never in a stack.
+  override def childIndexStack: MStackOfLong = writeOnly
+  override def moveOverOneElementChildOnly(): Unit = ()
+  override def childPos: Long = 0L
 
   override def advance: Boolean = inputter.advance
   override def advanceAccessor: InfosetAccessor = inputter.advanceAccessor

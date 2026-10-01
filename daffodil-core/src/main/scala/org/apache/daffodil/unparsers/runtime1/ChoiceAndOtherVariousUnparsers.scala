@@ -126,7 +126,7 @@ class ChoiceCombinatorUnparser(
           (Maybe.toMaybe(choiceBranchMap.defaultUnparser), -1)
         } else {
           val child = sharedCtx.awaitChild(complex, idx)
-          val key: ChoiceBranchEvent = ChoiceBranchStartEvent(child.erd.namedQName)
+          val key: ChoiceBranchEvent = child.erd.choiceBranchStartEvent
           val fromTable = choiceBranchMap.lookupTable.get(key)
           if (fromTable != null) {
             // An actual match; this tree position genuinely belongs to this
@@ -203,15 +203,12 @@ class ChoiceCombinatorUnparser(
       state.pushTRD(mgrd)
       val event: InfosetAccessor = state.inspectOrError
       val key: ChoiceBranchEvent = event match {
-        //
-        // The ChoiceBranchStartEvent(...) is not a case class constructor. It is a
-        // hash-table lookup for a cached value. This avoids constructing these
-        // objects over and over again.
-        //
-        case e if e.isStart && e.isElement => ChoiceBranchStartEvent(e.erd.namedQName)
-        case e if e.isEnd && e.isElement => ChoiceBranchEndEvent(e.erd.namedQName)
-        case e if e.isStart && e.isArray => ChoiceBranchStartEvent(e.erd.namedQName)
-        case e if e.isEnd && e.isArray => ChoiceBranchEndEvent(e.erd.namedQName)
+        // The events are cached on the ERD, so there is no per-event
+        // allocation or shared-cache lookup here.
+        case e if e.isStart && e.isElement => e.erd.choiceBranchStartEvent
+        case e if e.isEnd && e.isElement => e.erd.choiceBranchEndEvent
+        case e if e.isStart && e.isArray => e.erd.choiceBranchStartEvent
+        case e if e.isEnd && e.isArray => e.erd.choiceBranchEndEvent
       }
 
       val maybeChildUnparser = choiceBranchMap.get(key)

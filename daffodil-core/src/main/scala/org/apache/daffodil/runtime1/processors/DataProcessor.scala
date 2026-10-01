@@ -641,7 +641,7 @@ class DataProcessor(
       // unparseErrorResult itself rethrew (which it will rethrow again).
       case t: Throwable => unparseErrorResult(buildState, t)
     } finally {
-      buildState.getDataOutputStream.cleanUp()
+      buildState.cleanUp()
     }
   }
 
@@ -689,7 +689,6 @@ class DataProcessor(
     Assert.invariant(buildState.arrayIterationIndexStack.length == 1)
     Assert.invariant(buildState.occursIndexStack.length == 1)
     Assert.invariant(buildState.groupIndexStack.length == 1)
-    Assert.invariant(buildState.childIndexStack.length == 1)
     Assert.invariant(buildState.currentInfosetNodeMaybe.isEmpty)
     Assert.invariant(buildState.maybeTopTRD().isEmpty)
 
