@@ -201,13 +201,11 @@ sealed abstract class ElementUnparserBase(
   private[runtime1] def contentSetup(state: UState): Unit = ()
 
   private[runtime1] def dispatchContentUnparser(state: UState): Unit = {
-    (eReptypeUnparser.toOption, eUnparser.toOption) match {
-      case (Some(rep), _) =>
-        rep.unparse1(state)
-      case (None, Some(eu)) =>
-        eu.unparse1(state)
-      case _ => // nothing to do: no content unparser applies
-    }
+    if (eReptypeUnparser.isDefined) {
+      eReptypeUnparser.get.unparse1(state)
+    } else if (eUnparser.isDefined) {
+      eUnparser.get.unparse1(state)
+    } // else nothing to do: no content unparser applies
   }
 
   private[runtime1] def runContentUnparser(state: UState): Unit = {
@@ -235,11 +233,13 @@ sealed abstract class ElementUnparserBase(
     // A repType'd element's raw eUnparser can itself be group-wrapped, so
     // eReptypeUnparser takes priority: without this check the raw content
     // would be written instead of the repType conversion.
-    eUnparser.toOption match {
-      case Some(wu: WriteUnparser) if eReptypeUnparser.isEmpty =>
-        wu.writeContent(containerNode, s)
-      case _ =>
-        dispatchContentUnparser(s)
+    if (eReptypeUnparser.isEmpty && eUnparser.isDefined) {
+      eUnparser.get match {
+        case wu: WriteUnparser => wu.writeContent(containerNode, s)
+        case _ => dispatchContentUnparser(s)
+      }
+    } else {
+      dispatchContentUnparser(s)
     }
   }
 
