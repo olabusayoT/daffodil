@@ -61,6 +61,7 @@ import org.apache.daffodil.lib.util.ThreadSafePool
 import org.apache.daffodil.runtime1.events.MultipleEventHandler
 import org.apache.daffodil.runtime1.externalvars.ExternalVariablesLoader
 import org.apache.daffodil.runtime1.infoset.DIElement
+import org.apache.daffodil.runtime1.infoset.InfosetBuildCursor
 import org.apache.daffodil.runtime1.infoset.InfosetException
 import org.apache.daffodil.runtime1.infoset.InfosetInputter
 import org.apache.daffodil.runtime1.infoset.TeeInfosetOutputter
@@ -70,8 +71,7 @@ import org.apache.daffodil.runtime1.processors.parsers.ParseError
 import org.apache.daffodil.runtime1.processors.parsers.Parser
 import org.apache.daffodil.runtime1.processors.unparsers.AwaitChildStalledException
 import org.apache.daffodil.runtime1.processors.unparsers.BuildAbortedException
-import org.apache.daffodil.runtime1.processors.unparsers.BuildCursor
-import org.apache.daffodil.runtime1.processors.unparsers.BuildState
+import org.apache.daffodil.runtime1.processors.unparsers.InfosetBuildState
 import org.apache.daffodil.runtime1.processors.unparsers.NotUnparsableUnparser
 import org.apache.daffodil.runtime1.processors.unparsers.SuspensionCapableUState
 import org.apache.daffodil.runtime1.processors.unparsers.UState
@@ -526,7 +526,7 @@ class DataProcessor(
 
   /**
    * Build/write-prefetch unparse path (gated on `useBuildWritePrefetch`).
-   * `BuildState` builds the tree via a `BuildCursor`, while write recurses
+   * `InfosetBuildState` builds the tree via a `InfosetBuildCursor`, while write recurses
    * via `writeContent` and advances the cursor whenever it needs tree that
    * does not exist yet. Everything runs on this one thread.
    */
@@ -552,10 +552,10 @@ class DataProcessor(
     // Lazy so each is created only after the step before it has succeeded,
     // and never for a run that fails earlier, since each holds an output
     // stream that must then be cleaned up.
-    lazy val buildState = new BuildState(inputter, sharedCtx, Nil, areDebugging)
+    lazy val buildState = new InfosetBuildState(inputter, sharedCtx, Nil, areDebugging)
     // The root element always has a builder: it is exactly the case that
-    // gets ElementBuilder wrapped around it, regardless of schema content.
-    lazy val cursor = new BuildCursor(ssrd.builder.get, buildState, sharedCtx)
+    // gets ElementInfosetBuilder wrapped around it, regardless of schema content.
+    lazy val cursor = new InfosetBuildCursor(ssrd.builder.get, buildState, sharedCtx)
     lazy val writeState = UState.createInitialUState(outStream, this, inputter, areDebugging)
 
     def initBuildSide(): Unit = {
@@ -655,7 +655,7 @@ class DataProcessor(
   ): Unit = {
     writeState.setProcessor(rootUnparser)
 
-    // Routed via the shared SuspensionTracker, the SAME one BuildState
+    // Routed via the shared SuspensionTracker, the SAME one InfosetBuildState
     // registered into, so both build-side and write-side suspensions
     // get resolved here.
     writeState.evalSuspensions(isFinal = true)
@@ -682,7 +682,7 @@ class DataProcessor(
 
   // Asserts build's stacks ended up balanced and the inputter has
   // nothing left unconsumed.
-  private def finishBuildSide(buildState: BuildState, rootUnparser: Unparser): Unit = {
+  private def finishBuildSide(buildState: InfosetBuildState, rootUnparser: Unparser): Unit = {
     buildState.popTRD(rootUnparser.context.asInstanceOf[TermRuntimeData])
     buildState.setProcessor(rootUnparser)
 

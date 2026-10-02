@@ -15,60 +15,67 @@
  * limitations under the License.
  */
 
-package org.apache.daffodil.runtime1.processors.unparsers
+package org.apache.daffodil.runtime1.infoset
 
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.One
-import org.apache.daffodil.runtime1.infoset.ChoiceBranchEvent
 import org.apache.daffodil.runtime1.processors.ElementRuntimeData
 import org.apache.daffodil.runtime1.processors.ModelGroupRuntimeData
 import org.apache.daffodil.runtime1.processors.TermRuntimeData
+import org.apache.daffodil.runtime1.processors.unparsers.BuildAbortedException
+import org.apache.daffodil.runtime1.processors.unparsers.UState
+import org.apache.daffodil.runtime1.processors.unparsers.UnparseError
+import org.apache.daffodil.runtime1.processors.unparsers.UnparseSharedContext
 import org.apache.daffodil.unparsers.runtime1.ElementUnparserBase
 import org.apache.daffodil.unparsers.runtime1.RepeatingChildUnparser
 import org.apache.daffodil.unparsers.runtime1.SequenceChildUnparser
 
 /**
- * A node in a much smaller, dedicated tree of Builders that parallels the
+ * A node in a much smaller, dedicated tree of InfosetBuilders that parallels the
  * full Unparser tree: only Grams that actually create or select infoset
  * content (elements, sequences, choices, hidden groups) contribute one, so
  * building the infoset never has to dispatch through the many write-only
  * wrapper unparsers (delimiters, escape schemes, layers, padding,
  * specified-length) that sit between them in the Unparser tree.
  *
- * A Builder is immutable compiled-schema state shared by every parse. The
- * per-parse position lives in the BuildFrame it creates, on a BuildCursor's
+ * A InfosetBuilder is immutable compiled-schema state shared by every parse. The
+ * per-parse position lives in the InfosetBuildFrame it creates, on a InfosetBuildCursor's
  * explicit stack, so building can stop after any step and continue later
  * without holding a thread or a JVM call stack.
  */
-trait Builder extends Serializable {
-  def newFrame(): BuildFrame
+trait InfosetBuilder extends Serializable {
+  def newFrame(): InfosetBuildFrame
 }
 
 /**
- * One Builder's in-progress state for one parse. `step` performs one
+ * One InfosetBuilder's in-progress state for one parse. `step` performs one
  * transition and must either push exactly one child frame onto the cursor
  * (this frame is stepped again once that child pops) or pop itself from the
  * cursor to signal it is complete.
  */
-abstract class BuildFrame {
-  def step(cursor: BuildCursor): Unit
+abstract class InfosetBuildFrame {
+  def step(cursor: InfosetBuildCursor): Unit
 }
 
 /**
  * The explicit stack of BuildFrames that stands in for the call stack of a
  * recursive build. `advance` runs it until the lead window is full, so a
  * caller that needs more infoset tree can pull it forward directly. Driven
- * against a `BuildState`, never a write-side `UState`.
+ * against a `InfosetBuildState`, never a write-side `UState`.
  */
-final class BuildCursor(root: Builder, val state: UState, ctx: UnparseSharedContext) {
-  private var stack = new Array[BuildFrame](32)
+final class InfosetBuildCursor(
+  root: InfosetBuilder,
+  val state: UState,
+  ctx: UnparseSharedContext
+) {
+  private var stack = new Array[InfosetBuildFrame](32)
   private var depth = 0
   private var failure: Throwable = null
 
   push(root.newFrame())
 
-  def push(frame: BuildFrame): Unit = {
+  def push(frame: InfosetBuildFrame): Unit = {
     if (depth == stack.length) {
       stack = java.util.Arrays.copyOf(stack, depth * 2)
     }
@@ -132,11 +139,11 @@ final class BuildCursor(root: Builder, val state: UState, ctx: UnparseSharedCont
  * empty (e.g. an empty sequence), so its build-time presence can still be
  * recorded without anything actually needing to happen.
  */
-object EmptyBuilder extends Builder {
-  private object EmptyFrame extends BuildFrame {
-    override def step(cursor: BuildCursor): Unit = cursor.pop()
+object EmptyInfosetBuilder extends InfosetBuilder {
+  private object EmptyFrame extends InfosetBuildFrame {
+    override def step(cursor: InfosetBuildCursor): Unit = cursor.pop()
   }
-  override def newFrame(): BuildFrame = EmptyFrame
+  override def newFrame(): InfosetBuildFrame = EmptyFrame
 }
 
 /**
@@ -144,10 +151,10 @@ object EmptyBuilder extends Builder {
  * `~` composition has more than one child that actually builds infoset
  * content; the common case of at most one such child never needs this.
  */
-final class SeqCompBuilder(children: Array[Builder]) extends Builder {
-  override def newFrame(): BuildFrame = new BuildFrame {
+final class SeqCompInfosetBuilder(children: Array[InfosetBuilder]) extends InfosetBuilder {
+  override def newFrame(): InfosetBuildFrame = new InfosetBuildFrame {
     private var i = 0
-    override def step(cursor: BuildCursor): Unit = {
+    override def step(cursor: InfosetBuildCursor): Unit = {
       if (i < children.length) {
         val child = children(i)
         i += 1
@@ -169,16 +176,16 @@ final class SeqCompBuilder(children: Array[Builder]) extends Builder {
  * step is redirected to the builder tree instead of back into the
  * unparser tree.
  */
-final class ElementBuilder(
+final class ElementInfosetBuilder(
   erd: ElementRuntimeData,
   elementUnparser: ElementUnparserBase,
-  contentBuilder: Maybe[Builder]
-) extends Builder {
+  contentBuilder: Maybe[InfosetBuilder]
+) extends InfosetBuilder {
 
-  override def newFrame(): BuildFrame = new BuildFrame {
+  override def newFrame(): InfosetBuildFrame = new InfosetBuildFrame {
     private var contentPushed = false
 
-    override def step(cursor: BuildCursor): Unit = {
+    override def step(cursor: InfosetBuildCursor): Unit = {
       val state = cursor.state
       if (!contentPushed) {
         elementUnparser.unparseBeginForBuild(state)
@@ -203,47 +210,53 @@ final class ElementBuilder(
 /**
  * Pairs a sequence child's existing occurs-count/array bookkeeping (reused
  * as-is from the Unparser tree, since it is cheap, pure state bookkeeping
- * unrelated to the tree-walking overhead this Builder tree exists to avoid)
- * with that same child's own Builder, which SequenceBuilder builds
+ * unrelated to the tree-walking overhead this InfosetBuilder tree exists to avoid)
+ * with that same child's own InfosetBuilder, which SequenceInfosetBuilder builds
  * instead of the child's full Unparser.
  */
-final case class SequenceChildBuildInfo(
+final case class SequenceChildInfosetBuildInfo(
   childUnparser: SequenceChildUnparser,
-  childBuilder: Builder
+  childBuilder: InfosetBuilder
 )
 
 /**
- * Builds an entire sequence's children, scalar and array/optional alike,
- * each through its own Builder.
+ * Where a sequence's frame is in its walk over the children. Start is before
+ * the first step. NextChild is between children. AfterScalar and
+ * AfterOccurrence are right after a child's frame popped. InArray is an array
+ * or optional loop between occurrences.
  */
-final class SequenceBuilder(children: Array[SequenceChildBuildInfo]) extends Builder {
+private enum SequenceBuildPhase {
+  case Start, NextChild, AfterScalar, InArray, AfterOccurrence
+}
 
-  override def newFrame(): BuildFrame = new SequenceFrame
+/**
+ * Builds an entire sequence's children, scalar and array/optional alike,
+ * each through its own InfosetBuilder.
+ */
+final class SequenceInfosetBuilder(children: Array[SequenceChildInfosetBuildInfo])
+  extends InfosetBuilder {
 
-  private final class SequenceFrame extends BuildFrame {
-    // NextChild: between children. AfterScalar/AfterOccurrence: a child's
-    // frame just popped. InArray: array/optional loop is between occurrences.
-    private final val NextChild = 0
-    private final val AfterScalar = 1
-    private final val InArray = 2
-    private final val AfterOccurrence = 3
+  override def newFrame(): InfosetBuildFrame = new SequenceInfosetBuildFrame
 
-    private var phase = NextChild
-    private var started = false
+  private final class SequenceInfosetBuildFrame extends InfosetBuildFrame {
+    import SequenceBuildPhase.*
+
+    private var phase: SequenceBuildPhase = Start
     private var index = 0
     // children(index), read once per child and used by every later phase.
-    private var current: SequenceChildBuildInfo = null
+    private var current: SequenceChildInfosetBuildInfo = null
     private var rep: RepeatingChildUnparser = null
     private var numOccurrences = 0
     private var maxReps = 0L
 
-    override def step(cursor: BuildCursor): Unit = {
+    override def step(cursor: InfosetBuildCursor): Unit = {
       val state = cursor.state
-      if (!started) {
-        started = true
-        state.groupIndexStack.push(1L)
-      }
       phase match {
+        case Start => {
+          state.groupIndexStack.push(1L)
+          phase = NextChild
+          nextChild(cursor, state)
+        }
         case NextChild => nextChild(cursor, state)
         case AfterScalar => {
           current.childUnparser.trd match {
@@ -278,7 +291,7 @@ final class SequenceBuilder(children: Array[SequenceChildBuildInfo]) extends Bui
       }
     }
 
-    private def nextChild(cursor: BuildCursor, state: UState): Unit = {
+    private def nextChild(cursor: InfosetBuildCursor, state: UState): Unit = {
       if (index == children.length) {
         state.groupIndexStack.pop()
         cursor.pop()
@@ -335,15 +348,15 @@ final class SequenceBuilder(children: Array[SequenceChildBuildInfo]) extends Bui
 
 /**
  * Builds just the one structurally-present branch of a choice, resolved
- * from the next infoset event, through that branch's own Builder.
+ * from the next infoset event, through that branch's own InfosetBuilder.
  */
-final class ChoiceBuilder(
+final class ChoiceInfosetBuilder(
   mgrd: ModelGroupRuntimeData,
-  branchMap: Map[ChoiceBranchEvent, (TermRuntimeData, Builder)],
-  defaultBranch: Maybe[(TermRuntimeData, Builder)]
-) extends Builder {
+  branchMap: Map[ChoiceBranchEvent, (TermRuntimeData, InfosetBuilder)],
+  defaultBranch: Maybe[(TermRuntimeData, InfosetBuilder)]
+) extends InfosetBuilder {
 
-  private def resolveBranch(state: UState): (TermRuntimeData, Builder) = {
+  private def resolveBranch(state: UState): (TermRuntimeData, InfosetBuilder) = {
     if (state.withinHiddenNest) {
       defaultBranch.get
     } else {
@@ -375,10 +388,10 @@ final class ChoiceBuilder(
     }
   }
 
-  override def newFrame(): BuildFrame = new BuildFrame {
+  override def newFrame(): InfosetBuildFrame = new InfosetBuildFrame {
     private var branchTRD: TermRuntimeData = null
 
-    override def step(cursor: BuildCursor): Unit = {
+    override def step(cursor: InfosetBuildCursor): Unit = {
       val state = cursor.state
       if (branchTRD == null) {
         val (trd, builder) = resolveBranch(state)
@@ -399,11 +412,11 @@ final class ChoiceBuilder(
  * unparseEnd to manufacture a node instead of consuming an event that will
  * never exist.
  */
-final class HiddenGroupBuilder(bodyBuilder: Builder) extends Builder {
-  override def newFrame(): BuildFrame = new BuildFrame {
+final class HiddenGroupInfosetBuilder(bodyBuilder: InfosetBuilder) extends InfosetBuilder {
+  override def newFrame(): InfosetBuildFrame = new InfosetBuildFrame {
     private var bodyPushed = false
 
-    override def step(cursor: BuildCursor): Unit = {
+    override def step(cursor: InfosetBuildCursor): Unit = {
       if (!bodyPushed) {
         bodyPushed = true
         cursor.state.incrementHiddenDef()
@@ -421,11 +434,11 @@ final class HiddenGroupBuilder(bodyBuilder: Builder) extends Builder {
  * known once the node exists, so this checks it at build time rather than
  * resolving statically to either branch.
  */
-final class NilOrContentBuilder(contentBuilder: Builder) extends Builder {
-  override def newFrame(): BuildFrame = new BuildFrame {
+final class NilOrContentInfosetBuilder(contentBuilder: InfosetBuilder) extends InfosetBuilder {
+  override def newFrame(): InfosetBuildFrame = new InfosetBuildFrame {
     private var contentPushed = false
 
-    override def step(cursor: BuildCursor): Unit = {
+    override def step(cursor: InfosetBuildCursor): Unit = {
       if (!contentPushed && !cursor.state.currentInfosetNode.asComplex.isNilled) {
         contentPushed = true
         cursor.push(contentBuilder.newFrame())

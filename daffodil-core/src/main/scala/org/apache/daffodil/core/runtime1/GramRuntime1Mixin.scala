@@ -20,8 +20,8 @@ package org.apache.daffodil.core.runtime1
 import org.apache.daffodil.core.grammar.Gram
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.util.Maybe
+import org.apache.daffodil.runtime1.infoset.InfosetBuilder
 import org.apache.daffodil.runtime1.processors.parsers.Parser
-import org.apache.daffodil.runtime1.processors.unparsers.Builder
 import org.apache.daffodil.runtime1.processors.unparsers.Unparser
 
 trait GramRuntime1Mixin { self: Gram =>
@@ -62,9 +62,9 @@ trait GramRuntime1Mixin { self: Gram =>
   }
 
   /**
-   * Provides this Gram's node in the dedicated Builder tree that parallels
+   * Provides this Gram's node in the dedicated InfosetBuilder tree that parallels
    * the Unparser tree. Most Grams create or select no infoset content and
    * inherit this Nope default; only those that do override it.
    */
-  def builder: Maybe[Builder] = Maybe.Nope
+  def builder: Maybe[InfosetBuilder] = Maybe.Nope
 }

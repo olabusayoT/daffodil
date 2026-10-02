@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets
 import org.apache.daffodil.core.util.TestUtils
 import org.apache.daffodil.lib.util.SchemaUtils
 import org.apache.daffodil.lib.xml.XMLUtils
+import org.apache.daffodil.runtime1.infoset.InfosetBuildCursor
 import org.apache.daffodil.unparsers.runtime1.ElementUnparserBase
 
 import org.junit.Assert.*
@@ -55,7 +56,7 @@ class TestLeadCounter {
     )
 
     // Fixed dfdl:length is safe here because this tree comes from
-    // BuildState, which never runs content-writing (including
+    // InfosetBuildState, which never runs content-writing (including
     // CaptureStartOfContentLengthUnparser).
     val infoset =
       <ex:row xmlns:ex={example}>
@@ -69,16 +70,16 @@ class TestLeadCounter {
       Map("releaseUnneededInfoset" -> "false", "useBuildWritePrefetch" -> "true")
     )
 
-    // Build phase: drive BuildState through a BuildCursor, incrementing the
+    // Build phase: drive InfosetBuildState through a InfosetBuildCursor, incrementing the
     // shared lead counter via the actual unparseBegin hookup.
     val buildInputter = TestUtils.newInitializedInputter(infoset, dp)
 
     val sharedCtx =
       UnparseSharedContextTestFixture.build(dp, prefetchLimit = 100)()
-    val buildState = new BuildState(buildInputter, sharedCtx, Nil, false)
+    val buildState = new InfosetBuildState(buildInputter, sharedCtx, Nil, false)
 
     assertEquals(0L, sharedCtx.currentLead)
-    new BuildCursor(dp.ssrd.builder.get, buildState, sharedCtx).runToCompletion()
+    new InfosetBuildCursor(dp.ssrd.builder.get, buildState, sharedCtx).runToCompletion()
 
     // row itself, name, age, city = 4 elements total, each incrementing
     // once via unparseBegin's actual hookup.

@@ -26,6 +26,7 @@ import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.schema.annotation.props.gen.LengthUnits
 import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.runtime1.dpath.NodeInfo.PrimType
+import org.apache.daffodil.runtime1.infoset.InfosetBuilder
 import org.apache.daffodil.runtime1.processors.parsers.*
 import org.apache.daffodil.runtime1.processors.unparsers.*
 import org.apache.daffodil.unparsers.runtime1.*
@@ -48,7 +49,7 @@ abstract class SpecifiedLengthCombinatorBase(val e: ElementBase, eGramArg: => Gr
   // None of the length-kind wrapping below (explicit/implicit/prefixed
   // lengths, pattern matching) creates infoset nodes; the builder tree skips
   // straight to whatever the wrapped element content itself builds.
-  override lazy val builder: Maybe[Builder] = eGram.builder
+  override lazy val builder: Maybe[InfosetBuilder] = eGram.builder
 
   def kind: String
 

@@ -24,10 +24,10 @@ import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.Nope
 import org.apache.daffodil.lib.util.Maybe.One
+import org.apache.daffodil.runtime1.infoset.InfosetBuilder
+import org.apache.daffodil.runtime1.infoset.NilOrContentInfosetBuilder
 import org.apache.daffodil.runtime1.processors.parsers.ComplexNilOrContentParser
 import org.apache.daffodil.runtime1.processors.parsers.SimpleNilOrValueParser
-import org.apache.daffodil.runtime1.processors.unparsers.Builder
-import org.apache.daffodil.runtime1.processors.unparsers.NilOrContentBuilder
 import org.apache.daffodil.unparsers.runtime1.ComplexNilOrContentUnparser
 import org.apache.daffodil.unparsers.runtime1.SimpleNilOrValueUnparser
 
@@ -67,12 +67,12 @@ case class ComplexNilOrContent(ctxt: ElementBase, nilGram: Gram, contentGram: Gr
   // A nilled complex element has no children to build; nilled-ness is only
   // known once the node exists, so this needs a real runtime check, not a
   // static pass-through.
-  override lazy val builder: Maybe[Builder] = {
+  override lazy val builder: Maybe[InfosetBuilder] = {
     val cb = contentGram.builder
     if (cb.isEmpty) {
       Nope
     } else {
-      One(new NilOrContentBuilder(cb.get))
+      One(new NilOrContentInfosetBuilder(cb.get))
     }
   }
 }

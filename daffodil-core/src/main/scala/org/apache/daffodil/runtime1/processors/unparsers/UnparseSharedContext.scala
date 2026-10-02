@@ -20,6 +20,7 @@ package org.apache.daffodil.runtime1.processors.unparsers
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.iapi.DaffodilTunables
 import org.apache.daffodil.runtime1.infoset.DINode
+import org.apache.daffodil.runtime1.infoset.InfosetBuildCursor
 import org.apache.daffodil.runtime1.processors.DataProcessor
 import org.apache.daffodil.runtime1.processors.SuspensionTracker
 
@@ -77,9 +78,9 @@ final class UnparseSharedContext(
    */
   def pendingSuspensionTripLimit: Long = tunable.unparsePendingSuspensionTripLimit
 
-  private var buildCursor_ : BuildCursor = null
+  private var buildCursor_ : InfosetBuildCursor = null
 
-  def setBuildCursor(bc: BuildCursor): Unit = buildCursor_ = bc
+  def setBuildCursor(bc: InfosetBuildCursor): Unit = buildCursor_ = bc
 
   /**
    * Called from write when suspensions pile up faster than write's own

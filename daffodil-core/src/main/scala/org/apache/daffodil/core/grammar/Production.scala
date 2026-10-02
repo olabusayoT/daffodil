@@ -24,8 +24,8 @@ import org.apache.daffodil.core.dsom.SchemaComponent
 import org.apache.daffodil.lib.util.Logger
 import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.Nope
+import org.apache.daffodil.runtime1.infoset.InfosetBuilder
 import org.apache.daffodil.runtime1.processors.parsers.NadaParser
-import org.apache.daffodil.runtime1.processors.unparsers.Builder
 import org.apache.daffodil.unparsers.runtime1.NadaUnparser
 
 /**
@@ -111,7 +111,7 @@ final class Prod(
       unp
   }
 
-  final override lazy val builder: Maybe[Builder] = {
+  final override lazy val builder: Maybe[InfosetBuilder] = {
     if (gram.isEmpty) {
       Nope
     } else {

@@ -21,7 +21,7 @@ import org.apache.daffodil.runtime1.processors.DataProcessor
 import org.apache.daffodil.runtime1.processors.SuspensionTracker
 
 /**
- * Shared BuildState construction for tests. The default suspension-wait
+ * Shared InfosetBuildState construction for tests. The default suspension-wait
  * thresholds are doubled, since one tracker serves both build and write.
  */
 object UnparseSharedContextTestFixture {

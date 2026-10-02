@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets
 import org.apache.daffodil.core.util.TestUtils
 import org.apache.daffodil.lib.util.SchemaUtils
 import org.apache.daffodil.lib.xml.XMLUtils
+import org.apache.daffodil.runtime1.infoset.InfosetBuildCursor
 import org.apache.daffodil.unparsers.runtime1.ElementUnparserBase
 
 import org.junit.Assert.*
@@ -83,8 +84,8 @@ class TestBoundedPrefetch {
 
     val rootUnparser = dp.ssrd.unparser.asInstanceOf[ElementUnparserBase]
 
-    val buildState = new BuildState(buildInputter, sharedCtx, Nil, false)
-    val cursor = new BuildCursor(dp.ssrd.builder.get, buildState, sharedCtx)
+    val buildState = new InfosetBuildState(buildInputter, sharedCtx, Nil, false)
+    val cursor = new InfosetBuildCursor(dp.ssrd.builder.get, buildState, sharedCtx)
     sharedCtx.setBuildCursor(cursor)
 
     cursor.advance()

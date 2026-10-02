@@ -68,9 +68,9 @@ sealed trait RepMoveMixin {
 
 /**
  * The build-side hookup for bounded lookahead: called once per node, only
- * from the Builder tree (via unparseBeginForBuild below), never from
+ * from the InfosetBuilder tree (via unparseBeginForBuild below), never from
  * write's or single-pass's own unparseBegin call. Increments the shared
- * lead counter; BuildCursor.advance is what stops building once the
+ * lead counter; InfosetBuildCursor.advance is what stops building once the
  * counter exceeds the prefetch limit.
  */
 private object BuildWriteLeadHookup {
@@ -499,7 +499,7 @@ sealed trait ElementUnparserStartEndStrategy {
   def unparseEnd(state: UState, isBuild: Boolean): Unit
 
   /**
-   * The Builder tree's entry points: same node-creation logic as
+   * The InfosetBuilder tree's entry points: same node-creation logic as
    * unparseBegin/unparseEnd, plus the build-side lead-counter hookup that
    * only ever applies on this side.
    */

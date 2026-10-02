@@ -430,7 +430,7 @@ abstract class UState(
   def suspensionTracker: SuspensionTracker
 
   // Optional reference to the shared build/write lead counter. Defaults
-  // unset (a no-op for every existing call site); only BuildState sets it
+  // unset (a no-op for every existing call site); only InfosetBuildState sets it
   // (in its constructor), and only a write-side UState that opts in (via
   // setSharedContext) reads it.
   private var sharedContextMaybe: Maybe[UnparseSharedContext] = Nope
@@ -440,7 +440,7 @@ abstract class UState(
 
 /**
  * Mixed in by any `UState` that tracks `Suspension`s - `UStateMain` and
- * `BuildState`. Only write ever creates one; build never does, but
+ * `InfosetBuildState`. Only write ever creates one; build never does, but
  * still needs `evalSuspensions`/`suspensions` to resolve write-created
  * suspensions early against the tree it has already built.
  */
@@ -472,7 +472,7 @@ final class UStateForSuspension(
   areDebugging: Boolean
 ) extends UState(vbox, mainUState.diagnostics, mainUState.dataProc, tunable, areDebugging) {
 
-  // Always a live write-side UState, since BuildState never creates a
+  // Always a live write-side UState, since InfosetBuildState never creates a
   // suspension to clone off of.
   override def releaseUnneededInfoset: Boolean = mainUState.releaseUnneededInfoset
 
@@ -556,7 +556,7 @@ final class UStateForSuspension(
 
 /**
  * Stack-backed array-iteration/occurs/group/child index tracking, shared
- * by UStateMain and BuildState: each stack starts seeded with 1L, and
+ * by UStateMain and InfosetBuildState: each stack starts seeded with 1L, and
  * moveOverOne*Only bumps its top by one as navigation advances.
  * UStateForSuspension needs none of this (it stubs the stacks to die and
  * tracks arrayIterationPos/occursPos as plain frozen Longs instead), so

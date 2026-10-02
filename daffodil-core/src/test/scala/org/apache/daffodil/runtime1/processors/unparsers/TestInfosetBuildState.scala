@@ -20,15 +20,16 @@ package org.apache.daffodil.runtime1.processors.unparsers
 import org.apache.daffodil.core.util.TestUtils
 import org.apache.daffodil.lib.util.SchemaUtils
 import org.apache.daffodil.lib.xml.XMLUtils
+import org.apache.daffodil.runtime1.infoset.InfosetBuildCursor
 
 import org.junit.Assert.*
 import org.junit.Test
 
 /**
- * Validates BuildState in isolation: confirms it surfaces the same
+ * Validates InfosetBuildState in isolation: confirms it surfaces the same
  * event sequence a real UStateMain would, for a separated schema.
  */
-class TestBuildState {
+class TestInfosetBuildState {
 
   val example = XMLUtils.EXAMPLE_NAMESPACE
 
@@ -69,13 +70,13 @@ class TestBuildState {
 
     val sharedCtx =
       UnparseSharedContextTestFixture.build(dp, prefetchLimit = 100)()
-    val buildState = new BuildState(inputter, sharedCtx, Nil, false)
+    val buildState = new InfosetBuildState(inputter, sharedCtx, Nil, false)
 
-    // Drives through the actual Builder frames rather than hand-driven
+    // Drives through the actual InfosetBuilder frames rather than hand-driven
     // advance() calls, since next-element resolution depends on the TRD
     // push/pop the element frame performs. This schema's separator never
-    // reaches BuildState: the Builder tree skips the delimiter-stack wrapper.
-    new BuildCursor(dp.ssrd.builder.get, buildState, sharedCtx).runToCompletion()
+    // reaches InfosetBuildState: the InfosetBuilder tree skips the delimiter-stack wrapper.
+    new InfosetBuildCursor(dp.ssrd.builder.get, buildState, sharedCtx).runToCompletion()
 
     assertEquals(4L, sharedCtx.currentLead) // row, name, age, city
 

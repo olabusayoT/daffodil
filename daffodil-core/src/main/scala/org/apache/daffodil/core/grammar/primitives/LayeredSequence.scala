@@ -24,10 +24,10 @@ import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.Nope
 import org.apache.daffodil.lib.util.Maybe.One
 import org.apache.daffodil.lib.util.Misc
+import org.apache.daffodil.runtime1.infoset.InfosetBuilder
+import org.apache.daffodil.runtime1.infoset.SequenceInfosetBuilder
 import org.apache.daffodil.runtime1.processors.parsers.LayeredSequenceParser
 import org.apache.daffodil.runtime1.processors.parsers.Parser as DaffodilParser
-import org.apache.daffodil.runtime1.processors.unparsers.Builder
-import org.apache.daffodil.runtime1.processors.unparsers.SequenceBuilder
 import org.apache.daffodil.runtime1.processors.unparsers.Unparser as DaffodilUnparser
 import org.apache.daffodil.unparsers.runtime1.LayeredSequenceUnparser
 
@@ -57,12 +57,12 @@ case class LayeredSequence(sq: SequenceGroupTermBase, bodyTerm: SequenceChild)
   // sequence position: it must push/pop bodyTerm's TRD and advance the
   // group index like any sequence child, or next-element resolution on
   // the shared InfosetInputter breaks.
-  override lazy val builder: Maybe[Builder] = {
+  override lazy val builder: Maybe[InfosetBuilder] = {
     val info = bodyTerm.optSequenceChildBuildInfo
     if (info.isEmpty) {
       Nope
     } else {
-      One(new SequenceBuilder(Array(info.get)))
+      One(new SequenceInfosetBuilder(Array(info.get)))
     }
   }
 }

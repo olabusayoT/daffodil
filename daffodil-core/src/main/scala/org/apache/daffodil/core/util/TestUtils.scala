@@ -317,7 +317,7 @@ object TestUtils {
 
   /**
    * Pre-increments UnparseSharedContext's lead counter once per element in
-   * node's subtree, for a tree built outside BuildState (writeContent's
+   * node's subtree, for a tree built outside InfosetBuildState (writeContent's
    * decrementLead call requires the counter already be symmetric).
    */
   private def primeLeadCounter(sharedCtx: UnparseSharedContext, node: DINode): Unit =

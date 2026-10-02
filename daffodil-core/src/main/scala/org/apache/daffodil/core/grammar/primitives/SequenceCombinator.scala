@@ -24,6 +24,9 @@ import org.apache.daffodil.lib.schema.annotation.props.SeparatorSuppressionPolic
 import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.MaybeInt
 import org.apache.daffodil.lib.util.Misc
+import org.apache.daffodil.runtime1.infoset.InfosetBuilder
+import org.apache.daffodil.runtime1.infoset.SequenceChildInfosetBuildInfo
+import org.apache.daffodil.runtime1.infoset.SequenceInfosetBuilder
 import org.apache.daffodil.runtime1.processors.parsers.*
 import org.apache.daffodil.runtime1.processors.unparsers.*
 import org.apache.daffodil.unparsers.runtime1.{ Separated as SeparatedUnparser, * }
@@ -125,12 +128,12 @@ class OrderedSequence(sq: SequenceTermBase, sequenceChildrenArg: Seq[SequenceChi
     }
   }
 
-  override lazy val builder: Maybe[Builder] = {
+  override lazy val builder: Maybe[InfosetBuilder] = {
     val childBuildInfos = sequenceChildren.flatMap { _.optSequenceChildBuildInfo }
     if (childBuildInfos.isEmpty) {
       Maybe.Nope
     } else {
-      Maybe.One(new SequenceBuilder(childBuildInfos.toArray))
+      Maybe.One(new SequenceInfosetBuilder(childBuildInfos.toArray))
     }
   }
 }
@@ -230,12 +233,12 @@ class UnorderedSequence(
     }
   }
 
-  override lazy val builder: Maybe[Builder] = {
+  override lazy val builder: Maybe[InfosetBuilder] = {
     val childBuildInfos = sequenceChildren.flatMap { _.optSequenceChildBuildInfo }
     if (childBuildInfos.isEmpty) {
       Maybe.Nope
     } else {
-      Maybe.One(new SequenceBuilder(childBuildInfos.toArray))
+      Maybe.One(new SequenceInfosetBuilder(childBuildInfos.toArray))
     }
   }
 }

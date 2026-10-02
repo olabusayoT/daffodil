@@ -24,6 +24,7 @@ import org.apache.daffodil.core.util.TestUtils
 import org.apache.daffodil.lib.util.SchemaUtils
 import org.apache.daffodil.lib.xml.XMLUtils
 import org.apache.daffodil.runtime1.infoset.DIArray
+import org.apache.daffodil.runtime1.infoset.InfosetBuildCursor
 import org.apache.daffodil.unparsers.runtime1.ElementUnparserBase
 
 import org.junit.Assert.*
@@ -31,7 +32,7 @@ import org.junit.Test
 
 /**
  * Validates write-side dispatch against a single-pass tree, and a
- * standalone BuildState run, for both scalar and array/choice content.
+ * standalone InfosetBuildState run, for both scalar and array/choice content.
  */
 class TestBuildWriteArrayChoice {
 
@@ -125,7 +126,7 @@ class TestBuildWriteArrayChoice {
     assertArrayEquals(singlePassBytes, walkerBytes)
   }
 
-  // Standalone-build regression: drives BuildState directly, then feeds
+  // Standalone-build regression: drives InfosetBuildState directly, then feeds
   // its tree into write's writeContent (end-to-end build-then-write).
   @Test def testStandaloneBuildStateNavigatesArrayChoiceSeparator(): Unit = {
     val sch = SchemaUtils.dfdlTestSchema(
@@ -164,16 +165,16 @@ class TestBuildWriteArrayChoice {
       Map("releaseUnneededInfoset" -> "false", "useBuildWritePrefetch" -> "true")
     )
 
-    // Build phase: standalone BuildState drives the actual Unparser recursion,
+    // Build phase: standalone InfosetBuildState drives the actual Unparser recursion,
     // navigating past the sequence's separator and through the
     // array/choice content, purely to build the tree.
     val buildInputter = TestUtils.newInitializedInputter(infoset, dp)
 
     val sharedCtx =
       UnparseSharedContextTestFixture.build(dp, prefetchLimit = 100)()
-    val buildState = new BuildState(buildInputter, sharedCtx, Nil, false)
+    val buildState = new InfosetBuildState(buildInputter, sharedCtx, Nil, false)
 
-    new BuildCursor(dp.ssrd.builder.get, buildState, sharedCtx).runToCompletion()
+    new InfosetBuildCursor(dp.ssrd.builder.get, buildState, sharedCtx).runToCompletion()
 
     // row, header, item x3, typeB = 6 elements total.
     assertEquals(6L, sharedCtx.currentLead)
@@ -185,7 +186,7 @@ class TestBuildWriteArrayChoice {
     assertEquals(3, rootNode.child(1).asInstanceOf[DIArray].numChildren)
     assertEquals("typeB", rootNode.child(2).erd.name)
 
-    // Write phase: write the tree BuildState just constructed, confirming
+    // Write phase: write the tree InfosetBuildState just constructed, confirming
     // it's a usable, fully-built tree, not just a navigation exercise.
     val walkerOut = new ByteArrayOutputStream()
     val writeInputter = TestUtils.newInitializedInputter(infoset, dp)

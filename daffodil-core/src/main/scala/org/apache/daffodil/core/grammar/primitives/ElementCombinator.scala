@@ -30,6 +30,8 @@ import org.apache.daffodil.lib.schema.annotation.props.gen.TestKind
 import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.Nope
 import org.apache.daffodil.lib.util.Maybe.One
+import org.apache.daffodil.runtime1.infoset.ElementInfosetBuilder
+import org.apache.daffodil.runtime1.infoset.InfosetBuilder
 import org.apache.daffodil.runtime1.processors.parsers.CaptureEndOfContentLengthParser
 import org.apache.daffodil.runtime1.processors.parsers.CaptureEndOfValueLengthParser
 import org.apache.daffodil.runtime1.processors.parsers.CaptureStartOfContentLengthParser
@@ -38,8 +40,6 @@ import org.apache.daffodil.runtime1.processors.parsers.ElementParser
 import org.apache.daffodil.runtime1.processors.parsers.ElementParserInputValueCalc
 import org.apache.daffodil.runtime1.processors.parsers.NadaParser
 import org.apache.daffodil.runtime1.processors.parsers.Parser
-import org.apache.daffodil.runtime1.processors.unparsers.Builder
-import org.apache.daffodil.runtime1.processors.unparsers.ElementBuilder
 import org.apache.daffodil.runtime1.processors.unparsers.Unparser
 import org.apache.daffodil.unparsers.runtime1.CaptureEndOfContentLengthUnparser
 import org.apache.daffodil.unparsers.runtime1.CaptureEndOfValueLengthUnparser
@@ -148,18 +148,18 @@ class ElementCombinator(
     }
   }
 
-  private lazy val eBuilder: Maybe[Builder] = {
+  private lazy val eBuilder: Maybe[InfosetBuilder] = {
     if (eValue.isEmpty) {
       Nope
     } else {
       eValue.builder
     }
   }
-  private lazy val eReptypeBuilder: Maybe[Builder] = repTypeElementGram.builder
+  private lazy val eReptypeBuilder: Maybe[InfosetBuilder] = repTypeElementGram.builder
 
   // Shares the memoized unparser above for unparseBegin/unparseEnd, so
   // build and write see identical node-creation behavior.
-  override lazy val builder: Maybe[Builder] = unparser match {
+  override lazy val builder: Maybe[InfosetBuilder] = unparser match {
     case eu @ (_: ElementOVCSpecifiedLengthUnparser | _: ElementSpecifiedLengthUnparser) => {
       val eub = eu.asInstanceOf[ElementUnparserBase]
       val contentBuilder = if (eReptypeBuilder.isDefined) {
@@ -168,7 +168,7 @@ class ElementCombinator(
         eBuilder
       }
       One(
-        new ElementBuilder(
+        new ElementInfosetBuilder(
           context.erd,
           eub,
           contentBuilder
@@ -411,7 +411,7 @@ class ElementParseAndUnspecifiedLength(
 
   // Shares the memoized unparser above for unparseBegin/unparseEnd, so
   // build and write see identical nilled/OVC/IVC node-creation behavior.
-  override lazy val builder: Maybe[Builder] = {
+  override lazy val builder: Maybe[InfosetBuilder] = {
     val eu = unparser.asInstanceOf[ElementUnparserBase]
     val contentBuilder = if (eRepTypeBuilder.isDefined) {
       eRepTypeBuilder
@@ -419,7 +419,7 @@ class ElementParseAndUnspecifiedLength(
       eBuilder
     }
     One(
-      new ElementBuilder(
+      new ElementInfosetBuilder(
         context.erd,
         eu,
         contentBuilder
@@ -501,8 +501,8 @@ abstract class ElementCombinatorBase(
 
   def unparser: Unparser
 
-  lazy val eBuilder: Maybe[Builder] = eGram.builder
+  lazy val eBuilder: Maybe[InfosetBuilder] = eGram.builder
 
-  lazy val eRepTypeBuilder: Maybe[Builder] = repTypeElementGram.builder
+  lazy val eRepTypeBuilder: Maybe[InfosetBuilder] = repTypeElementGram.builder
 
 }

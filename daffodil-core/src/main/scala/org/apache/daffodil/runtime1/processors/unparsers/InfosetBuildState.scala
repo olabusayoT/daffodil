@@ -51,7 +51,7 @@ import org.apache.daffodil.runtime1.processors.dfa.DFADelimiter
  * build never writes content.
  *
  * `getDataOutputStream` is NOT stubbed: generic `UState` utility methods
- * (toString, currentLocation, bitPos0b) call into it, so `BuildState`
+ * (toString, currentLocation, bitPos0b) call into it, so `InfosetBuildState`
  * lazily constructs an actual DOS wrapping a no-op sink purely to satisfy
  * that.
  *
@@ -59,7 +59,7 @@ import org.apache.daffodil.runtime1.processors.dfa.DFADelimiter
  * false); otherwise unused, and unparsing constructs `UStateMain`
  * exclusively as before.
  */
-final class BuildState(
+final class InfosetBuildState(
   private val inputter: InfosetInputter,
   sharedCtx: UnparseSharedContext,
   diagnosticsArg: Seq[api.Diagnostic],
@@ -109,7 +109,9 @@ final class BuildState(
   override def releaseUnneededInfoset: Boolean = false
 
   private def writeOnly =
-    Assert.usageError("BuildState never writes content, so this write-only state doesn't exist")
+    Assert.usageError(
+      "InfosetBuildState never writes content, so this write-only state doesn't exist"
+    )
 
   override def escapeSchemeEVCache: MStackOfMaybe[EscapeSchemeUnparserHelper] = writeOnly
   override def withUnparserDataInputStream: LocalStack[StringDataInputStreamForUnparse] =

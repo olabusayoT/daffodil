@@ -24,11 +24,11 @@ import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.Nope
 import org.apache.daffodil.lib.util.Maybe.One
+import org.apache.daffodil.runtime1.infoset.InfosetBuilder
+import org.apache.daffodil.runtime1.infoset.SeqCompInfosetBuilder
 import org.apache.daffodil.runtime1.processors.parsers.AssertExpressionEvaluationParser
 import org.apache.daffodil.runtime1.processors.parsers.NadaParser
 import org.apache.daffodil.runtime1.processors.parsers.SeqCompParser
-import org.apache.daffodil.runtime1.processors.unparsers.Builder
-import org.apache.daffodil.runtime1.processors.unparsers.SeqCompBuilder
 import org.apache.daffodil.runtime1.processors.unparsers.SeqCompUnparser
 import org.apache.daffodil.unparsers.runtime1.NadaUnparser
 
@@ -133,20 +133,20 @@ class SeqComp private (context: SchemaComponent, children: Seq[Gram])
   // Only the (usually at most one) child(ren) that actually build infoset
   // content contribute here; write-only children (delimiters, padding, etc.)
   // simply have no builder to collect.
-  lazy val builderChildren: Array[Builder] = {
+  lazy val builderChildren: Array[InfosetBuilder] = {
     children
       .filter(x => !x.isEmpty && (x.forWhat != ForParser))
       .flatMap { x => x.builder.toList }
       .toArray
   }
 
-  final override lazy val builder: Maybe[Builder] = {
+  final override lazy val builder: Maybe[InfosetBuilder] = {
     if (builderChildren.isEmpty) {
       Nope
     } else if (builderChildren.length == 1) {
       One(builderChildren.head)
     } else {
-      One(new SeqCompBuilder(builderChildren))
+      One(new SeqCompInfosetBuilder(builderChildren))
     }
   }
 }

@@ -26,10 +26,10 @@ import org.apache.daffodil.lib.schema.annotation.props.gen.OccursCountKind
 import org.apache.daffodil.lib.schema.annotation.props.gen.Representation
 import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.runtime1.dpath.NodeInfo
+import org.apache.daffodil.runtime1.infoset.EmptyInfosetBuilder
+import org.apache.daffodil.runtime1.infoset.InfosetBuilder
+import org.apache.daffodil.runtime1.infoset.SequenceChildInfosetBuildInfo
 import org.apache.daffodil.runtime1.processors.parsers.*
-import org.apache.daffodil.runtime1.processors.unparsers.Builder
-import org.apache.daffodil.runtime1.processors.unparsers.EmptyBuilder
-import org.apache.daffodil.runtime1.processors.unparsers.SequenceChildBuildInfo
 import org.apache.daffodil.unparsers.runtime1.*
 
 /**
@@ -73,7 +73,7 @@ abstract class SequenceChild(protected val sq: SequenceTermBase, child: Term, gr
 
   protected lazy val childParser = child.termContentBody.parser
   protected lazy val childUnparser = child.termContentBody.unparser
-  protected lazy val childBuilder: Maybe[Builder] = child.termContentBody.builder
+  protected lazy val childBuilder: Maybe[InfosetBuilder] = child.termContentBody.builder
 
   final override lazy val parser = sequenceChildParser
   final override lazy val unparser = sequenceChildUnparser
@@ -87,13 +87,13 @@ abstract class SequenceChild(protected val sq: SequenceTermBase, child: Term, gr
   final lazy val optSequenceChildUnparser: Option[SequenceChildUnparser] =
     if (childUnparser.isEmpty) None else Some(unparser)
 
-  final lazy val optSequenceChildBuildInfo: Option[SequenceChildBuildInfo] = {
+  final lazy val optSequenceChildBuildInfo: Option[SequenceChildInfosetBuildInfo] = {
     if (childUnparser.isEmpty) {
       None
     } else if (childBuilder.isDefined) {
-      Some(SequenceChildBuildInfo(unparser, childBuilder.get))
+      Some(SequenceChildInfosetBuildInfo(unparser, childBuilder.get))
     } else {
-      Some(SequenceChildBuildInfo(unparser, EmptyBuilder))
+      Some(SequenceChildInfosetBuildInfo(unparser, EmptyInfosetBuilder))
     }
   }
 

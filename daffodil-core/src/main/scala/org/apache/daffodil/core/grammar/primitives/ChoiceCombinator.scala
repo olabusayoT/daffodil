@@ -35,6 +35,9 @@ import org.apache.daffodil.lib.util.Maybe.One
 import org.apache.daffodil.lib.util.MaybeInt
 import org.apache.daffodil.lib.util.ProperlySerializableMap.*
 import org.apache.daffodil.runtime1.infoset.ChoiceBranchEvent
+import org.apache.daffodil.runtime1.infoset.ChoiceInfosetBuilder
+import org.apache.daffodil.runtime1.infoset.EmptyInfosetBuilder
+import org.apache.daffodil.runtime1.infoset.InfosetBuilder
 import org.apache.daffodil.runtime1.processors.RangeBound
 import org.apache.daffodil.runtime1.processors.TermRuntimeData
 import org.apache.daffodil.runtime1.processors.parsers.*
@@ -337,22 +340,22 @@ case class ChoiceCombinator(ch: ChoiceTermBase, alternatives: Seq[Gram])
     }
   }
 
-  override lazy val builder: Maybe[Builder] = {
+  override lazy val builder: Maybe[InfosetBuilder] = {
     val (eventRDMap, optDefaultBranch) = ch.choiceBranchMap
 
-    def builderFor(term: Term): (TermRuntimeData, Builder) = {
+    def builderFor(term: Term): (TermRuntimeData, InfosetBuilder) = {
       val cb = term.termContentBody.builder
       val b = if (cb.isDefined) {
         cb.get
       } else {
-        EmptyBuilder
+        EmptyInfosetBuilder
       }
       (term.termRuntimeData, b)
     }
 
-    val branchMap: Map[ChoiceBranchEvent, (TermRuntimeData, Builder)] =
+    val branchMap: Map[ChoiceBranchEvent, (TermRuntimeData, InfosetBuilder)] =
       eventRDMap.map { case (cbe, branchTerm) => (cbe, builderFor(branchTerm)) }
-    val defaultBranch: Maybe[(TermRuntimeData, Builder)] = optDefaultBranch match {
+    val defaultBranch: Maybe[(TermRuntimeData, InfosetBuilder)] = optDefaultBranch match {
       case Some(term) => One(builderFor(term))
       case None => Nope
     }
@@ -360,7 +363,7 @@ case class ChoiceCombinator(ch: ChoiceTermBase, alternatives: Seq[Gram])
     if (branchMap.isEmpty && defaultBranch.isEmpty) {
       Nope
     } else {
-      One(new ChoiceBuilder(ch.modelGroupRuntimeData, branchMap, defaultBranch))
+      One(new ChoiceInfosetBuilder(ch.modelGroupRuntimeData, branchMap, defaultBranch))
     }
   }
 }
