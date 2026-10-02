@@ -44,8 +44,14 @@ final class UnparseSharedContext(
   val prefetchLimit: Long
 ) {
   private var buildLead: Long = 0
+  private var peakLead_ : Long = 0
 
-  def incrementLead(): Unit = buildLead += 1
+  def incrementLead(): Unit = {
+    buildLead += 1
+    if (buildLead > peakLead_) {
+      peakLead_ = buildLead
+    }
+  }
 
   def decrementLead(): Unit = {
     buildLead -= 1
@@ -53,6 +59,13 @@ final class UnparseSharedContext(
   }
 
   def currentLead: Long = buildLead
+
+  /**
+   * The highest the lead has ever been, across build and write together.
+   * The lead only rises as build adds nodes and only falls as write
+   * finishes them, so this is the peak over a whole run.
+   */
+  def peakLead: Long = peakLead_
 
   def leadExceedsPrefetchLimit: Boolean = buildLead > prefetchLimit
 

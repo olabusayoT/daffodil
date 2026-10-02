@@ -220,7 +220,9 @@ class OrderedSeparatedSequenceUnparser(
       }
       var n = numOccurrences
       while (n < maxReps) {
-        beforeSeparator(rep.erd, rep.isKnownStaticallyNotToSuppressSeparator)
+        // A missing occurrence has no content, so its separator is always
+        // suppressible, whatever the schema says about a present occurrence.
+        beforeSeparator(rep.erd, staticallyNotSuppressible = false)
         afterSeparator()
         n += 1
         state.moveOverOneArrayIterationIndexOnly()

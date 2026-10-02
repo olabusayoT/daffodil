@@ -20,12 +20,11 @@ package org.apache.daffodil.runtime1.processors.unparsers
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.One
-import org.apache.daffodil.runtime1.infoset.ChoiceBranchEndEvent
 import org.apache.daffodil.runtime1.infoset.ChoiceBranchEvent
-import org.apache.daffodil.runtime1.infoset.ChoiceBranchStartEvent
 import org.apache.daffodil.runtime1.processors.ElementRuntimeData
 import org.apache.daffodil.runtime1.processors.ModelGroupRuntimeData
 import org.apache.daffodil.runtime1.processors.TermRuntimeData
+import org.apache.daffodil.unparsers.runtime1.ElementUnparserBase
 import org.apache.daffodil.unparsers.runtime1.RepeatingChildUnparser
 import org.apache.daffodil.unparsers.runtime1.SequenceChildUnparser
 
@@ -162,17 +161,17 @@ final class SeqCompBuilder(children: Array[Builder]) extends Builder {
 
 /**
  * Builds one element's infoset node and, for complex types, builds
- * descendant nodes via contentBuilder. unparseBegin/unparseEnd are the
- * same element-kind-specific (plain/nillable/OVC/etc.) node-creation logic
- * unparse() itself uses, including the bounded-lookahead lead-counter
- * hookup and the deferred simple-value finalization; only the "what does
- * this element contain" step is redirected to the builder tree instead
- * of back into the unparser tree.
+ * descendant nodes via contentBuilder. The element unparser's
+ * unparseBegin/unparseEnd are the same element-kind-specific
+ * (plain/nillable/OVC/etc.) node-creation logic unparse() itself uses,
+ * including the bounded-lookahead lead-counter hookup and the deferred
+ * simple-value finalization; only the "what does this element contain"
+ * step is redirected to the builder tree instead of back into the
+ * unparser tree.
  */
 final class ElementBuilder(
   erd: ElementRuntimeData,
-  unparseBegin: UState => Unit,
-  unparseEnd: UState => Unit,
+  elementUnparser: ElementUnparserBase,
   contentBuilder: Maybe[Builder]
 ) extends Builder {
 
@@ -182,7 +181,7 @@ final class ElementBuilder(
     override def step(cursor: BuildCursor): Unit = {
       val state = cursor.state
       if (!contentPushed) {
-        unparseBegin(state)
+        elementUnparser.unparseBeginForBuild(state)
         if (erd.isComplexType) {
           state.pushTRD(erd.optComplexTypeModelGroupRuntimeData.get)
           if (contentBuilder.isDefined) {
@@ -195,7 +194,7 @@ final class ElementBuilder(
       if (erd.isComplexType) {
         state.popTRD(erd.optComplexTypeModelGroupRuntimeData.get)
       }
-      unparseEnd(state)
+      elementUnparser.unparseEndForBuild(state)
       cursor.pop()
     }
   }
@@ -352,9 +351,9 @@ final class ChoiceBuilder(
       val event = state.inspectOrError
       val key: ChoiceBranchEvent = event match {
         case e if e.isStart && (e.isElement || e.isArray) =>
-          ChoiceBranchStartEvent(e.erd.namedQName)
+          e.erd.choiceBranchStartEvent
         case e if e.isEnd && (e.isElement || e.isArray) =>
-          ChoiceBranchEndEvent(e.erd.namedQName)
+          e.erd.choiceBranchEndEvent
       }
       val fromTable = branchMap.get(key)
       val resolved = if (fromTable.isDefined) {

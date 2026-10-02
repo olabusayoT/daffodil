@@ -580,14 +580,6 @@ trait TraversalIndexStacks { self: UState =>
   override def moveOverOneGroupIndexOnly(): Unit =
     groupIndexStack.setTop(groupIndexStack.top + 1)
   override def groupPos = groupIndexStack.top
-
-  // TODO: it doesn't look anything is actually reading the value of childindex
-  // stack. Can we get rid of it?
-  override val childIndexStack = MStackOfLong(16)
-  childIndexStack.push(1L)
-  override def moveOverOneElementChildOnly(): Unit =
-    childIndexStack.setTop(childIndexStack.top + 1)
-  override def childPos = childIndexStack.top
 }
 
 final class UStateMain private[unparsers] (
@@ -603,6 +595,14 @@ final class UStateMain private[unparsers] (
   with TraversalIndexStacks {
 
   final val releaseUnneededInfoset: Boolean = !areDebugging && tunable.releaseUnneededInfoset
+
+  // Write-side only: sequence and choice unparsers read it to find their
+  // current child; build tracks position in its own frames instead.
+  override val childIndexStack = MStackOfLong(16)
+  childIndexStack.push(1L)
+  override def moveOverOneElementChildOnly(): Unit =
+    childIndexStack.setTop(childIndexStack.top + 1)
+  override def childPos = childIndexStack.top
 
   dState.setMode(UnparserBlocking)
 

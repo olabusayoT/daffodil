@@ -40,12 +40,6 @@ object SuspendableExpression {
    * it doesn't know whether the referenced position is already written. */
   def canResolveWithoutWriting(expr: CompiledExpression[AnyRef]): Boolean =
     expr.valueReferencedElementInfos.isEmpty && expr.contentReferencedElementInfos.isEmpty
-
-  /** True only for OVCs that can actually create a suspension worth
-   * prefetching: a constant expression never suspends in the first place,
-   * so it derives no benefit from racing build ahead of write. */
-  def isPrefetchBeneficial(expr: CompiledExpression[AnyRef]): Boolean =
-    !expr.isConstant && canResolveWithoutWriting(expr)
 }
 
 trait SuspendableExpression extends Suspension {
