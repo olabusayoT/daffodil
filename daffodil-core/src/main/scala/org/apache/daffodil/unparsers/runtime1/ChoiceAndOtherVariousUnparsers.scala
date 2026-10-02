@@ -173,10 +173,10 @@ class ChoiceCombinatorUnparser(
     var innerSelfManagesPosition = false
     withChoiceLengthFiller(state) {
       maybeChildUnparser.get match {
-        case elemUnp: ElementUnparserBase => elemUnp.writeContent(child, state)
+        case elemUnp: ElementUnparserBase => elemUnp.writeContent1(child, state)
         case wu: WriteUnparser =>
           innerSelfManagesPosition = true
-          wu.writeContent(containerNode, state)
+          wu.writeContent1(containerNode, state)
         case emptyUnp: ChoiceBranchEmptyUnparser =>
           // A branch that optimized to nothing (e.g. a sequence containing
           // only an assert); runs its (no-op) unparse, same as any other

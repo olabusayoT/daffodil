@@ -75,7 +75,7 @@ abstract class UState(
   diagnosticsArg: Seq[api.Diagnostic],
   dataProcArg: Maybe[DataProcessor],
   tunable: DaffodilTunables,
-  areDebugging: Boolean,
+  val areDebugging: Boolean,
   eventState: InfosetEventState,
   delimiterEscapePosition: DelimiterEscapePositionState
 ) extends ParseOrUnparseState(vbox, diagnosticsArg, dataProcArg, tunable)

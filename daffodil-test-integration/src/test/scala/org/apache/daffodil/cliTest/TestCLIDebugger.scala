@@ -24,7 +24,10 @@ import org.apache.daffodil.cli.Main.ExitCode
 import org.apache.daffodil.cli.cliTest.Util.*
 import org.apache.daffodil.core.util.TestUtils.intercept
 
+import net.sf.expectit.matcher.Matchers.eof
 import net.sf.expectit.matcher.Matchers.regexp
+import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 
 /**
@@ -1325,4 +1328,51 @@ class TestCLIDebugger {
     }(ExitCode.Success)
   }
 
+  /**
+   * Tracing an unparse must step through the same unparsers, at the same bit
+   * positions, whether or not the build/write prefetch path is used. The
+   * trace also shows the infoset, data and diff at each step; those differ
+   * in small ways on the prefetch path (the child and group indexes, and
+   * nodes built one step ahead), so they are not compared.
+   */
+  @Test def test_CLI_Tdml_Trace_prefetchUnparseMatchesSinglePass(): Unit = {
+    val tdml = path(
+      "daffodil-test/src/test/resources/org/apache/daffodil/unparser/buildWritePrefetch.tdml"
+    )
+
+    def steps(prefetch: Boolean): Seq[String] = {
+      val tunables = Map("DAFFODIL_TDML_TUNABLES" -> s"useBuildWritePrefetch=$prefetch")
+      var transcript = ""
+      runCLI(
+        args"test -t $tdml nviScopedVariableWithValueLengthOVC",
+        fork = true,
+        envs = envs ++ tunables
+      ) { cli =>
+        transcript = cli.expect(eof()).getInput
+      }(ExitCode.Success)
+      transcript.linesIterator
+        .filter { line =>
+          line.startsWith("unparser:") || line.startsWith("bitPosition:") ||
+          line.startsWith("-----")
+        }
+        .map(_.replaceAll("@[0-9a-f]+", ""))
+        .toSeq
+    }
+
+    val singlePass = steps(prefetch = false)
+    val prefetch = steps(prefetch = true)
+    assertTrue("expected a trace of unparser steps", singlePass.exists(_.startsWith("unparser:")))
+    val firstDifference = singlePass.zipAll(prefetch, "<none>", "<none>").indexWhere {
+      case (a, b) => a != b
+    }
+    if (firstDifference >= 0) {
+      def around(lines: Seq[String]) =
+        lines.slice(firstDifference - 3, firstDifference + 3).mkString("\n    ")
+      fail(
+        s"first difference at line $firstDifference of ${singlePass.length} single-pass and " +
+          s"${prefetch.length} prefetch lines\n  single-pass:\n    ${around(singlePass)}" +
+          s"\n  prefetch:\n    ${around(prefetch)}"
+      )
+    }
+  }
 }

@@ -44,7 +44,8 @@ import org.apache.daffodil.runtime1.processors.TermRuntimeData
  */
 final class InfosetBuildState(
   private val inputter: InfosetInputter,
-  sharedCtx: UnparseSharedContext
+  sharedCtx: UnparseSharedContext,
+  areDebugging: Boolean
 ) extends InfosetTreeState
   with SuspensionResolver
   with TraversalIndexStacks {
@@ -113,7 +114,9 @@ final class InfosetBuildState(
    * unfiltered sweep.
    */
   def evalSuspensions(isFinal: Boolean): Unit = {
-    sharedCtx.suspensionTracker.evalBuildResolvableSuspensions()
+    // A debugger needs suspensions to resolve at the steps a single-pass
+    // unparse would resolve them, which only write's sweeps give it.
+    if (!areDebugging) sharedCtx.suspensionTracker.evalBuildResolvableSuspensions()
     if (isFinal) sharedCtx.suspensionTracker.requireFinal()
   }
   def suspensions: Seq[Suspension] = sharedCtx.suspensionTracker.suspensions

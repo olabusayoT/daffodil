@@ -540,19 +540,22 @@ class DataProcessor(
       // Shared by build and write, which together tick this tracker at
       // roughly twice the per-node rate a single traversal would;
       // doubling both thresholds restores the intended sweep density.
+      // Debugging has only write tick it, as a single-pass unparse does.
       new SuspensionTracker(
-        tunables.unparseSuspensionWaitYoung * 2,
-        tunables.unparseSuspensionWaitOld * 2
+        tunables.unparseSuspensionWaitYoung * (if (areDebugging) 1 else 2),
+        tunables.unparseSuspensionWaitOld * (if (areDebugging) 1 else 2)
       ),
       this,
       tunables,
-      prefetchLimit = tunables.unparsePrefetchWindowNodes
+      // Debugging builds only what write asks for, so the infoset a debugger
+      // shows is what a single-pass unparse would have built by that step.
+      prefetchLimit = if (areDebugging) 0L else tunables.unparsePrefetchWindowNodes
     )
 
     // Lazy so each is created only after the step before it has succeeded,
     // and never for a run that fails earlier, since each holds an output
     // stream that must then be cleaned up.
-    lazy val buildState = new InfosetBuildState(inputter, sharedCtx)
+    lazy val buildState = new InfosetBuildState(inputter, sharedCtx, areDebugging)
     // The root element always has a builder: it is exactly the case that
     // gets ElementInfosetBuilder wrapped around it, regardless of schema content.
     lazy val cursor = new InfosetBuildCursor(ssrd.builder, buildState, sharedCtx)
@@ -583,7 +586,7 @@ class DataProcessor(
       val rootElemUnp = rootUnparser.asInstanceOf[ElementUnparserBase]
       try {
         val rootNode = sharedCtx.awaitChild(inputter.documentElement, 0)
-        rootElemUnp.writeContent(rootNode, writeState)
+        rootElemUnp.writeContent1(rootNode, writeState)
       } catch {
         // A genuine deadlock (if any) surfaces via finishWriteSide's
         // own evalSuspensions(isFinal = true) call, which runs regardless

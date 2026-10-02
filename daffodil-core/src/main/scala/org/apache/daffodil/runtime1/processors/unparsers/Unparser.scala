@@ -180,7 +180,7 @@ final class SeqCompUnparser(context: RuntimeData, val childUnparsers: Array[Unpa
     while (i < childUnparsers.length) {
       childUnparsers(i) match {
         case wu: WriteUnparser =>
-          wu.writeContent(containerNode, ustate)
+          wu.writeContent1(containerNode, ustate)
         case cu =>
           cu.unparse1(ustate)
       }

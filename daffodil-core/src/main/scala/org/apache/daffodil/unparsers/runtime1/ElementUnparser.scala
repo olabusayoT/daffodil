@@ -235,7 +235,7 @@ sealed abstract class ElementUnparserBase(
     // would be written instead of the repType conversion.
     if (eRepTypeUnparser.isEmpty && eUnparser.isDefined) {
       eUnparser.get match {
-        case wu: WriteUnparser => wu.writeContent(containerNode, s)
+        case wu: WriteUnparser => wu.writeContent1(containerNode, s)
         case _ => dispatchContentUnparser(s)
       }
     } else {
@@ -268,6 +268,7 @@ sealed abstract class ElementUnparserBase(
    * unparser or a plain simple-element value-writer.
    */
   override def writeContent(containerNode: DINode, state: UState): Unit = {
+    if (state.areDebugging) state.dataProc.value.startElement(state, this)
     state.currentInfosetNodeStack.push(One(containerNode))
     state.childIndexStack.push(0L)
     try {
@@ -304,6 +305,9 @@ sealed abstract class ElementUnparserBase(
       state.childIndexStack.pop()
       state.currentInfosetNodeStack.pop
     }
+    // After the node is popped, as unparse does, so a debugger sees the same
+    // context at the end of an element. Skipped when content failed.
+    if (state.areDebugging) state.dataProc.value.endElement(state, this)
   }
 
   override def unparse(state: UState): Unit = {

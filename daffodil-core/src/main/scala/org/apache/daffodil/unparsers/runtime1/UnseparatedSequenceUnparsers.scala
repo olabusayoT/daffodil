@@ -86,7 +86,9 @@ class OrderedUnseparatedSequenceUnparser(
         case rep: RepeatingChildUnparser =>
           writeRepeatingTerm(rep, complex, sharedCtx, state)
         case cu =>
-          writeRequiredTerm(cu, complex, sharedCtx, state)
+          withDebuggerEvents(cu, state) {
+            writeRequiredTerm(cu, complex, sharedCtx, state)
+          }
       }
       index += 1
     }
@@ -130,7 +132,9 @@ class OrderedUnseparatedSequenceUnparser(
       var arrayOcc = 0
       while (sharedCtx.childExistsOrFinal(arrayNode, arrayOcc)) {
         val occNode = sharedCtx.awaitChild(arrayNode, arrayOcc)
-        rep.childUnparser.asInstanceOf[ElementUnparserBase].writeContent(occNode, state)
+        withDebuggerEvents(rep, state) {
+          rep.childUnparser.asInstanceOf[ElementUnparserBase].writeContent1(occNode, state)
+        }
         arrayNode.freeChildIfNoLongerNeeded(arrayOcc, state.releaseUnneededInfoset)
         arrayOcc += 1
         state.moveOverOneArrayIterationIndexOnly()
@@ -156,7 +160,9 @@ class OrderedUnseparatedSequenceUnparser(
     val readyChild = sharedCtx.awaitChild(complex, idx)
     state.pushOccurrenceIndices()
     try {
-      rep.childUnparser.asInstanceOf[ElementUnparserBase].writeContent(readyChild, state)
+      withDebuggerEvents(rep, state) {
+        rep.childUnparser.asInstanceOf[ElementUnparserBase].writeContent1(readyChild, state)
+      }
       state.moveOverOneElementChildOnly()
       complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
       state.moveOverOneArrayIterationIndexOnly()
@@ -209,7 +215,7 @@ class OrderedUnseparatedSequenceUnparser(
   ): Unit = {
     val idx = state.childIndexStack.top.toInt
     awaitRequiredTermChild(isGroupTerm = false, complex, idx, sharedCtx)
-    elemUnp.writeContent(complex.child(idx), state)
+    elemUnp.writeContent1(complex.child(idx), state)
     state.moveOverOneElementChildOnly()
     complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
   }
@@ -222,7 +228,7 @@ class OrderedUnseparatedSequenceUnparser(
   ): Unit = {
     val idx = state.childIndexStack.top.toInt
     awaitRequiredTermChild(isGroupTerm = true, complex, idx, sharedCtx)
-    wu.writeContent(complex, state)
+    wu.writeContent1(complex, state)
   }
 
   /**

@@ -367,7 +367,9 @@ class OrderedSeparatedSequenceUnparser(
           val repSep = rep.asInstanceOf[RepeatingChildUnparser with Separated]
           writeRepeatingTerm(repSep, complex, sharedCtx, state, sepState)
         case cu =>
-          writeRequiredTerm(cu, complex, sharedCtx, state, sepState)
+          withDebuggerEvents(cu, state) {
+            writeRequiredTerm(cu, complex, sharedCtx, state, sepState)
+          }
       }
       index += 1
     }
@@ -469,7 +471,9 @@ class OrderedSeparatedSequenceUnparser(
     sepState: SeparatorSuppressionState
   ): Unit = {
     sepState.beforeSeparator(rep.erd, rep.isKnownStaticallyNotToSuppressSeparator)
-    rep.childUnparser.asInstanceOf[ElementUnparserBase].writeContent(occNode, state)
+    withDebuggerEvents(rep, state) {
+      rep.childUnparser.asInstanceOf[ElementUnparserBase].writeContent1(occNode, state)
+    }
     sepState.afterSeparator()
   }
 
@@ -557,12 +561,12 @@ class OrderedSeparatedSequenceUnparser(
     }
     cu.childUnparser match {
       case elemUnp: ElementUnparserBase =>
-        elemUnp.writeContent(complex.child(idx), state)
+        elemUnp.writeContent1(complex.child(idx), state)
         sepState.afterSeparator()
         state.moveOverOneElementChildOnly()
         complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
       case wu: WriteUnparser =>
-        wu.writeContent(complex, state)
+        wu.writeContent1(complex, state)
         sepState.afterSeparator()
       case other =>
         Assert.usageError(s"unhandled sequence term unparser type: $other")
