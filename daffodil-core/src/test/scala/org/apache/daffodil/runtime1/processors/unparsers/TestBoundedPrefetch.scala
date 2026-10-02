@@ -20,7 +20,6 @@ package org.apache.daffodil.runtime1.processors.unparsers
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
 
-import org.apache.daffodil.core.util.TestUtils
 import org.apache.daffodil.lib.util.SchemaUtils
 import org.apache.daffodil.lib.xml.XMLUtils
 import org.apache.daffodil.runtime1.infoset.InfosetBuildCursor
@@ -66,18 +65,18 @@ class TestBoundedPrefetch {
       </ex:row>
     val expectedBytes = (0 until numItems).map(i => s"i$i").mkString(",")
 
-    val dp = TestUtils.compileForUnparse(
+    val dp = UnparseSharedContextTestFixture.compileForUnparse(
       sch,
       Map("releaseUnneededInfoset" -> "false", "useBuildWritePrefetch" -> "true")
     )
 
-    val buildInputter = TestUtils.newInitializedInputter(infoset, dp)
+    val buildInputter = UnparseSharedContextTestFixture.newInitializedInputter(infoset, dp)
 
     val sharedCtx =
       UnparseSharedContextTestFixture.build(dp, prefetchLimit)()
 
     val walkerOut = new ByteArrayOutputStream()
-    val writeInputter = TestUtils.newInitializedInputter(infoset, dp)
+    val writeInputter = UnparseSharedContextTestFixture.newInitializedInputter(infoset, dp)
     val writeState = UState.createInitialUState(walkerOut, dp, writeInputter, false)
     writeState.setSharedContext(sharedCtx)
     writeState.getDataOutputStream.setPriorBitOrder(dp.ssrd.elementRuntimeData.defaultBitOrder)

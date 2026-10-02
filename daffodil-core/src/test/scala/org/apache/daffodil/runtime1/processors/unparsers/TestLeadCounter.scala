@@ -20,7 +20,6 @@ package org.apache.daffodil.runtime1.processors.unparsers
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
 
-import org.apache.daffodil.core.util.TestUtils
 import org.apache.daffodil.lib.util.SchemaUtils
 import org.apache.daffodil.lib.xml.XMLUtils
 import org.apache.daffodil.runtime1.infoset.InfosetBuildCursor
@@ -65,14 +64,14 @@ class TestLeadCounter {
         <city>Boston</city>
       </ex:row>
 
-    val dp = TestUtils.compileForUnparse(
+    val dp = UnparseSharedContextTestFixture.compileForUnparse(
       sch,
       Map("releaseUnneededInfoset" -> "false", "useBuildWritePrefetch" -> "true")
     )
 
     // Build phase: drive InfosetBuildState through a InfosetBuildCursor, incrementing the
     // shared lead counter via the actual unparseBegin hookup.
-    val buildInputter = TestUtils.newInitializedInputter(infoset, dp)
+    val buildInputter = UnparseSharedContextTestFixture.newInitializedInputter(infoset, dp)
 
     val sharedCtx =
       UnparseSharedContextTestFixture.build(dp, prefetchLimit = 100)()
@@ -89,7 +88,7 @@ class TestLeadCounter {
     // (buildInputter.documentElement) against the SAME sharedCtx,
     // decrementing the lead counter as it goes.
     val walkerOut = new ByteArrayOutputStream()
-    val writeInputter = TestUtils.newInitializedInputter(infoset, dp)
+    val writeInputter = UnparseSharedContextTestFixture.newInitializedInputter(infoset, dp)
     val writeState = UState.createInitialUState(walkerOut, dp, writeInputter, false)
     writeState.setSharedContext(sharedCtx)
     writeState.getDataOutputStream.setPriorBitOrder(dp.ssrd.elementRuntimeData.defaultBitOrder)

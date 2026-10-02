@@ -17,7 +17,6 @@
 
 package org.apache.daffodil.runtime1.processors.unparsers
 
-import org.apache.daffodil.core.util.TestUtils
 import org.apache.daffodil.lib.util.SchemaUtils
 import org.apache.daffodil.lib.xml.XMLUtils
 import org.apache.daffodil.runtime1.infoset.InfosetBuildCursor
@@ -59,12 +58,12 @@ class TestInfosetBuildState {
         <city>Boston</city>
       </ex:row>
 
-    val dp = TestUtils.compileForUnparse(
+    val dp = UnparseSharedContextTestFixture.compileForUnparse(
       sch,
       Map("releaseUnneededInfoset" -> "false", "useBuildWritePrefetch" -> "true")
     )
 
-    val inputter = TestUtils.newInitializedInputter(infoset, dp)
+    val inputter = UnparseSharedContextTestFixture.newInitializedInputter(infoset, dp)
     // initialize() pushes the root TRD as its last step - the same
     // setup a real unparse's invariant check relies on.
 

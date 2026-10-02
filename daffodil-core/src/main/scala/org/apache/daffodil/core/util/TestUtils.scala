@@ -18,7 +18,6 @@
 package org.apache.daffodil.core.util
 
 import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.net.URL
 import java.nio.channels.Channels
@@ -44,20 +43,10 @@ import org.apache.daffodil.lib.iapi.*
 import org.apache.daffodil.lib.util.*
 import org.apache.daffodil.lib.xml.*
 import org.apache.daffodil.runtime1.iapi.DFDL
-import org.apache.daffodil.runtime1.infoset.DIArray
-import org.apache.daffodil.runtime1.infoset.DIComplex
-import org.apache.daffodil.runtime1.infoset.DIDocument
-import org.apache.daffodil.runtime1.infoset.DINode
-import org.apache.daffodil.runtime1.infoset.InfosetInputter
 import org.apache.daffodil.runtime1.infoset.ScalaXMLInfosetInputter
 import org.apache.daffodil.runtime1.infoset.ScalaXMLInfosetOutputter
 import org.apache.daffodil.runtime1.processors.DataProcessor
-import org.apache.daffodil.runtime1.processors.SuspensionTracker
 import org.apache.daffodil.runtime1.processors.VariableMap
-import org.apache.daffodil.runtime1.processors.unparsers.UState
-import org.apache.daffodil.runtime1.processors.unparsers.UStateMain
-import org.apache.daffodil.runtime1.processors.unparsers.UnparseSharedContext
-import org.apache.daffodil.unparsers.runtime1.ElementUnparserBase
 
 import org.apache.commons.io.FileUtils
 /*
@@ -210,134 +199,6 @@ object TestUtils {
     if (p.isError) throwDiagnostics(p.getDiagnostics)
     p
   }
-
-  /**
-   * Compiles testSchema with the given tunables and returns the resulting
-   * DataProcessor without a saveAndReload round-trip, since some callers
-   * build test-only state directly off the live object.
-   */
-  def compileForUnparse(
-    testSchema: Node,
-    tunables: Map[String, String] = Map.empty
-  ): DataProcessor = {
-    val pf = Compiler().withTunables(tunables).compileNode(testSchema)
-    if (pf.isError) throwDiagnostics(pf.getDiagnostics)
-    val dp = pf.onPath("/").asInstanceOf[DataProcessor]
-    if (dp.isError) throwDiagnostics(dp.getDiagnostics)
-    dp
-  }
-
-  /**
-   * Builds a fresh InfosetInputter walking infosetXML against dp, already
-   * initialized with the root TRD pushed.
-   */
-  def newInitializedInputter(infosetXML: Node, dp: DataProcessor): InfosetInputter = {
-    val inputter = new InfosetInputter(new ScalaXMLInfosetInputter(infosetXML))
-    inputter.initialize(dp.ssrd.elementRuntimeData, dp.tunables)
-    inputter
-  }
-
-  /**
-   * Unparses infosetXML against dp, throwing if the result is an error,
-   * and returns the raw unparsed bytes.
-   */
-  def unparseToBytes(dp: DataProcessor, infosetXML: Node): Array[Byte] = {
-    val out = new ByteArrayOutputStream()
-    val res = dp.unparse(new ScalaXMLInfosetInputter(infosetXML), out)
-    if (res.isError) throwDiagnostics(res.getDiagnostics)
-    out.toByteArray
-  }
-
-  /**
-   * Compiles testSchema twice - once with useBuildWritePrefetch off, once
-   * with it on (plus any extraTunables) - and unparses infosetXML both
-   * ways. Returns (singlePassBytes, prefetchBytes) for the caller to
-   * assert equality (and any expected-string checks) on.
-   */
-  def getSinglePassAndPrefetchBytes(
-    testSchema: Node,
-    infosetXML: Node,
-    extraTunables: Map[String, String] = Map.empty
-  ): (Array[Byte], Array[Byte]) = {
-    val singlePassDp = compileForUnparse(testSchema, Map("useBuildWritePrefetch" -> "false"))
-    val singlePassBytes = unparseToBytes(singlePassDp, infosetXML)
-
-    val prefetchDp =
-      compileForUnparse(testSchema, extraTunables + ("useBuildWritePrefetch" -> "true"))
-    val prefetchBytes = unparseToBytes(prefetchDp, infosetXML)
-
-    (singlePassBytes, prefetchBytes)
-  }
-
-  /**
-   * Unparses infosetXML single-pass (dp must have releaseUnneededInfoset
-   * disabled, so the built tree survives), then re-walks that tree through
-   * a fresh UState that builds no infoset, via writeContent. Returns (singlePassBytes,
-   * walkerBytes) for the caller to assert equality on.
-   */
-  def getSinglePassAndWriteContentBytes(
-    dp: DataProcessor,
-    infosetXML: Node,
-    prefetchLimit: Long = 1000
-  ): (Array[Byte], Array[Byte]) = {
-    val singlePassOut = new ByteArrayOutputStream()
-    val singlePassResult = dp.unparse(new ScalaXMLInfosetInputter(infosetXML), singlePassOut)
-    if (singlePassResult.isError) throwDiagnostics(singlePassResult.getDiagnostics)
-    val singlePassBytes = singlePassOut.toByteArray
-
-    val ustate = singlePassResult.resultState.asInstanceOf[UStateMain]
-    val builtTree: DIDocument = ustate.documentElement
-
-    val walkerOut = new ByteArrayOutputStream()
-    val writeInputter = newInitializedInputter(infosetXML, dp)
-    val writeState = UState.createInitialUState(walkerOut, dp, writeInputter, false)
-    writeState.getDataOutputStream.setPriorBitOrder(dp.ssrd.elementRuntimeData.defaultBitOrder)
-
-    val sharedCtx = new UnparseSharedContext(
-      new SuspensionTracker(
-        dp.tunables.unparseSuspensionWaitYoung,
-        dp.tunables.unparseSuspensionWaitOld
-      ),
-      dp,
-      dp.tunables,
-      prefetchLimit
-    )
-    writeState.setSharedContext(sharedCtx)
-
-    primeLeadCounter(sharedCtx, builtTree.child(0))
-
-    val rootUnparser = dp.ssrd.unparser.asInstanceOf[ElementUnparserBase]
-    val rootNode = sharedCtx.awaitChild(builtTree, 0)
-    rootUnparser.writeContent(rootNode, writeState)
-    writeState.evalSuspensions(isFinal = true)
-    writeState.getDataOutputStream.setFinished(writeState)
-
-    (singlePassBytes, walkerOut.toByteArray)
-  }
-
-  /**
-   * Pre-increments UnparseSharedContext's lead counter once per element in
-   * node's subtree, for a tree built outside InfosetBuildState (writeContent's
-   * decrementLead call requires the counter already be symmetric).
-   */
-  private def primeLeadCounter(sharedCtx: UnparseSharedContext, node: DINode): Unit =
-    node match {
-      case complex: DIComplex =>
-        sharedCtx.incrementLead()
-        var i = 0
-        while (i < complex.numChildren) {
-          primeLeadCounter(sharedCtx, complex.child(i))
-          i += 1
-        }
-      case array: DIArray =>
-        var i = 0
-        while (i < array.numChildren) {
-          primeLeadCounter(sharedCtx, array.child(i))
-          i += 1
-        }
-      case _ =>
-        sharedCtx.incrementLead()
-    }
 
   private def runSchemaOnRBC(
     testSchema: Node,

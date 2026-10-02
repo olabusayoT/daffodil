@@ -20,7 +20,6 @@ package org.apache.daffodil.runtime1.processors.unparsers
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
 
-import org.apache.daffodil.core.util.TestUtils
 import org.apache.daffodil.lib.util.SchemaUtils
 import org.apache.daffodil.lib.xml.XMLUtils
 import org.apache.daffodil.runtime1.infoset.DIArray
@@ -66,13 +65,13 @@ class TestBuildWriteArrayChoice {
 
     // Single-pass on purpose: this compares the write walker against a real
     // single-pass unparse, which the tunable would otherwise replace.
-    val dp = TestUtils.compileForUnparse(
+    val dp = UnparseSharedContextTestFixture.compileForUnparse(
       sch,
       Map("releaseUnneededInfoset" -> "false", "useBuildWritePrefetch" -> "false")
     )
 
     val (singlePassBytes, walkerBytes) =
-      TestUtils.getSinglePassAndWriteContentBytes(dp, infoset)
+      UnparseSharedContextTestFixture.getSinglePassAndWriteContentBytes(dp, infoset)
 
     assertArrayEquals(singlePassBytes, walkerBytes)
   }
@@ -114,13 +113,13 @@ class TestBuildWriteArrayChoice {
       </ex:row>
 
     // Single-pass on purpose, as in the test above.
-    val dp = TestUtils.compileForUnparse(
+    val dp = UnparseSharedContextTestFixture.compileForUnparse(
       sch,
       Map("releaseUnneededInfoset" -> "false", "useBuildWritePrefetch" -> "false")
     )
 
     val (singlePassBytes, walkerBytes) =
-      TestUtils.getSinglePassAndWriteContentBytes(dp, infoset)
+      UnparseSharedContextTestFixture.getSinglePassAndWriteContentBytes(dp, infoset)
 
     assertEquals("H,a,b,c,X", new String(singlePassBytes, StandardCharsets.US_ASCII))
     assertArrayEquals(singlePassBytes, walkerBytes)
@@ -160,7 +159,7 @@ class TestBuildWriteArrayChoice {
         <typeB>X</typeB>
       </ex:row>
 
-    val dp = TestUtils.compileForUnparse(
+    val dp = UnparseSharedContextTestFixture.compileForUnparse(
       sch,
       Map("releaseUnneededInfoset" -> "false", "useBuildWritePrefetch" -> "true")
     )
@@ -168,7 +167,7 @@ class TestBuildWriteArrayChoice {
     // Build phase: standalone InfosetBuildState drives the actual Unparser recursion,
     // navigating past the sequence's separator and through the
     // array/choice content, purely to build the tree.
-    val buildInputter = TestUtils.newInitializedInputter(infoset, dp)
+    val buildInputter = UnparseSharedContextTestFixture.newInitializedInputter(infoset, dp)
 
     val sharedCtx =
       UnparseSharedContextTestFixture.build(dp, prefetchLimit = 100)()
@@ -189,7 +188,7 @@ class TestBuildWriteArrayChoice {
     // Write phase: write the tree InfosetBuildState just constructed, confirming
     // it's a usable, fully-built tree, not just a navigation exercise.
     val walkerOut = new ByteArrayOutputStream()
-    val writeInputter = TestUtils.newInitializedInputter(infoset, dp)
+    val writeInputter = UnparseSharedContextTestFixture.newInitializedInputter(infoset, dp)
     val writeState = UState.createInitialUState(walkerOut, dp, writeInputter, false)
     writeState.setSharedContext(sharedCtx)
     writeState.getDataOutputStream.setPriorBitOrder(dp.ssrd.elementRuntimeData.defaultBitOrder)
