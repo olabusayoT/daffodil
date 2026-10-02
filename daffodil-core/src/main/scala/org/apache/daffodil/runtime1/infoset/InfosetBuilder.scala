@@ -40,8 +40,8 @@ import org.apache.daffodil.unparsers.runtime1.SequenceChildUnparser
  * layers, padding, specified-length) that sit between them in the
  * Unparser tree.
  *
- * A InfosetBuilder is immutable compiled-schema state shared by every parse. The
- * per-parse position lives in the InfosetBuildFrame it creates, on a InfosetBuildCursor's
+ * An InfosetBuilder is immutable compiled-schema state shared by every unparse. The
+ * per-unparse position lives in the InfosetBuildFrame it creates, on an InfosetBuildCursor's
  * explicit stack, so building can stop after any step and continue later
  * without holding a thread or a JVM call stack.
  */
@@ -56,7 +56,7 @@ trait InfosetBuilder extends Serializable {
 }
 
 /**
- * One InfosetBuilder's in-progress state for one parse. `step` performs one
+ * One InfosetBuilder's in-progress state for one unparse. `step` performs one
  * transition and must either push exactly one child frame onto the cursor
  * (this frame is stepped again once that child pops) or pop itself from the
  * cursor to signal it is complete.
@@ -66,10 +66,10 @@ abstract class InfosetBuildFrame {
 }
 
 /**
- * The explicit stack of BuildFrames that stands in for the call stack of a
+ * The explicit stack of InfosetBuildFrames that stands in for the call stack of a
  * recursive build. `advance` runs it until the lead window is full, so a
  * caller that needs more infoset tree can pull it forward directly. Driven
- * against a `InfosetBuildState`, never a write-side `InfosetTreeState`.
+ * against an `InfosetBuildState`.
  */
 final class InfosetBuildCursor(
   root: InfosetBuilder,

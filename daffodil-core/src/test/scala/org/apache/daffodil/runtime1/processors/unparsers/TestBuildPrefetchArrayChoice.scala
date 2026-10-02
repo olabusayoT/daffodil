@@ -30,14 +30,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 /**
- * Validates write-side dispatch against a single-pass tree, and a
+ * Validates unparse-side dispatch against a single-pass tree, and a
  * standalone InfosetBuildState run, for both scalar and array/choice content.
  */
-class TestBuildWriteArrayChoice {
+class TestBuildPrefetchArrayChoice {
 
   val example = XMLUtils.EXAMPLE_NAMESPACE
 
-  @Test def testWriteWalkerMatchesActualUnparse(): Unit = {
+  @Test def testTreeWalkerMatchesActualUnparse(): Unit = {
     val sch = SchemaUtils.dfdlTestSchema(
       <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
       <dfdl:format ref="tns:GeneralFormat"
@@ -63,20 +63,20 @@ class TestBuildWriteArrayChoice {
         <city>Boston</city>
       </ex:row>
 
-    // Single-pass on purpose: this compares the write walker against a real
+    // Single-pass on purpose: this compares the unparseTree pass against a real
     // single-pass unparse, which the tunable would otherwise replace.
     val dp = UnparseSharedContextTestFixture.compileForUnparse(
       sch,
-      Map("releaseUnneededInfoset" -> "false", "useBuildWritePrefetch" -> "false")
+      Map("releaseUnneededInfoset" -> "false", "useBuildPrefetch" -> "false")
     )
 
-    val (singlePassBytes, walkerBytes) =
-      UnparseSharedContextTestFixture.getSinglePassAndWriteContentBytes(dp, infoset)
+    val (singlePassBytes, unparseTreeBytes) =
+      UnparseSharedContextTestFixture.getSinglePassAndUnparseTreeBytes(dp, infoset)
 
-    assertArrayEquals(singlePassBytes, walkerBytes)
+    assertArrayEquals(singlePassBytes, unparseTreeBytes)
   }
 
-  @Test def testArrayAndChoiceWriteContentMatchesSinglePass(): Unit = {
+  @Test def testArrayAndChoiceUnparseTreeMatchesSinglePass(): Unit = {
     val sch = SchemaUtils.dfdlTestSchema(
       <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
       <dfdl:format ref="tns:GeneralFormat"
@@ -115,18 +115,18 @@ class TestBuildWriteArrayChoice {
     // Single-pass on purpose, as in the test above.
     val dp = UnparseSharedContextTestFixture.compileForUnparse(
       sch,
-      Map("releaseUnneededInfoset" -> "false", "useBuildWritePrefetch" -> "false")
+      Map("releaseUnneededInfoset" -> "false", "useBuildPrefetch" -> "false")
     )
 
-    val (singlePassBytes, walkerBytes) =
-      UnparseSharedContextTestFixture.getSinglePassAndWriteContentBytes(dp, infoset)
+    val (singlePassBytes, unparseTreeBytes) =
+      UnparseSharedContextTestFixture.getSinglePassAndUnparseTreeBytes(dp, infoset)
 
     assertEquals("H,a,b,c,X", new String(singlePassBytes, StandardCharsets.US_ASCII))
-    assertArrayEquals(singlePassBytes, walkerBytes)
+    assertArrayEquals(singlePassBytes, unparseTreeBytes)
   }
 
   // Standalone-build regression: drives InfosetBuildState directly, then feeds
-  // its tree into write's writeContent (end-to-end build-then-write).
+  // its tree to unparseTree (end-to-end build-then-unparseTree).
   @Test def testStandaloneBuildStateNavigatesArrayChoiceSeparator(): Unit = {
     val sch = SchemaUtils.dfdlTestSchema(
       <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
@@ -161,19 +161,19 @@ class TestBuildWriteArrayChoice {
 
     val dp = UnparseSharedContextTestFixture.compileForUnparse(
       sch,
-      Map("releaseUnneededInfoset" -> "false", "useBuildWritePrefetch" -> "true")
+      Map("releaseUnneededInfoset" -> "false", "useBuildPrefetch" -> "true")
     )
 
-    // Build phase: standalone InfosetBuildState drives the actual Unparser recursion,
-    // navigating past the sequence's separator and through the
-    // array/choice content, purely to build the tree.
+    // Build pass: an InfosetBuildCursor over the InfosetBuilder tree builds
+    // the whole tree from the inputter, including the array and choice content.
     val buildInputter = UnparseSharedContextTestFixture.newInitializedInputter(infoset, dp)
 
     val sharedCtx =
       UnparseSharedContextTestFixture.build(dp, prefetchLimit = 100)()
-    val buildState = new InfosetBuildState(buildInputter, sharedCtx, areDebugging = false)
+    val infosetBuildState =
+      new InfosetBuildState(buildInputter, sharedCtx, areDebugging = false)
 
-    new InfosetBuildCursor(dp.ssrd.builder, buildState, sharedCtx).runToCompletion()
+    new InfosetBuildCursor(dp.ssrd.builder, infosetBuildState, sharedCtx).runToCompletion()
 
     // row, header, item x3, typeB = 6 elements total.
     assertEquals(6L, sharedCtx.currentLead)
@@ -185,24 +185,28 @@ class TestBuildWriteArrayChoice {
     assertEquals(3, rootNode.child(1).asInstanceOf[DIArray].numChildren)
     assertEquals("typeB", rootNode.child(2).erd.name)
 
-    // Write phase: write the tree InfosetBuildState just constructed, confirming
+    // unparseTree pass: unparse the tree InfosetBuildState just constructed, confirming
     // it's a usable, fully-built tree, not just a navigation exercise.
-    val walkerOut = new ByteArrayOutputStream()
-    val writeInputter = UnparseSharedContextTestFixture.newInitializedInputter(infoset, dp)
-    val writeState = UState.createInitialUState(walkerOut, dp, writeInputter, false)
-    writeState.setSharedContext(sharedCtx)
-    writeState.getDataOutputStream.setPriorBitOrder(dp.ssrd.elementRuntimeData.defaultBitOrder)
+    val unparseTreeOut = new ByteArrayOutputStream()
+    val unparseTreeInputter =
+      UnparseSharedContextTestFixture.newInitializedInputter(infoset, dp)
+    val unparseTreeState =
+      UState.createInitialUState(unparseTreeOut, dp, unparseTreeInputter, false)
+    unparseTreeState.setSharedContext(sharedCtx)
+    unparseTreeState.getDataOutputStream.setPriorBitOrder(
+      dp.ssrd.elementRuntimeData.defaultBitOrder
+    )
 
     val rootUnparser = dp.ssrd.unparser.asInstanceOf[ElementUnparserBase]
-    val rootWriteNode = sharedCtx.awaitChild(buildInputter.documentElement, 0)
-    rootUnparser.writeContent(rootWriteNode, writeState)
+    val rootTreeNode = sharedCtx.awaitChild(buildInputter.documentElement, 0)
+    rootUnparser.unparseTree(rootTreeNode, unparseTreeState)
     // The separator (default separatorSuppressionPolicy "anyEmpty") is
     // written speculatively via a suspension that decides, once known,
     // whether the region it precedes is zero-length; drain that chain
     // before the DOS is finalized.
-    writeState.evalSuspensions(isFinal = true)
-    writeState.getDataOutputStream.setFinished(writeState)
+    unparseTreeState.evalSuspensions(isFinal = true)
+    unparseTreeState.getDataOutputStream.setFinished(unparseTreeState)
 
-    assertEquals("H,a,b,c,X", new String(walkerOut.toByteArray, StandardCharsets.US_ASCII))
+    assertEquals("H,a,b,c,X", new String(unparseTreeOut.toByteArray, StandardCharsets.US_ASCII))
   }
 }

@@ -59,8 +59,9 @@ class SuspensionTracker(suspensionWaitYoung: Int, suspensionWaitOld: Int) {
   /**
    * Same cadence as evalSuspensions, but a suspension whose
    * canResolveWithoutWriting is false is skipped and requeued instead of
-   * genuinely attempted, since it is usually unresolvable against a no-op
-   * sink; it stays pending for a later unfiltered sweep.
+   * genuinely attempted, since it usually cannot resolve until unparseTree
+   * has written the bytes it needs; it stays pending for a later unfiltered
+   * sweep.
    */
   def evalBuildResolvableSuspensions(): Unit =
     evalSuspensionsThrottled(buildResolvableOnly = true)

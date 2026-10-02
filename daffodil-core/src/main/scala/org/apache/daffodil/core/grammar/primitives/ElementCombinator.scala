@@ -158,7 +158,7 @@ class ElementCombinator(
   private lazy val eRepTypeBuilder: InfosetBuilder = repTypeElementGram.builder
 
   // Shares the memoized unparser above for unparseBegin/unparseEnd, so
-  // build and write see identical node-creation behavior.
+  // build and unparseTree see identical node-creation behavior.
   override lazy val builder: InfosetBuilder = {
     if (context.isOutputValueCalc || isSpecifiedLength) {
       val eu = unparser.asInstanceOf[ElementUnparserBase]
@@ -401,7 +401,7 @@ class ElementParseAndUnspecifiedLength(
   }
 
   // Shares the memoized unparser above for unparseBegin/unparseEnd, so
-  // build and write see identical nilled/OVC/IVC node-creation behavior.
+  // build and unparseTree see identical nilled/OVC/IVC node-creation behavior.
   override lazy val builder: InfosetBuilder = {
     val eu = unparser.asInstanceOf[ElementUnparserBase]
     val contentBuilder = eRepTypeBuilder.orElse(eBuilder)

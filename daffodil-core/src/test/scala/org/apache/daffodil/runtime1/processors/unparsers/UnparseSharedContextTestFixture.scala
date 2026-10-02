@@ -35,7 +35,7 @@ import org.apache.daffodil.unparsers.runtime1.ElementUnparserBase
 
 /**
  * Shared InfosetBuildState construction for tests. The default suspension-wait
- * thresholds are doubled, since one tracker serves both build and write.
+ * thresholds are doubled, since one tracker serves both build and unparseTree.
  */
 object UnparseSharedContextTestFixture {
   def build(dp: DataProcessor, prefetchLimit: Long)(
@@ -82,10 +82,10 @@ object UnparseSharedContextTestFixture {
   /**
    * Unparses infosetXML in a single pass (dp must have releaseUnneededInfoset
    * disabled, so the built tree survives), then re-walks that tree through
-   * a fresh UState that builds no infoset, via writeContent. Returns
-   * (singlePassBytes, walkerBytes) for the caller to assert equality on.
+   * a fresh UState that builds no infoset, via unparseTree. Returns
+   * (singlePassBytes, unparseTreeBytes) for the caller to assert equality on.
    */
-  def getSinglePassAndWriteContentBytes(
+  def getSinglePassAndUnparseTreeBytes(
     dp: DataProcessor,
     infosetXML: Node,
     prefetchLimit: Long = 1000
@@ -98,10 +98,13 @@ object UnparseSharedContextTestFixture {
     val ustate = singlePassResult.resultState.asInstanceOf[UStateMain]
     val builtTree: DIDocument = ustate.documentElement
 
-    val walkerOut = new ByteArrayOutputStream()
-    val writeInputter = newInitializedInputter(infosetXML, dp)
-    val writeState = UState.createInitialUState(walkerOut, dp, writeInputter, false)
-    writeState.getDataOutputStream.setPriorBitOrder(dp.ssrd.elementRuntimeData.defaultBitOrder)
+    val unparseTreeOut = new ByteArrayOutputStream()
+    val unparseTreeInputter = newInitializedInputter(infosetXML, dp)
+    val unparseTreeState =
+      UState.createInitialUState(unparseTreeOut, dp, unparseTreeInputter, false)
+    unparseTreeState.getDataOutputStream.setPriorBitOrder(
+      dp.ssrd.elementRuntimeData.defaultBitOrder
+    )
 
     val sharedCtx = new UnparseSharedContext(
       new SuspensionTracker(
@@ -112,22 +115,22 @@ object UnparseSharedContextTestFixture {
       dp.tunables,
       prefetchLimit
     )
-    writeState.setSharedContext(sharedCtx)
+    unparseTreeState.setSharedContext(sharedCtx)
 
     primeLeadCounter(sharedCtx, builtTree.child(0))
 
     val rootUnparser = dp.ssrd.unparser.asInstanceOf[ElementUnparserBase]
     val rootNode = sharedCtx.awaitChild(builtTree, 0)
-    rootUnparser.writeContent(rootNode, writeState)
-    writeState.evalSuspensions(isFinal = true)
-    writeState.getDataOutputStream.setFinished(writeState)
+    rootUnparser.unparseTree(rootNode, unparseTreeState)
+    unparseTreeState.evalSuspensions(isFinal = true)
+    unparseTreeState.getDataOutputStream.setFinished(unparseTreeState)
 
-    (singlePassBytes, walkerOut.toByteArray)
+    (singlePassBytes, unparseTreeOut.toByteArray)
   }
 
   /**
    * Pre-increments UnparseSharedContext's lead counter once per element in
-   * node's subtree, for a tree built outside InfosetBuildState (writeContent's
+   * node's subtree, for a tree built outside InfosetBuildState (unparseTree's
    * decrementLead call requires the counter already be symmetric).
    */
   private def primeLeadCounter(sharedCtx: UnparseSharedContext, node: DINode): Unit =

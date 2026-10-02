@@ -1334,7 +1334,7 @@ final class DIArray(
 
   final def freeChildIfNoLongerNeeded(index: Int, doFree: Boolean): Unit = {
     val node = _contents(index)
-    // A null slot means write already freed it before build's redundant
+    // A null slot means unparseTree already freed it before build's redundant
     // call arrived, and build never frees (doFree=false); a doFree=true
     // call hitting null is a real bug.
     if (node == null) {
@@ -1832,7 +1832,7 @@ sealed class DIComplex(override val erd: ElementRuntimeData)
 
   def freeChildIfNoLongerNeeded(index: Int, doFree: Boolean): Unit = {
     val node = child(index)
-    // A null slot means write already freed it before build's redundant
+    // A null slot means unparseTree already freed it before build's redundant
     // call arrived, and build never frees (doFree=false); a doFree=true
     // call hitting null is a real bug.
     if (node == null) {

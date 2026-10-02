@@ -25,14 +25,14 @@ import org.apache.daffodil.runtime1.processors.DataProcessor
 import org.apache.daffodil.runtime1.processors.SuspensionTracker
 
 /**
- * What build and write genuinely need to share by reference: the
+ * What build and unparseTree genuinely need to share by reference: the
  * `SuspensionTracker` (one queue; build opportunistically resolves
- * write-created suspensions early against the tree it has already
- * built, and write drains whatever remains at the end).
+ * unparseTree-created suspensions early against the tree it has already
+ * built, and unparseTree drains whatever remains at the end).
  *
- * Also owns the lead counter: how far build is ahead of write,
+ * Also owns the lead counter: how far build is ahead of unparseTree,
  * incremented once per node build constructs and decremented once per
- * node write finishes. Write pulls build forward through `buildCursor`
+ * node unparseTree finishes. unparseTree pulls build forward through `buildCursor`
  * whenever it needs tree that does not exist yet; build stops advancing
  * once `leadExceedsPrefetchLimit` or the pending-suspension backlog
  * exceeds `pendingSuspensionTripLimit` (below), bounding how far ahead
@@ -62,8 +62,8 @@ final class UnparseSharedContext(
   def currentLead: Long = buildLead
 
   /**
-   * The highest the lead has ever been, across build and write together.
-   * The lead only rises as build adds nodes and only falls as write
+   * The highest the lead has ever been, across build and unparseTree together.
+   * The lead only rises as build adds nodes and only falls as unparseTree
    * finishes them, so this is the peak over a whole run.
    */
   def peakLead: Long = peakLead_
@@ -71,7 +71,7 @@ final class UnparseSharedContext(
   def leadExceedsPrefetchLimit: Boolean = buildLead > prefetchLimit
 
   /**
-   * A second, independent limit on how far build may run ahead of write,
+   * A second, independent limit on how far build may run ahead of unparseTree,
    * alongside prefetchLimit: a suspension can be created without moving
    * the lead counter, so the lead alone doesn't bound how many pile up
    * pending.
@@ -83,7 +83,7 @@ final class UnparseSharedContext(
   def setBuildCursor(bc: InfosetBuildCursor): Unit = buildCursor_ = bc
 
   /**
-   * Called from write when suspensions pile up faster than write's own
+   * Called from unparseTree when suspensions pile up faster than unparseTree's own
    * progress resolves them: builds a little further ahead, which gives the
    * build-side sweeps more tree to resolve them against. Does nothing once
    * the lead window is already full or build has finished.
@@ -98,10 +98,10 @@ final class UnparseSharedContext(
   }
 
   /**
-   * True if `child` may safely be written now: complex/array existing is
+   * True if `child` may safely be unparsed now: complex/array existing is
    * enough; simple needs a value, except hidden/nilled elements (never
    * given one) and OVC (deferred via its own Suspension; must not block,
-   * or an OVC depending on a later sibling's write-time property would deadlock).
+   * or an OVC depending on a later sibling's unparseTree-time property would deadlock).
    */
   private def isChildReady(child: DINode): Boolean = {
     if (child.isSimple) {
@@ -114,12 +114,12 @@ final class UnparseSharedContext(
   }
 
   /**
-   * One attempt at unblocking write: advances build if it is unfinished,
+   * One attempt at unblocking unparseTree: advances build if it is unfinished,
    * else retries suspensions. False means no progress was made, so callers
    * must throw AwaitChildStalledException; the final suspension sweep
    * gives the real diagnosis.
    */
-  private def tryUnblockWrite(): Boolean = {
+  private def tryUnblockUnparseTree(): Boolean = {
     if (buildCursor_ != null && !buildCursor_.isFinished) {
       buildCursor_.advance()
       true
@@ -137,7 +137,7 @@ final class UnparseSharedContext(
    */
   def awaitChild(parent: DINode, index: Int): DINode = {
     while (index >= parent.numChildren || !isChildReady(parent.child(index))) {
-      if (!tryUnblockWrite()) throw new AwaitChildStalledException
+      if (!tryUnblockUnparseTree()) throw new AwaitChildStalledException
     }
     parent.child(index)
   }
@@ -151,14 +151,14 @@ final class UnparseSharedContext(
   def childExistsOrFinal(parent: DINode, index: Int): Boolean = {
     while (index >= parent.numChildren) {
       if (parent.isFinal) return false
-      if (!tryUnblockWrite()) throw new AwaitChildStalledException
+      if (!tryUnblockUnparseTree()) throw new AwaitChildStalledException
     }
     true
   }
 }
 
 /**
- * Thrown when write can make no further progress after build has
+ * Thrown when unparseTree can make no further progress after build has
  * finished and an unthrottled suspension retry made no headway. Caught
  * only by the top-level driver, which still runs its normal
  * finalization (the genuine, diagnostic-producing final suspension
@@ -167,7 +167,7 @@ final class UnparseSharedContext(
 final class AwaitChildStalledException extends Exception
 
 /**
- * Thrown from inside write's recursion when advancing build failed; the
+ * Thrown from inside unparseTree's recursion when advancing build failed; the
  * original build failure is the cause. Caught only by the top-level
  * driver, which skips its own normal finalization entirely (those
  * invariants and the final suspension drain assume a consistently,

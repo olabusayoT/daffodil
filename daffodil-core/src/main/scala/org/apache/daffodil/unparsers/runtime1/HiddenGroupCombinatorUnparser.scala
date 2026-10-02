@@ -32,7 +32,7 @@ import org.apache.daffodil.runtime1.processors.unparsers.*
  */
 class HiddenGroupCombinatorUnparser(ctxt: ModelGroupRuntimeData, bodyUnparser: Unparser)
   extends CombinatorUnparser(ctxt)
-  with WriteUnparser {
+  with TreeUnparser {
 
   override def childProcessors = Vector(bodyUnparser)
 
@@ -51,7 +51,7 @@ class HiddenGroupCombinatorUnparser(ctxt: ModelGroupRuntimeData, bodyUnparser: U
     }
   }
 
-  override def writeContent(containerNode: DINode, start: UState): Unit =
+  override def unparseTree(containerNode: DINode, start: UState): Unit =
     run(One(containerNode), start)
 
   def unparse(start: UState): Unit = run(Nope, start)

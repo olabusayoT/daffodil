@@ -17,8 +17,8 @@
 -->
 
 <tdml:testSuite
-  suiteName="buildWritePrefetch"
-  description="Unparse tests whose output must not depend on whether the build/write prefetch path is used. Run the suite with DAFFODIL_TDML_TUNABLES=useBuildWritePrefetch=false and =true."
+  suiteName="buildPrefetch"
+  description="Unparse tests whose output must not depend on whether the build-prefetch path is used. Run the suite with DAFFODIL_TDML_TUNABLES=useBuildPrefetch=false and =true."
   xmlns:tdml="http://www.ibm.com/xmlns/dfdl/testData"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xmlns:dfdl="http://www.ogf.org/dfdl/dfdl-1.0/"
@@ -222,7 +222,7 @@
     </tdml:document>
   </tdml:unparserTestCase>
 
-  <!-- A choice branch with zero tree footprint (absent optional element) must still write its own initiator, or write's dispatch can hang. -->
+  <!-- A choice branch with zero tree footprint (absent optional element) must still unparse its own initiator, or unparse's dispatch can hang. -->
   <tdml:defineSchema name="s_choiceBranchWithAbsentOptionalElement" elementFormDefault="unqualified">
     <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>
     <dfdl:format ref="ex:GeneralFormat"
@@ -335,7 +335,7 @@
     <tdml:document>i0,i1,i2,i3,i4,i5,i6,i7,i8,i9,i10,i11</tdml:document>
   </tdml:unparserTestCase>
 
-  <!-- A bare nested xs:sequence has no tree node of its own; the enclosing writeContent must not advance/free a tree-child position recursing into it. -->
+  <!-- A bare nested xs:sequence has no tree node of its own; the enclosing unparseTree must not advance/free a tree-child position recursing into it. -->
   <tdml:defineSchema name="s_nestedBareSequence" elementFormDefault="unqualified">
     <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>
     <dfdl:format ref="ex:GeneralFormat"
@@ -371,7 +371,7 @@
     <tdml:document>B,I1I2,A</tdml:document>
   </tdml:unparserTestCase>
 
-  <!-- A fixed-length choice must pad unused space after a shorter branch, not just write the branch content. -->
+  <!-- A fixed-length choice must pad unused space after a shorter branch, not just unparse the branch content. -->
   <tdml:defineSchema name="s_fixedLengthChoicePadding" elementFormDefault="unqualified">
     <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>
     <dfdl:format ref="ex:GeneralFormat"
@@ -400,7 +400,7 @@
     </tdml:document>
   </tdml:unparserTestCase>
 
-  <!-- A hidden group's elements never get hasValue=true; write's dispatch must special-case that instead of blocking on it forever. -->
+  <!-- A hidden group's elements never get hasValue=true; unparse's dispatch must special-case that instead of blocking on it forever. -->
   <tdml:defineSchema name="s_hiddenGroup" elementFormDefault="unqualified">
     <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>
     <dfdl:format ref="ex:GeneralFormat"
@@ -796,7 +796,7 @@
     <tdml:document>05hello</tdml:document>
   </tdml:unparserTestCase>
 
-  <!-- A prefixed-length element with complex (not simple) content, so write's dispatch must recurse into the wrapped content unparser. -->
+  <!-- A prefixed-length element with complex (not simple) content, so unparse's dispatch must recurse into the wrapped content unparser. -->
   <tdml:defineSchema name="s_prefixedLengthComplexContent" elementFormDefault="unqualified">
     <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>
     <dfdl:format ref="ex:GeneralFormat"
@@ -882,7 +882,7 @@
     <tdml:document>122</tdml:document>
   </tdml:unparserTestCase>
 
-  <!-- A large array that build finishes entirely before write starts, so write never has to wait for more tree. -->
+  <!-- A large array that build finishes entirely before unparse starts, so unparse never has to wait for more tree. -->
   <tdml:defineSchema name="s_ovcCountOfPrecedingArrayAfterBuildFullyFinishes" elementFormDefault="unqualified">
     <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>
     <dfdl:format ref="ex:GeneralFormat"
@@ -1289,7 +1289,7 @@
     </tdml:document>
   </tdml:unparserTestCase>
 
-  <!-- A variable-length dfdl:length expression inside a separated sequence must also call computeTargetLength from write's dispatch. -->
+  <!-- A variable-length dfdl:length expression inside a separated sequence must also call computeTargetLength from unparse's dispatch. -->
   <tdml:defineSchema name="s_delimitedVariableLengthExpression" elementFormDefault="unqualified">
     <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>
     <dfdl:format ref="ex:GeneralFormat"

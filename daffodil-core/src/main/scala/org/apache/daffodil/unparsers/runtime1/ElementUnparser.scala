@@ -67,25 +67,6 @@ sealed trait RepMoveMixin {
 }
 
 /**
- * The build-side hookup for bounded lookahead: called once per node, only
- * from the InfosetBuilder tree (via unparseBeginForBuild below), never from
- * write's or single-pass's own unparseBegin call. Increments the shared
- * lead counter; InfosetBuildCursor.advance is what stops building once the
- * counter exceeds the prefetch limit.
- */
-private object BuildWriteLeadHookup {
-
-  /**
-   * Must be called after unparseBegin, not unparseEnd: an ancestor's
-   * increment must happen before any descendant's content is built, or
-   * write finishing that ancestor first would underflow the counter.
-   */
-  def afterNodeAdded(state: InfosetTreeState): Unit = {
-    state.sharedContext.get.incrementLead()
-  }
-}
-
-/**
  * The unparser used for an element that has inputValueCalc.
  *
  * The only thing we do is move over one child element, because the
@@ -147,7 +128,7 @@ sealed abstract class ElementUnparserBase(
 ) extends CombinatorUnparser(erd)
   with RepMoveMixin
   with ElementUnparserStartEndStrategy
-  with WriteUnparser {
+  with TreeUnparser {
 
   final override def childProcessors =
     (eBeforeUnparser.toList ++ eUnparser.toList ++ eAfterUnparser.toList ++ eRepTypeUnparser.toList ++ setVarUnparsers.toList).toVector
@@ -195,7 +176,7 @@ sealed abstract class ElementUnparserBase(
   /**
    * Registers the suspensions this element's content depends on
    * (dfdl:length, dfdl:outputValueCalc) before content bytes are written.
-   * No-op by default. writeContent calls it unconditionally, before its
+   * No-op by default. unparseTree calls it unconditionally, before its
    * group-unparser check, so wrapped elements don't skip it.
    */
   private[runtime1] def contentSetup(state: UState): Unit = ()
@@ -216,7 +197,7 @@ sealed abstract class ElementUnparserBase(
   private def dispatchForUnparse(s: UState): Unit = {
     // Push the TermRuntimeData of the complex type's model-group (simple
     // types have none). Only unparse's event-driven dispatch needs it, to
-    // resolve a raw event's tag name; writeContent never consumes events.
+    // resolve a raw event's tag name; unparseTree never consumes events.
     if (erd.isComplexType) {
       s.pushTRD(erd.optComplexTypeModelGroupRuntimeData.get)
     }
@@ -228,14 +209,14 @@ sealed abstract class ElementUnparserBase(
     }
   }
 
-  private def dispatchForWrite(containerNode: DINode, s: UState): Unit = {
+  private def dispatchForTree(containerNode: DINode, s: UState): Unit = {
     contentSetup(s)
     // A repType'd element's raw eUnparser can itself be group-wrapped, so
     // eRepTypeUnparser takes priority: without this check the raw content
     // would be written instead of the repType conversion.
     if (eRepTypeUnparser.isEmpty && eUnparser.isDefined) {
       eUnparser.get match {
-        case wu: WriteUnparser => wu.writeContent1(containerNode, s)
+        case tu: TreeUnparser => tu.unparseTree1(containerNode, s)
         case _ => dispatchContentUnparser(s)
       }
     } else {
@@ -244,10 +225,10 @@ sealed abstract class ElementUnparserBase(
   }
 
   /**
-   * The steps common to writeContent and unparse: before-content, content
+   * The steps common to unparseTree and unparse: before-content, content
    * dispatch, after-content, and setVariables. A Nope containerNode selects
-   * unparse's event-driven dispatch; a One selects writeContent's, which
-   * reaches a nested group's own writeContent.
+   * unparse's event-driven dispatch; a One selects unparseTree's, which
+   * reaches a nested group's own unparseTree.
    */
   private[runtime1] def runElementContent(state: UState, containerNode: Maybe[DINode]): Unit = {
     captureRuntimeValuedExpressionValues(state)
@@ -255,19 +236,19 @@ sealed abstract class ElementUnparserBase(
     if (containerNode.isEmpty) {
       dispatchForUnparse(state)
     } else {
-      dispatchForWrite(containerNode.get, state)
+      dispatchForTree(containerNode.get, state)
     }
     doAfterContentUnparser(state)
     computeSetVariables(state)
   }
 
   /**
-   * Writes this element's content against an already-built
+   * Unparses this element's content against an already-built
    * `containerNode`, without consuming any InfosetInputter events:
    * dispatches to whatever `eUnparser` turns out to be, a group
-   * unparser or a plain simple-element value-writer.
+   * unparser or a plain simple-element value unparser.
    */
-  override def writeContent(containerNode: DINode, state: UState): Unit = {
+  override def unparseTree(containerNode: DINode, state: UState): Unit = {
     if (state.areDebugging) state.dataProc.value.startElement(state, this)
     state.currentInfosetNodeStack.push(One(containerNode))
     state.childIndexStack.push(0L)
@@ -284,12 +265,12 @@ sealed abstract class ElementUnparserBase(
       if (containerNode.isSimple && !containerNode.isFinal && containerNode.asSimple.hasValue) {
         containerNode.setFinal()
       }
-      // Write-side half of the shared lead counter, decremented once per
+      // The unparseTree half of the shared lead counter, decremented once per
       // node; no-op unless this UState has a shared context.
       if (state.sharedContext.isDefined) {
         state.sharedContext.get.decrementLead()
       }
-      // Content/value-length suspensions can only unblock once write has
+      // Content/value-length suspensions can only unblock once unparseTree has
       // actually written the bytes, so this must run here too, not just
       // build's unparseEnd, or they pile up unresolved until the final
       // isFinal=true call instead of resolving as data becomes available.
@@ -438,7 +419,7 @@ class ElementOVCSpecifiedLengthUnparserSuspendableExpression(
     diSimple.setDataValue(v)
     // Do NOT setFinal here: a chained retry for this value's own
     // conversion may still be pending, and finalizing now would trip
-    // that retry's own not-yet-final assertion; writeContent's own
+    // that retry's own not-yet-final assertion; unparseTree's own
     // hasValue-guarded setFinal covers the synchronous common case.
   }
 
@@ -497,7 +478,7 @@ sealed trait ElementUnparserStartEndStrategy {
 
   /**
    * Restores prior context. Consumes end-element event. A freshly-built
-   * simple node has no value yet (write still has to set it), so isBuild
+   * simple node has no value yet (unparseTree still has to set it), so isBuild
    * defers finalizing it; a complex/array node is always final here.
    */
   def unparseEnd(state: InfosetTreeState, isBuild: Boolean): Unit
@@ -509,7 +490,10 @@ sealed trait ElementUnparserStartEndStrategy {
    */
   final def unparseBeginForBuild(state: InfosetTreeState): Unit = {
     unparseBegin(state)
-    BuildWriteLeadHookup.afterNodeAdded(state)
+    // Counted after unparseBegin, not unparseEnd: an ancestor's increment must
+    // precede any descendant's, or unparseTree finishing the ancestor first
+    // would underflow the counter.
+    state.sharedContext.get.incrementLead()
   }
   final def unparseEndForBuild(state: InfosetTreeState): Unit =
     unparseEnd(state, isBuild = true)
@@ -659,7 +643,7 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
       // cur is finished: mark it final and free via its container (not
       // parent, so an array-member frees from the array), except hidden
       // IVC elements (never get a value) and, for build, SIMPLE elements
-      // (write still needs to set their actual value afterward).
+      // (unparseTree still needs to set their actual value afterward).
       if (
         (!state.withinHiddenNest || erd.isRepresented) &&
         !(isBuild && cur.isSimple)

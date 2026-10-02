@@ -22,31 +22,30 @@ import org.apache.daffodil.runtime1.infoset.DINode
 import org.apache.daffodil.runtime1.processors.unparsers.*
 
 /**
- * Write-side dispatch for the build/write-prefetch unparse path, by
- * ordinary recursive calls, using `UnparseSharedContext.awaitChild` to
- * advance build wherever a needed child doesn't yet exist or isn't ready.
+ * An unparser that unparses from an already-built infoset tree by recursing
+ * into it, instead of consuming infoset events. Where a needed child does
+ * not exist yet or is not ready, `UnparseSharedContext.awaitChild` advances
+ * build until it is.
  */
-trait WriteUnparser { self: Unparser =>
+trait TreeUnparser { self: Unparser =>
 
-  // Writes containerNode's content via direct recursive calls - "where we
-  // are" is just the JVM call stack, not a return-value state machine. May
-  // advance build (via awaitChild) until a needed child exists and is
-  // ready, then continues where it left off.
-  def writeContent(containerNode: DINode, state: UState): Unit
+  // Unparses containerNode's content from the built tree. Looking up a child
+  // may advance build until that child exists and is ready.
+  def unparseTree(containerNode: DINode, state: UState): Unit
 
   /**
-   * writeContent, preceded and followed by the debugger events that unparse1
-   * fires around an unparser. Callers use this, not writeContent, so a
+   * unparseTree, preceded and followed by the debugger events that unparse1
+   * fires around an unparser. Callers use this, not unparseTree, so a
    * debugger sees the same steps as in a single-pass unparse.
    */
-  final def writeContent1(containerNode: DINode, state: UState): Unit =
+  final def unparseTree1(containerNode: DINode, state: UState): Unit =
     withDebuggerEvents(self, state) {
-      writeContent(containerNode, state)
+      unparseTree(containerNode, state)
     }
 
   /**
    * Runs body between the debugger events unparse1 fires around an
-   * unparser. For the write loops that run a sequence's child unparser
+   * unparser. For the unparseTree loops that run a sequence's child unparser
    * inline, where unparse1 is never called on it. Inline, so the normal path
    * pays only a flag test.
    */
@@ -66,10 +65,10 @@ trait WriteUnparser { self: Unparser =>
     }
   }
 
-  // The body dispatch shared by unparse() and writeContent() of a
-  // combinator that wraps one body unparser. A Nope containerNode means
-  // unparse's event-driven path; otherwise bodyUnparser is dispatched to
-  // writeContent if it's a WriteUnparser, else plain unparse1.
+  // The body dispatch shared by unparse and unparseTree of a combinator that
+  // wraps one body unparser. Nope means event-driven unparse; otherwise the
+  // body runs through its own unparseTree1 if it is a TreeUnparser, else
+  // through unparse1.
   protected final def dispatchBody(
     containerNode: Maybe[DINode],
     bodyUnparser: Unparser,
@@ -79,7 +78,7 @@ trait WriteUnparser { self: Unparser =>
       bodyUnparser.unparse1(state)
     } else {
       bodyUnparser match {
-        case wu: WriteUnparser => wu.writeContent1(containerNode.get, state)
+        case tu: TreeUnparser => tu.unparseTree1(containerNode.get, state)
         case _ => bodyUnparser.unparse1(state)
       }
     }

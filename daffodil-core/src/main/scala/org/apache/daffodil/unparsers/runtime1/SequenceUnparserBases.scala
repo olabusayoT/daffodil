@@ -37,7 +37,7 @@ abstract class OrderedSequenceUnparserBase(
 
   protected final def isGroupTerm(cu: SequenceChildUnparser): Boolean =
     !cu.childUnparser.isInstanceOf[ElementUnparserBase] &&
-      cu.childUnparser.isInstanceOf[WriteUnparser]
+      cu.childUnparser.isInstanceOf[TreeUnparser]
 
   // A nested bare group (e.g. a choice) may resolve to a branch with no
   // infoset footprint at all; once build is done and no child showed up, the

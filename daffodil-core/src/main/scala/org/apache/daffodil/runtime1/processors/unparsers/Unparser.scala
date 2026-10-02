@@ -22,7 +22,7 @@ import org.apache.daffodil.lib.util.Maybe.*
 import org.apache.daffodil.runtime1.dsom.RuntimeSchemaDefinitionError
 import org.apache.daffodil.runtime1.infoset.DINode
 import org.apache.daffodil.runtime1.processors.*
-import org.apache.daffodil.unparsers.runtime1.WriteUnparser
+import org.apache.daffodil.unparsers.runtime1.TreeUnparser
 
 sealed trait Unparser extends Processor {
 
@@ -153,7 +153,7 @@ final class ErrorUnparser(override val context: TermRuntimeData = null)
 final class SeqCompUnparser(context: RuntimeData, val childUnparsers: Array[Unparser])
   extends CombinatorUnparser(context)
   with ToBriefXMLImpl
-  with WriteUnparser {
+  with TreeUnparser {
 
   override val runtimeDependencies = Array()
 
@@ -170,17 +170,16 @@ final class SeqCompUnparser(context: RuntimeData, val childUnparsers: Array[Unpa
   }
 
   /**
-   * SeqCompUnparser can wrap any `WriteUnparser` (sequence/choice/
-   * hidden-group/delimiter-stack) alongside plain prims: a `WriteUnparser`
-   * recurses into its own writeContent; everything else (a bare element
-   * never appears here directly, only wrapped by one) runs via unparse1.
+   * A child that is a `TreeUnparser` unparses the same container through its
+   * own unparseTree1; every other child (a delimiter or value unparser, for
+   * example) runs through unparse1 against the current state.
    */
-  override def writeContent(containerNode: DINode, ustate: UState): Unit = {
+  override def unparseTree(containerNode: DINode, ustate: UState): Unit = {
     var i = 0
     while (i < childUnparsers.length) {
       childUnparsers(i) match {
-        case wu: WriteUnparser =>
-          wu.writeContent1(containerNode, ustate)
+        case tu: TreeUnparser =>
+          tu.unparseTree1(containerNode, ustate)
         case cu =>
           cu.unparse1(ustate)
       }

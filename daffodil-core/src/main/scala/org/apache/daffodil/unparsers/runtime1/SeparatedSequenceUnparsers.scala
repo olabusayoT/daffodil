@@ -124,7 +124,7 @@ class OrderedSeparatedSequenceUnparser(
   sep: Unparser,
   childUnparsers: Array[SequenceChildUnparser with Separated]
 ) extends OrderedSequenceUnparserBase(rd)
-  with WriteUnparser {
+  with TreeUnparser {
   // Sequences of nothing (no initiator, no terminator, nothing at all) should
   // have been optimized away
   Assert.invariant(childUnparsers.length > 0)
@@ -134,7 +134,7 @@ class OrderedSeparatedSequenceUnparser(
   override def childProcessors = childUnparsers.toVector
 
   /**
-   * In-flight separator-suppression state for one writeContent call:
+   * In-flight separator-suppression state for one unparseTree call:
    * whether any term has already written something (`wroteAny`), whichever
    * separator is currently deferred pending its term's content
    * (`pendingPostfixSeparatorAtTerm` for ssp Never,
@@ -168,7 +168,7 @@ class OrderedSeparatedSequenceUnparser(
      * missing occurrence. Other policies decide via content length
      * instead; irrelevant here.
      */
-    def writeExtraSeparatorsIfNeverSuppressed(
+    def unparseMissingOccurrenceSeparatorsForTree(
       rep: RepeatingChildUnparser,
       numOccurrences: Long
     ): Unit = {
@@ -200,7 +200,7 @@ class OrderedSeparatedSequenceUnparser(
      * or a later term shifts position. stacksAlreadyPushed: true only right
      * after an actual occurrence loop already positioned the stacks.
      */
-    def writePositionallyRequiredSepsIfSuppressed(
+    def unparsePositionalMissingSeparatorsForTree(
       rep: RepeatingChildUnparser with Separated,
       numOccurrences: Long,
       stacksAlreadyPushed: Boolean
@@ -330,9 +330,9 @@ class OrderedSeparatedSequenceUnparser(
     // separators, like an actual occurrence loop's own end-of-term handling.
     def zeroOccurrences(rep: RepeatingChildUnparser with Separated): Unit = {
       if (ssp eq Never) {
-        writeExtraSeparatorsIfNeverSuppressed(rep, 0)
+        unparseMissingOccurrenceSeparatorsForTree(rep, 0)
       } else {
-        writePositionallyRequiredSepsIfSuppressed(rep, 0, stacksAlreadyPushed = false)
+        unparsePositionalMissingSeparatorsForTree(rep, 0, stacksAlreadyPushed = false)
       }
     }
 
@@ -351,11 +351,11 @@ class OrderedSeparatedSequenceUnparser(
 
   /**
    * Walks childUnparsers positionally against an already-built
-   * containerNode, writing each term's content/separator per spos; blocks
+   * containerNode, unparsing each term's content/separator per spos; blocks
    * via childExistsOrFinal/awaitChild wherever a needed child isn't ready.
    * childIndexStack.top tracks position (an array is ONE slot).
    */
-  override def writeContent(containerNode: DINode, state: UState): Unit = {
+  override def unparseTree(containerNode: DINode, state: UState): Unit = {
     val sharedCtx = state.sharedContext.get
     val complex = containerNode.asComplex
     val sepState = new SeparatorSuppressionState(state)
@@ -365,10 +365,10 @@ class OrderedSeparatedSequenceUnparser(
       childUnparsers(index) match {
         case rep: RepeatingChildUnparser =>
           val repSep = rep.asInstanceOf[RepeatingChildUnparser with Separated]
-          writeRepeatingTerm(repSep, complex, sharedCtx, state, sepState)
+          unparseRepeatingTermForTree(repSep, complex, sharedCtx, state, sepState)
         case cu =>
           withDebuggerEvents(cu, state) {
-            writeRequiredTerm(cu, complex, sharedCtx, state, sepState)
+            unparseRequiredTermForTree(cu, complex, sharedCtx, state, sepState)
           }
       }
       index += 1
@@ -378,10 +378,10 @@ class OrderedSeparatedSequenceUnparser(
   }
 
   /**
-   * Writes an array/optional term: its occurrences if it produced any,
+   * Unparses an array/optional term: its occurrences if it produced any,
    * otherwise its zero-occurrences separator bookkeeping.
    */
-  private def writeRepeatingTerm(
+  private def unparseRepeatingTermForTree(
     rep: RepeatingChildUnparser with Separated,
     complex: DIComplex,
     sharedCtx: UnparseSharedContext,
@@ -392,16 +392,24 @@ class OrderedSeparatedSequenceUnparser(
     if (hasOccurrences(rep, complex, idx, sharedCtx)) {
       complex.child(idx) match {
         case arrayNode: DIArray =>
-          writeArrayOccurrences(rep, arrayNode, complex, idx, sharedCtx, state, sepState)
+          unparseArrayOccurrencesForTree(
+            rep,
+            arrayNode,
+            complex,
+            idx,
+            sharedCtx,
+            state,
+            sepState
+          )
         case _ =>
-          writeScalarOptionalOccurrence(rep, complex, idx, sharedCtx, state, sepState)
+          unparseScalarOptionalOccurrenceForTree(rep, complex, idx, sharedCtx, state, sepState)
       }
     } else {
       sepState.zeroOccurrences(rep)
     }
   }
 
-  private def writeArrayOccurrences(
+  private def unparseArrayOccurrencesForTree(
     rep: RepeatingChildUnparser with Separated,
     arrayNode: DIArray,
     complex: DIComplex,
@@ -418,7 +426,7 @@ class OrderedSeparatedSequenceUnparser(
       var arrayOcc = 0
       while (sharedCtx.childExistsOrFinal(arrayNode, arrayOcc)) {
         val occNode = sharedCtx.awaitChild(arrayNode, arrayOcc)
-        writeOccurrence(rep, occNode, state, sepState)
+        unparseOccurrenceForTree(rep, occNode, state, sepState)
         arrayNode.freeChildIfNoLongerNeeded(arrayOcc, state.releaseUnneededInfoset)
         arrayOcc += 1
         state.moveOverOneArrayIterationIndexOnly()
@@ -437,7 +445,7 @@ class OrderedSeparatedSequenceUnparser(
   // A scalar optional is still a RepeatingChildUnparser, just one that can
   // never hold more than one occurrence, so it pushes the same occurrence
   // indices a true array does.
-  private def writeScalarOptionalOccurrence(
+  private def unparseScalarOptionalOccurrenceForTree(
     rep: RepeatingChildUnparser with Separated,
     complex: DIComplex,
     idx: Int,
@@ -448,7 +456,7 @@ class OrderedSeparatedSequenceUnparser(
     val readyChild = sharedCtx.awaitChild(complex, idx)
     state.pushOccurrenceIndices()
     try {
-      writeOccurrence(rep, readyChild, state, sepState)
+      unparseOccurrenceForTree(rep, readyChild, state, sepState)
       state.moveOverOneElementChildOnly()
       complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
       // occursIndexStack.top must reflect the next (missing) occurrence's
@@ -464,7 +472,7 @@ class OrderedSeparatedSequenceUnparser(
 
   // Postfix's separator comes after the occurrence's content;
   // afterSeparator runs once it's written.
-  private def writeOccurrence(
+  private def unparseOccurrenceForTree(
     rep: RepeatingChildUnparser with Separated,
     occNode: DINode,
     state: UState,
@@ -472,7 +480,7 @@ class OrderedSeparatedSequenceUnparser(
   ): Unit = {
     sepState.beforeSeparator(rep.erd, rep.isKnownStaticallyNotToSuppressSeparator)
     withDebuggerEvents(rep, state) {
-      rep.childUnparser.asInstanceOf[ElementUnparserBase].writeContent1(occNode, state)
+      rep.childUnparser.asInstanceOf[ElementUnparserBase].unparseTree1(occNode, state)
     }
     sepState.afterSeparator()
   }
@@ -483,9 +491,9 @@ class OrderedSeparatedSequenceUnparser(
     sepState: SeparatorSuppressionState
   ): Unit = {
     if (ssp eq Never) {
-      sepState.writeExtraSeparatorsIfNeverSuppressed(rep, occurrences)
+      sepState.unparseMissingOccurrenceSeparatorsForTree(rep, occurrences)
     } else {
-      sepState.writePositionallyRequiredSepsIfSuppressed(
+      sepState.unparsePositionalMissingSeparatorsForTree(
         rep,
         occurrences,
         stacksAlreadyPushed = true
@@ -494,11 +502,11 @@ class OrderedSeparatedSequenceUnparser(
   }
 
   /**
-   * Writes a required term (exactly one occurrence): a simple/complex
+   * Unparses a required term (exactly one occurrence): a simple/complex
    * element, a nested bare group, or a statement-only term with no tree
    * child of its own. Includes its own separator bookkeeping if represented.
    */
-  private def writeRequiredTerm(
+  private def unparseRequiredTermForTree(
     cu: SequenceChildUnparser with Separated,
     complex: DIComplex,
     sharedCtx: UnparseSharedContext,
@@ -513,20 +521,19 @@ class OrderedSeparatedSequenceUnparser(
       case nvi: NewVariableInstanceEndUnparser =>
         nvi.unparse1(state)
       case align: AlignmentPrimUnparser =>
-        writeAlignmentTerm(cu, align, state, sepState)
-      case statementOnly if !statementOnly.isInstanceOf[WriteUnparser] =>
+        unparseAlignmentTermForTree(cu, align, state, sepState)
+      case statementOnly if !statementOnly.isInstanceOf[TreeUnparser] =>
         // No tree child, so no separator, and nothing to wait on.
         ()
       case _ =>
-        writeElementOrGroupTerm(cu, complex, sharedCtx, state, sepState)
+        unparseElementOrGroupTermForTree(cu, complex, sharedCtx, state, sepState)
     }
   }
 
   // Padding has no non-idempotent side effect (unlike assert/discriminator),
-  // so re-running it here is required, not forbidden: build's own traversal
-  // only ran it against build's no-op-sink DOS. Always represented, and
-  // never suppressible since its content is deterministic.
-  private def writeAlignmentTerm(
+  // so running it here is safe, and the build pass skips it. Always
+  // represented, and never suppressible since its content is deterministic.
+  private def unparseAlignmentTermForTree(
     cu: SequenceChildUnparser with Separated,
     align: AlignmentPrimUnparser,
     state: UState,
@@ -541,7 +548,7 @@ class OrderedSeparatedSequenceUnparser(
     }
   }
 
-  private def writeElementOrGroupTerm(
+  private def unparseElementOrGroupTermForTree(
     cu: SequenceChildUnparser with Separated,
     complex: DIComplex,
     sharedCtx: UnparseSharedContext,
@@ -561,12 +568,12 @@ class OrderedSeparatedSequenceUnparser(
     }
     cu.childUnparser match {
       case elemUnp: ElementUnparserBase =>
-        elemUnp.writeContent1(complex.child(idx), state)
+        elemUnp.unparseTree1(complex.child(idx), state)
         sepState.afterSeparator()
         state.moveOverOneElementChildOnly()
         complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
-      case wu: WriteUnparser =>
-        wu.writeContent1(complex, state)
+      case tu: TreeUnparser =>
+        tu.unparseTree1(complex, state)
         sepState.afterSeparator()
       case other =>
         Assert.usageError(s"unhandled sequence term unparser type: $other")

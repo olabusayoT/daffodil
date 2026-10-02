@@ -534,14 +534,14 @@
             </xs:documentation>
           </xs:annotation>
         </xs:element>
-        <xs:element name="useBuildWritePrefetch" type="xs:boolean" default="true" minOccurs="0">
+        <xs:element name="useBuildPrefetch" type="xs:boolean" default="true" minOccurs="0">
           <xs:annotation>
             <xs:documentation>
-              If true (the default), unparsing uses a build/write-prefetch path for
-              every schema: a build pass runs ahead of a write pass over the same
+              If true (the default), unparsing uses a build-prefetch path for
+              every schema: a build pass runs ahead of an unparse pass over the same
               infoset tree, resolving forward references against the tree directly
               instead of via Suspensions where possible. How far build may run
-              ahead of write is bounded by unparsePrefetchWindowNodes. If false,
+              ahead of unparse is bounded by unparsePrefetchWindowNodes. If false,
               unparsing is a single pass.
             </xs:documentation>
           </xs:annotation>
@@ -549,9 +549,9 @@
         <xs:element name="unparsePrefetchWindowNodes" type="xs:long" default="1000" minOccurs="0">
           <xs:annotation>
             <xs:documentation>
-              Only consulted when useBuildWritePrefetch is true. The maximum
-              number of infoset nodes build may construct ahead of write before
-              build pauses to let write catch up. Bounds peak memory use to
+              Only consulted when useBuildPrefetch is true. The maximum
+              number of infoset nodes build may construct ahead of unparse before
+              build pauses to let unparse catch up. Bounds peak memory use to
               roughly this many infoset nodes rather than the whole infoset.
             </xs:documentation>
           </xs:annotation>
@@ -559,21 +559,21 @@
         <xs:element name="unparsePendingSuspensionTripLimit" type="xs:long" default="500" minOccurs="0">
           <xs:annotation>
             <xs:documentation>
-              Only consulted when useBuildWritePrefetch is true. A second,
-              independent limit on how far build may run ahead of write,
+              Only consulted when useBuildPrefetch is true. A second,
+              independent limit on how far build may run ahead of unparse,
               alongside unparsePrefetchWindowNodes: the maximum number of
               pending suspensions (forward references that cannot resolve
-              until write itself writes the referenced bytes, e.g.
+              until unparse itself writes the referenced bytes, e.g.
               dfdl:valueLength/dfdl:contentLength) build may accumulate
-              before it pauses to let write catch up, regardless of how
+              before it pauses to let unparse catch up, regardless of how
               large unparsePrefetchWindowNodes is set. Without this,
               unparsePrefetchWindowNodes alone does not bound this
               backlog, since a node's lead-counter contribution is
-              released once write's structural pass reaches it, whether or
+              released once unparse's structural pass reaches it, whether or
               not that node's own suspension has resolved yet, so a large
               window can otherwise let many resolved-but-still-
               pending nodes accumulate unboundedly before anything
-              forces write to actually catch up to what they're
+              forces unparse to actually catch up to what they're
               waiting on.
             </xs:documentation>
           </xs:annotation>
@@ -688,9 +688,9 @@
               evaluating suspensions that are likely to fail. The
               unparseSuspensionWaitYoung and unparseSuspensionWaitOld
               values determine how many elements are unparsed before evaluating
-              young and old suspensions, respectively. When useBuildWritePrefetch
+              young and old suspensions, respectively. When useBuildPrefetch
               is true, both values are used internally at double what is
-              configured here, since build and write independently advance this
+              configured here, since build and unparse independently advance this
               same counter, so it would otherwise tick twice as fast as a single
               traversal.
             </xs:documentation>

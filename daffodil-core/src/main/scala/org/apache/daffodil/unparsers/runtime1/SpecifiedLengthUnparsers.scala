@@ -38,7 +38,7 @@ final class SpecifiedLengthExplicitImplicitUnparser(
   erd: ElementRuntimeData,
   targetLengthInBitsEv: UnparseTargetLengthInBitsEv
 ) extends CombinatorUnparser(erd)
-  with WriteUnparser {
+  with TreeUnparser {
 
   override val runtimeDependencies = Array()
 
@@ -77,11 +77,9 @@ final class SpecifiedLengthExplicitImplicitUnparser(
     eUnparser.unparse1(state)
   }
 
-  // Without this, a SeqCompUnparser wrapping this class would treat
-  // eUnparser as a synchronous call via its generic fallback, but
-  // eUnparser can itself be a resumable group unparser expecting live
-  // InfosetInputter events, desyncing build's event stream entirely.
-  override def writeContent(containerNode: DINode, state: UState): Unit = {
+  // Tree counterpart of unparse: eUnparser unparses from the already-built
+  // containerNode, through its own unparseTree if it has one, else unparse1.
+  override def unparseTree(containerNode: DINode, state: UState): Unit = {
     checkVariableWidthComplexType(state)
     dispatchBody(One(containerNode), eUnparser, state)
   }
@@ -155,7 +153,7 @@ class SpecifiedLengthPrefixedUnparser(
   override val prefixedLengthAdjustmentInUnits: Long
 ) extends CombinatorUnparser(erd)
   with CalculatedPrefixedLengthUnparserMixin
-  with WriteUnparser {
+  with TreeUnparser {
 
   override val runtimeDependencies = Array()
 
@@ -166,12 +164,14 @@ class SpecifiedLengthPrefixedUnparser(
     try {
       dispatchBody(containerNode, eUnparser, state)
     } finally {
+      // Event-driven unparse finds the element on the state; tree unparse is
+      // handed it as containerNode.
       if (containerNode.isEmpty) {
         resolvePrefixLength(state, state.currentInfosetNode.asInstanceOf[DIElement], plElem)
       } else {
-        // resolvePrefixLength (via assignPrefixLength/suspension.run)
-        // expects state.processor to already be set, normally done by
-        // Unparser.unparse1, which this recursive-dispatch path bypasses.
+        // resolvePrefixLength runs a suspension that reads state.processor,
+        // which unparse1 normally sets; unparseTree is not reached through
+        // unparse1, so set it here.
         state.setProcessor(this)
         resolvePrefixLength(state, containerNode.get.asInstanceOf[DIElement], plElem)
       }
@@ -180,11 +180,9 @@ class SpecifiedLengthPrefixedUnparser(
 
   override def unparse(state: UState): Unit = run(Nope, state)
 
-  // Without this, WriteUnparser dispatch (a plain recursive-dispatch
-  // fallback for a group-wrapped eUnparser) would call eUnparser.unparse1
-  // synchronously, but it can itself be a resumable group unparser
-  // expecting live InfosetInputter events.
-  override def writeContent(containerNode: DINode, state: UState): Unit =
+  // Tree counterpart of unparse: eUnparser unparses from the already-built
+  // containerNode, through its own unparseTree if it has one, else unparse1.
+  override def unparseTree(containerNode: DINode, state: UState): Unit =
     run(One(containerNode), state)
 
   private def pushDetachedPrefixLengthElement(state: UState): DISimple = {

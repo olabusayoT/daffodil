@@ -22,12 +22,12 @@ import org.apache.daffodil.junit.tdml.TdmlTests
 
 import org.junit.Test
 
-object TestBuildWritePrefetch extends TdmlSuite {
-  val tdmlResource = "/org/apache/daffodil/unparser/buildWritePrefetch.tdml"
+object TestBuildPrefetch extends TdmlSuite {
+  val tdmlResource = "/org/apache/daffodil/unparser/buildPrefetch.tdml"
 }
 
-class TestBuildWritePrefetch extends TdmlTests {
-  val tdmlSuite = TestBuildWritePrefetch
+class TestBuildPrefetch extends TdmlTests {
+  val tdmlSuite = TestBuildPrefetch
 
   @Test def ovcSuspension = test
   @Test def arrayChoiceSeparator = test

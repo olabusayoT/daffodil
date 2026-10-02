@@ -33,14 +33,14 @@ import org.apache.daffodil.runtime1.processors.SuspensionTracker
 import org.apache.daffodil.runtime1.processors.TermRuntimeData
 
 /**
- * The "build" side of the build/write unparse split: it walks the infoset
+ * The "build" side of the build/unparseTree split: it walks the infoset
  * events from an actual `InfosetInputter` and builds the infoset tree ahead
- * of the write pass. It needs only the tree state, so it is not a `UState`:
+ * of unparseTree. It needs only the tree state, so it is not a `UState`:
  * it has no output stream, variables or debugger state, and build never
  * writes content.
  *
- * Used only when the `useBuildWritePrefetch` tunable is enabled; otherwise
- * unparsing constructs `UStateMain` exclusively as before.
+ * Used only when the `useBuildPrefetch` tunable is enabled; otherwise
+ * only `UStateMain` is constructed.
  */
 final class InfosetBuildState(
   private val inputter: InfosetInputter,
@@ -95,15 +95,15 @@ final class InfosetBuildState(
   override def decrementHiddenDef(): Unit = hiddenDepth -= 1
   override def withinHiddenNest: Boolean = hiddenDepth > 0
 
-  // Build runs ahead of write, so freeing a node here would null out a
-  // child reference write hasn't read yet; write still frees as normal.
+  // Build runs ahead of unparseTree, so freeing a node here would null out a
+  // child reference unparseTree hasn't read yet; unparseTree still frees as normal.
   override def releaseUnneededInfoset: Boolean = false
 
   override def sharedContext: Maybe[UnparseSharedContext] = One(sharedCtx)
 
   override def maybeCurrentLocation: Maybe[DataLocation] = Nope
 
-  // Shared, not owned; one SuspensionTracker queue, both build and write
+  // Shared, not owned; one SuspensionTracker queue, both build and unparseTree
   // see the same one via sharedCtx.
   def suspensionTracker: SuspensionTracker = sharedCtx.suspensionTracker
 
@@ -115,7 +115,7 @@ final class InfosetBuildState(
    */
   def evalSuspensions(isFinal: Boolean): Unit = {
     // A debugger needs suspensions to resolve at the steps a single-pass
-    // unparse would resolve them, which only write's sweeps give it.
+    // unparse would resolve them, which only unparseTree's sweeps give it.
     if (!areDebugging) sharedCtx.suspensionTracker.evalBuildResolvableSuspensions()
     if (isFinal) sharedCtx.suspensionTracker.requireFinal()
   }

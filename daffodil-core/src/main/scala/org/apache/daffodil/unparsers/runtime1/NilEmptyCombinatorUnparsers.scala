@@ -55,7 +55,7 @@ case class ComplexNilOrContentUnparser(
   nilUnparser: Unparser,
   contentUnparser: Unparser
 ) extends CombinatorUnparser(ctxt)
-  with WriteUnparser {
+  with TreeUnparser {
 
   override val runtimeDependencies = Array()
 
@@ -69,9 +69,8 @@ case class ComplexNilOrContentUnparser(
     chooseBodyUnparser(state.currentInfosetNode).unparse1(state)
   }
 
-  // Without this override, dispatch would call contentUnparser.unparse1
-  // synchronously on write's state, but it can itself be a group unparser
-  // expecting live InfosetInputter events that don't exist yet.
-  override def writeContent(containerNode: DINode, state: UState): Unit =
+  // Without this override, dispatch would call contentUnparser.unparse1,
+  // which reads infoset events that unparseTree never consumes.
+  override def unparseTree(containerNode: DINode, state: UState): Unit =
     dispatchBody(One(containerNode), chooseBodyUnparser(containerNode), state)
 }

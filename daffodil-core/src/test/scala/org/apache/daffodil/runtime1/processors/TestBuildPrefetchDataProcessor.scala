@@ -30,13 +30,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 /**
- * Checks when the build/write prefetch path is in use for a compiled schema
+ * Checks when the build-prefetch path is in use for a compiled schema
  * (a non-empty builder), and how DataProcessor.unparse behaves when it cannot
  * start. Whether unparse output is the same with and without prefetch is
- * covered by buildWritePrefetch.tdml, run with DAFFODIL_TDML_TUNABLES set to
- * each value of useBuildWritePrefetch.
+ * covered by buildPrefetch.tdml, run with DAFFODIL_TDML_TUNABLES set to
+ * each value of useBuildPrefetch.
  */
-class TestBuildWritePrefetchDataProcessor {
+class TestBuildPrefetchDataProcessor {
 
   val example = XMLUtils.EXAMPLE_NAMESPACE
 
@@ -51,7 +51,7 @@ class TestBuildWritePrefetchDataProcessor {
   // a failed UnparseResult, not an NPE from a null error-path state.
   @Test def testMalformedInfosetInputterGetsCleanErrorNotNPE(): Unit = {
     // Needs prefetch in use (the tunable on), or DataProcessor.unparse takes
-    // single-pass and unparseViaBuildThenWrite (the method under test) would
+    // single-pass and unparseWithPrefetch (the method under test) would
     // never run.
     val sch = SchemaUtils.dfdlTestSchema(
       <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
@@ -72,7 +72,7 @@ class TestBuildWritePrefetchDataProcessor {
       elementFormDefault = "unqualified"
     )
     val dp = Compiler()
-      .withTunable("useBuildWritePrefetch", "true")
+      .withTunable("useBuildPrefetch", "true")
       .compileNode(sch)
       .onPath("/")
       .asInstanceOf[DataProcessor]
@@ -121,7 +121,7 @@ class TestBuildWritePrefetchDataProcessor {
       elementFormDefault = "unqualified"
     )
     val dp = Compiler()
-      .withTunable("useBuildWritePrefetch", "true")
+      .withTunable("useBuildPrefetch", "true")
       .compileNode(sch)
       .onPath("/")
       .asInstanceOf[DataProcessor]
@@ -153,7 +153,7 @@ class TestBuildWritePrefetchDataProcessor {
       elementFormDefault = "unqualified"
     )
     val dp = Compiler()
-      .withTunable("useBuildWritePrefetch", "true")
+      .withTunable("useBuildPrefetch", "true")
       .compileNode(sch)
       .onPath("/")
       .asInstanceOf[DataProcessor]
@@ -185,7 +185,7 @@ class TestBuildWritePrefetchDataProcessor {
       elementFormDefault = "unqualified"
     )
     val dp = Compiler()
-      .withTunable("useBuildWritePrefetch", "false")
+      .withTunable("useBuildPrefetch", "false")
       .compileNode(sch)
       .onPath("/")
       .asInstanceOf[DataProcessor]
@@ -217,7 +217,7 @@ class TestBuildWritePrefetchDataProcessor {
       elementFormDefault = "unqualified"
     )
     val dp = Compiler()
-      .withTunable("useBuildWritePrefetch", "true")
+      .withTunable("useBuildPrefetch", "true")
       .compileNode(sch)
       .onPath("/")
       .asInstanceOf[DataProcessor]

@@ -175,8 +175,8 @@ abstract class UState(
 
   // A dfdl:occursIndex() expression in an occurrence's own content reads
   // arrayIterationIndexStack/occursIndexStack's top, which must track the
-  // occurrence currently being unparsed; both build and write push/pop
-  // this pair identically around each array/optional occurrence group.
+  // occurrence currently being unparsed; the build pass pushes the same pair
+  // directly around each array/optional occurrence group.
   final def pushOccurrenceIndices(): Unit = {
     arrayIterationIndexStack.push(1L)
     occursIndexStack.push(1L)
@@ -441,9 +441,8 @@ abstract class UState(
 
   def documentElement: DIDocument
 
-  // Build must never free infoset nodes: build runs ahead of write, so
-  // freeing one would null out a child reference write hasn't read yet.
-  // Write still frees as normal once done with a node.
+  // Whether a node is freed once it is done with. False for the build side,
+  // which runs ahead of unparseTree and would free children not yet read.
   def releaseUnneededInfoset: Boolean
 
   def delimitedParseResult = Nope
@@ -453,10 +452,8 @@ abstract class UState(
   // savedUstate, even after it's been cloned off for suspension.
   def suspensionTracker: SuspensionTracker
 
-  // Optional reference to the shared build/write lead counter. Defaults
-  // unset (a no-op for every existing call site); only InfosetBuildState sets it
-  // (in its constructor), and only a write-side UState that opts in (via
-  // setSharedContext) reads it.
+  // The context shared with the build side when unparsing with prefetch; Nope
+  // for a single-pass unparse, which has no build side.
   private var sharedContextMaybe: Maybe[UnparseSharedContext] = Nope
   final def setSharedContext(ctx: UnparseSharedContext): Unit = sharedContextMaybe = One(ctx)
   final def sharedContext: Maybe[UnparseSharedContext] = sharedContextMaybe
@@ -730,7 +727,7 @@ final private class SuspendedDelimiterEscapePositionState(
 }
 
 /**
- * Mixed in by a `UState` that creates `Suspension`s, which only write does:
+ * Mixed in by a `UState` that creates `Suspension`s, which only unparse does:
  * `UStateMain`.
  */
 trait SuspensionCapableUState extends SuspensionResolver {
@@ -776,8 +773,7 @@ final class UStateForSuspension(
     delimiterEscapePosition
   ) {
 
-  // Always a live write-side UState, since InfosetBuildState never creates a
-  // suspension to clone off of.
+  // Follows the main state this suspension state was cloned from.
   override def releaseUnneededInfoset: Boolean = mainUState.releaseUnneededInfoset
 
   _dataOutputStream = dataOutputStream

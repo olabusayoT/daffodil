@@ -38,17 +38,16 @@ class LayeredSequenceUnparser(
   }
 
   // Same setup/teardown as unparse() below, via withLayerTransform. Without
-  // this override, write-side dispatch would treat this as a plain
-  // WriteUnparser (inherited), bypassing the layer transform entirely: raw
+  // this override, unparseTree-side dispatch would treat this as a plain
+  // TreeUnparser (inherited), bypassing the layer transform entirely: raw
   // bytes, no compression/checksum, no layer error handling.
-  override def writeContent(containerNode: DINode, state: UState): Unit = {
-    // Needed for the same reason as ChoiceCombinatorUnparser's writeContent:
-    // setFinished/cloneForSuspension reach state.bitOrder/state.processor,
-    // normally set by Unparser.unparse1's wrapper, which this
-    // recursive-dispatch code bypasses.
+  override def unparseTree(containerNode: DINode, state: UState): Unit = {
+    // Needed because setFinished/cloneForSuspension reach
+    // state.bitOrder/state.processor, normally set by Unparser.unparse1's
+    // wrapper, which this recursive-dispatch code bypasses.
     state.setProcessor(LayeredSequenceUnparser.this)
     withLayerTransform(state) {
-      LayeredSequenceUnparser.super.writeContent(containerNode, state)
+      LayeredSequenceUnparser.super.unparseTree(containerNode, state)
     }
   }
 
@@ -129,8 +128,8 @@ class LayeredSequenceUnparser(
       // layer stack is potentially still needed, so
       // nothing can be cleaned up at this point.
     } catch {
-      // Pure write-side control-flow signals, unrelated to the layer
-      // itself; rewrapping either would defeat write's own handling
+      // Pure unparseTree-side control-flow signals, unrelated to the layer
+      // itself; rewrapping either would defeat unparseTree's own handling
       // (a stall diagnostic, or build's abort cleanup) with a raw
       // "layer failed" exception.
       case e: AwaitChildStalledException => throw e

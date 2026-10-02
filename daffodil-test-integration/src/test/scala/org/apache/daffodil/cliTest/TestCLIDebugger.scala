@@ -1330,18 +1330,18 @@ class TestCLIDebugger {
 
   /**
    * Tracing an unparse must step through the same unparsers, at the same bit
-   * positions, whether or not the build/write prefetch path is used. The
+   * positions, whether or not the build-prefetch path is used. The
    * trace also shows the infoset, data and diff at each step; those differ
    * in small ways on the prefetch path (the child and group indexes, and
    * nodes built one step ahead), so they are not compared.
    */
   @Test def test_CLI_Tdml_Trace_prefetchUnparseMatchesSinglePass(): Unit = {
     val tdml = path(
-      "daffodil-test/src/test/resources/org/apache/daffodil/unparser/buildWritePrefetch.tdml"
+      "daffodil-test/src/test/resources/org/apache/daffodil/unparser/buildPrefetch.tdml"
     )
 
     def steps(prefetch: Boolean): Seq[String] = {
-      val tunables = Map("DAFFODIL_TDML_TUNABLES" -> s"useBuildWritePrefetch=$prefetch")
+      val tunables = Map("DAFFODIL_TDML_TUNABLES" -> s"useBuildPrefetch=$prefetch")
       var transcript = ""
       runCLI(
         args"test -t $tdml nviScopedVariableWithValueLengthOVC",

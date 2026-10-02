@@ -80,7 +80,7 @@ class ChoiceCombinatorUnparser(
   choiceLengthInBits: MaybeInt
 ) extends CombinatorUnparser(mgrd)
   with ToBriefXMLImpl
-  with WriteUnparser {
+  with TreeUnparser {
   override def nom = "Choice"
 
   override val runtimeDependencies = Array()
@@ -93,7 +93,7 @@ class ChoiceCombinatorUnparser(
    * recurses into it. Manages its own tree-child position and applies the
    * choice-length filling. Visible choices only; hidden ones are below.
    */
-  override def writeContent(containerNode: DINode, state: UState): Unit = {
+  override def unparseTree(containerNode: DINode, state: UState): Unit = {
     val sharedCtx = state.sharedContext.get
     val complex = containerNode.asComplex
     val childIndex = state.childIndexStack.top.toInt
@@ -102,7 +102,9 @@ class ChoiceCombinatorUnparser(
       if (state.withinHiddenNest) {
         // A hidden choice's branch is always the single deterministic
         // default one (DFDL requires its outcome to be schema-determined,
-        // not data-driven), so no key/event peek is needed. The tree child at this position, if any, IS this default branch's own content, not something to skip past.
+        // not data-driven), so no key/event peek is needed. The tree child at
+        // this position, if any, IS this default branch's own content, not
+        // something to skip past.
         val idx = if (sharedCtx.childExistsOrFinal(complex, childIndex)) {
           childIndex
         } else {
@@ -154,9 +156,9 @@ class ChoiceCombinatorUnparser(
     val child = if (resolvedChildIndex >= 0) {
       complex.child(resolvedChildIndex)
     } else {
-      // A resumable group or ChoiceBranchEmptyUnparser needs no tree child,
+      // A TreeUnparser group or ChoiceBranchEmptyUnparser needs no tree child,
       // so null is fine, but the unmapped default can also be a bare
-      // ElementUnparserBase, which DOES need one: writeContent(null, state)
+      // ElementUnparserBase, which DOES need one: unparseTree(null, state)
       // on that would NPE deep inside it instead of failing clearly here.
       if (maybeChildUnparser.get.isInstanceOf[ElementUnparserBase]) {
         Assert.invariantFailed(
@@ -166,21 +168,20 @@ class ChoiceCombinatorUnparser(
       null
     }
 
-    // True when the resolved branch is itself a resumable group, whose own
+    // True when the resolved branch is itself a TreeUnparser group, whose own
     // dispatch already advances/frees its tree positions; this choice must
     // not also advance/free then, or it double-advances past the branch's
     // last child, skipping the following sibling term.
     var innerSelfManagesPosition = false
     withChoiceLengthFiller(state) {
       maybeChildUnparser.get match {
-        case elemUnp: ElementUnparserBase => elemUnp.writeContent1(child, state)
-        case wu: WriteUnparser =>
+        case elemUnp: ElementUnparserBase => elemUnp.unparseTree1(child, state)
+        case tu: TreeUnparser =>
           innerSelfManagesPosition = true
-          wu.writeContent1(containerNode, state)
+          tu.unparseTree1(containerNode, state)
         case emptyUnp: ChoiceBranchEmptyUnparser =>
           // A branch that optimized to nothing (e.g. a sequence containing
-          // only an assert); runs its (no-op) unparse, same as any other
-          // synchronous branch.
+          // only an assert); runs its no-op unparse1.
           emptyUnp.unparse1(state)
         case other =>
           Assert.usageError(s"unhandled choice branch unparser type: $other")
@@ -188,7 +189,8 @@ class ChoiceCombinatorUnparser(
     }
 
     // Nothing to advance/free when the branch had no infoset footprint
-    // (resolvedChildIndex == -1), nor when it's itself a resumable group (innerSelfManagesPosition), which already did so for its own positions.
+    // (resolvedChildIndex == -1), nor when it's itself a TreeUnparser group
+    // (innerSelfManagesPosition), which already did so for its own positions.
     if (resolvedChildIndex >= 0 && !innerSelfManagesPosition) {
       state.moveOverOneElementChildOnly()
       complex.freeChildIfNoLongerNeeded(resolvedChildIndex, state.releaseUnneededInfoset)
@@ -238,7 +240,7 @@ class ChoiceCombinatorUnparser(
   /**
    * Wraps runChosenBranch with the dfdl:choiceLength "unused region"
    * filler (no-op if choiceLengthInBits isn't set). The setProcessor calls
-   * are redundant for unparse() but required for writeContent, which
+   * are redundant for unparse() but required for unparseTree, which
    * bypasses unparse1's own setProcessor.
    */
   private def withChoiceLengthFiller(state: UState)(runChosenBranch: => Unit): Unit = {
@@ -265,11 +267,11 @@ class DelimiterStackUnparser(
   ctxt: TermRuntimeData,
   bodyUnparser: Unparser
 ) extends CombinatorUnparser(ctxt)
-  with WriteUnparser {
+  with TreeUnparser {
 
   /**
    * Pushes the delimiter scope, dispatches the body, and pops only once
-   * the body's own writeContent (if any) returns, since a pending pause
+   * the body's own unparseTree (if any) returns, since a pending pause
    * still needs the stack for separator writing.
    */
   private def run(containerNode: Maybe[DINode], state: UState): Unit = {
@@ -281,7 +283,7 @@ class DelimiterStackUnparser(
     }
   }
 
-  override def writeContent(containerNode: DINode, state: UState): Unit =
+  override def unparseTree(containerNode: DINode, state: UState): Unit =
     run(One(containerNode), state)
 
   override def nom = "DelimiterStack"
@@ -322,7 +324,7 @@ class DynamicEscapeSchemeUnparser(
   ctxt: TermRuntimeData,
   bodyUnparser: Unparser
 ) extends CombinatorUnparser(ctxt)
-  with WriteUnparser {
+  with TreeUnparser {
   override def nom = "EscapeSchemeStack"
 
   override def childProcessors = Vector(bodyUnparser)
@@ -331,7 +333,7 @@ class DynamicEscapeSchemeUnparser(
 
   /**
    * Caches the escape scheme, dispatches the body, and invalidates the
-   * cache only once the body's own writeContent (if any) returns, since a
+   * cache only once the body's own unparseTree (if any) returns, since a
    * pending pause still needs the cache for delimiter writing.
    */
   private def run(containerNode: Maybe[DINode], state: UState): Unit = {
@@ -343,7 +345,7 @@ class DynamicEscapeSchemeUnparser(
     }
   }
 
-  override def writeContent(containerNode: DINode, state: UState): Unit =
+  override def unparseTree(containerNode: DINode, state: UState): Unit =
     run(One(containerNode), state)
 
   def unparse(state: UState): Unit = run(Nope, state)

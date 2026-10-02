@@ -64,7 +64,7 @@ trait SchemaSetRuntime1Mixin {
   }.value
 
   // Not forced eagerly: onPath only references this when
-  // tunable.useBuildWritePrefetch is on (the tunable is fixed at compile
+  // tunable.useBuildPrefetch is on (the tunable is fixed at compile
   // time), so schemas that never enable it never pay to construct the
   // InfosetBuilder tree.
   lazy val builder: InfosetBuilder = LV(Symbol("builder")) {
@@ -104,7 +104,7 @@ trait SchemaSetRuntime1Mixin {
       new SchemaSetRuntimeData(
         parser,
         unparser,
-        if (tunable.useBuildWritePrefetch) builder else NadaInfosetBuilder,
+        if (tunable.useBuildPrefetch) builder else NadaInfosetBuilder,
         root.elementRuntimeData,
         variableMap,
         allLayers,

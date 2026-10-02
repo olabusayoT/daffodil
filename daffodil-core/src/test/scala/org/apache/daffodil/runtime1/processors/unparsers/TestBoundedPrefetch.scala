@@ -29,9 +29,9 @@ import org.junit.Assert.*
 import org.junit.Test
 
 /**
- * Proves build stops to let write catch up: with a small prefetchLimit,
+ * Proves build stops to let unparseTree catch up: with a small prefetchLimit,
  * one advance() leaves the lead counter just past it, and the lead never
- * goes further across the refills write triggers while it runs.
+ * goes further across the refills unparseTree triggers while it runs.
  */
 class TestBoundedPrefetch {
 
@@ -67,7 +67,7 @@ class TestBoundedPrefetch {
 
     val dp = UnparseSharedContextTestFixture.compileForUnparse(
       sch,
-      Map("releaseUnneededInfoset" -> "false", "useBuildWritePrefetch" -> "true")
+      Map("releaseUnneededInfoset" -> "false", "useBuildPrefetch" -> "true")
     )
 
     val buildInputter = UnparseSharedContextTestFixture.newInitializedInputter(infoset, dp)
@@ -75,16 +75,21 @@ class TestBoundedPrefetch {
     val sharedCtx =
       UnparseSharedContextTestFixture.build(dp, prefetchLimit)()
 
-    val walkerOut = new ByteArrayOutputStream()
-    val writeInputter = UnparseSharedContextTestFixture.newInitializedInputter(infoset, dp)
-    val writeState = UState.createInitialUState(walkerOut, dp, writeInputter, false)
-    writeState.setSharedContext(sharedCtx)
-    writeState.getDataOutputStream.setPriorBitOrder(dp.ssrd.elementRuntimeData.defaultBitOrder)
+    val unparseTreeOut = new ByteArrayOutputStream()
+    val unparseTreeInputter =
+      UnparseSharedContextTestFixture.newInitializedInputter(infoset, dp)
+    val unparseTreeState =
+      UState.createInitialUState(unparseTreeOut, dp, unparseTreeInputter, false)
+    unparseTreeState.setSharedContext(sharedCtx)
+    unparseTreeState.getDataOutputStream.setPriorBitOrder(
+      dp.ssrd.elementRuntimeData.defaultBitOrder
+    )
 
     val rootUnparser = dp.ssrd.unparser.asInstanceOf[ElementUnparserBase]
 
-    val buildState = new InfosetBuildState(buildInputter, sharedCtx, areDebugging = false)
-    val cursor = new InfosetBuildCursor(dp.ssrd.builder, buildState, sharedCtx)
+    val infosetBuildState =
+      new InfosetBuildState(buildInputter, sharedCtx, areDebugging = false)
+    val cursor = new InfosetBuildCursor(dp.ssrd.builder, infosetBuildState, sharedCtx)
     sharedCtx.setBuildCursor(cursor)
 
     cursor.advance()
@@ -100,18 +105,21 @@ class TestBoundedPrefetch {
       sharedCtx.currentLead
     )
 
-    // Write pulls the rest of the tree forward as it needs it; confirm the
+    // unparseTree pulls the rest of the tree forward as it needs it; confirm the
     // output is byte-for-byte correct despite having been built across many
     // separate advance() calls rather than a single one-shot build pass.
     val rootNode = sharedCtx.awaitChild(buildInputter.documentElement, 0)
-    rootUnparser.writeContent(rootNode, writeState)
+    rootUnparser.unparseTree(rootNode, unparseTreeState)
     cursor.runToCompletion()
-    writeState.evalSuspensions(isFinal = true)
-    writeState.getDataOutputStream.setFinished(writeState)
+    unparseTreeState.evalSuspensions(isFinal = true)
+    unparseTreeState.getDataOutputStream.setFinished(unparseTreeState)
 
-    assertEquals(expectedBytes, new String(walkerOut.toByteArray, StandardCharsets.US_ASCII))
+    assertEquals(
+      expectedBytes,
+      new String(unparseTreeOut.toByteArray, StandardCharsets.US_ASCII)
+    )
 
-    // Every refill write triggered stopped at the same point, so the lead
+    // Every refill unparseTree triggered stopped at the same point, so the lead
     // never went past one node beyond the window, and did reach it.
     assertEquals(prefetchLimit + 1, sharedCtx.peakLead)
   }

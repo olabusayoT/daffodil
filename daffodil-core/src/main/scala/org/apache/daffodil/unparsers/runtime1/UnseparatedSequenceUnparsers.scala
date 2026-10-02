@@ -60,7 +60,7 @@ class OrderedUnseparatedSequenceUnparser(
   rd: SequenceRuntimeData,
   childUnparsers: Array[SequenceChildUnparser]
 ) extends OrderedSequenceUnparserBase(rd)
-  with WriteUnparser {
+  with TreeUnparser {
 
   // Sequences of nothing (no initiator, no terminator, nothing at all) should
   // have been optimized away
@@ -73,10 +73,10 @@ class OrderedUnseparatedSequenceUnparser(
   /**
    * Walks childUnparsers positionally against an already-built
    * containerNode. Without this override, the outer dispatch's
-   * WriteUnparser check would be false and dispatch would fall through to
+   * TreeUnparser check would be false and dispatch would fall through to
    * event-driven unparse against an untouched inputter.
    */
-  override def writeContent(containerNode: DINode, state: UState): Unit = {
+  override def unparseTree(containerNode: DINode, state: UState): Unit = {
     val sharedCtx = state.sharedContext.get
     val complex = containerNode.asComplex
 
@@ -84,10 +84,10 @@ class OrderedUnseparatedSequenceUnparser(
     while (index < childUnparsers.length) {
       childUnparsers(index) match {
         case rep: RepeatingChildUnparser =>
-          writeRepeatingTerm(rep, complex, sharedCtx, state)
+          unparseRepeatingTermForTree(rep, complex, sharedCtx, state)
         case cu =>
           withDebuggerEvents(cu, state) {
-            writeRequiredTerm(cu, complex, sharedCtx, state)
+            unparseRequiredTermForTree(cu, complex, sharedCtx, state)
           }
       }
       index += 1
@@ -95,11 +95,11 @@ class OrderedUnseparatedSequenceUnparser(
   }
 
   /**
-   * Writes an array/optional term's occurrences, if it produced any;
+   * Unparses an array/optional term's occurrences, if it produced any;
    * nothing to do otherwise. This sequence has no separator bookkeeping to
    * resolve either way.
    */
-  private def writeRepeatingTerm(
+  private def unparseRepeatingTermForTree(
     rep: RepeatingChildUnparser,
     complex: DIComplex,
     sharedCtx: UnparseSharedContext,
@@ -109,14 +109,14 @@ class OrderedUnseparatedSequenceUnparser(
     if (hasOccurrences(rep, complex, idx, sharedCtx)) {
       complex.child(idx) match {
         case arrayNode: DIArray =>
-          writeArrayOccurrences(rep, arrayNode, complex, idx, sharedCtx, state)
+          unparseArrayOccurrencesForTree(rep, arrayNode, complex, idx, sharedCtx, state)
         case _ =>
-          writeScalarOptionalOccurrence(rep, complex, idx, sharedCtx, state)
+          unparseScalarOptionalOccurrenceForTree(rep, complex, idx, sharedCtx, state)
       }
     }
   }
 
-  private def writeArrayOccurrences(
+  private def unparseArrayOccurrencesForTree(
     rep: RepeatingChildUnparser,
     arrayNode: DIArray,
     complex: DIComplex,
@@ -133,7 +133,7 @@ class OrderedUnseparatedSequenceUnparser(
       while (sharedCtx.childExistsOrFinal(arrayNode, arrayOcc)) {
         val occNode = sharedCtx.awaitChild(arrayNode, arrayOcc)
         withDebuggerEvents(rep, state) {
-          rep.childUnparser.asInstanceOf[ElementUnparserBase].writeContent1(occNode, state)
+          rep.childUnparser.asInstanceOf[ElementUnparserBase].unparseTree1(occNode, state)
         }
         arrayNode.freeChildIfNoLongerNeeded(arrayOcc, state.releaseUnneededInfoset)
         arrayOcc += 1
@@ -150,7 +150,7 @@ class OrderedUnseparatedSequenceUnparser(
   // A scalar optional is still a RepeatingChildUnparser, just one that can
   // never hold more than one occurrence, so it pushes the same occurrence
   // indices a true array does.
-  private def writeScalarOptionalOccurrence(
+  private def unparseScalarOptionalOccurrenceForTree(
     rep: RepeatingChildUnparser,
     complex: DIComplex,
     idx: Int,
@@ -161,7 +161,7 @@ class OrderedUnseparatedSequenceUnparser(
     state.pushOccurrenceIndices()
     try {
       withDebuggerEvents(rep, state) {
-        rep.childUnparser.asInstanceOf[ElementUnparserBase].writeContent1(readyChild, state)
+        rep.childUnparser.asInstanceOf[ElementUnparserBase].unparseTree1(readyChild, state)
       }
       state.moveOverOneElementChildOnly()
       complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
@@ -173,10 +173,10 @@ class OrderedUnseparatedSequenceUnparser(
   }
 
   /**
-   * Writes a required term: a simple or complex element, a nested bare
+   * Unparses a required term: a simple or complex element, a nested bare
    * group, or a statement-only term with no tree child of its own.
    */
-  private def writeRequiredTerm(
+  private def unparseRequiredTermForTree(
     cu: SequenceChildUnparser,
     complex: DIComplex,
     sharedCtx: UnparseSharedContext,
@@ -184,9 +184,9 @@ class OrderedUnseparatedSequenceUnparser(
   ): Unit = {
     cu.childUnparser match {
       case elemUnp: ElementUnparserBase =>
-        writeElementTerm(elemUnp, complex, sharedCtx, state)
-      case wu: WriteUnparser =>
-        writeGroupTerm(wu, complex, sharedCtx, state)
+        unparseElementTermForTree(elemUnp, complex, sharedCtx, state)
+      case tu: TreeUnparser =>
+        unparseGroupTermForTree(tu, complex, sharedCtx, state)
       case nvi: NewVariableInstanceStartUnparser =>
         nvi.unparse1(state)
       case sv: SetVariableUnparser =>
@@ -195,9 +195,7 @@ class OrderedUnseparatedSequenceUnparser(
         nvi.unparse1(state)
       case align: AlignmentPrimUnparser =>
         // Padding has no non-idempotent side effect (unlike assert/
-        // discriminator), so re-running it here is required, not
-        // forbidden: build's own traversal only ran it against build's
-        // no-op-sink DOS.
+        // discriminator), and the build pass skips it, so it runs here.
         align.unparse1(state)
       case _ =>
         // No tree child, so nothing to wait on.
@@ -205,9 +203,9 @@ class OrderedUnseparatedSequenceUnparser(
     }
   }
 
-  // A plain scalar element term: await its one tree child, write its
+  // A plain scalar element term: await its one tree child, unparse its
   // content, then advance the element-child position.
-  private def writeElementTerm(
+  private def unparseElementTermForTree(
     elemUnp: ElementUnparserBase,
     complex: DIComplex,
     sharedCtx: UnparseSharedContext,
@@ -215,20 +213,20 @@ class OrderedUnseparatedSequenceUnparser(
   ): Unit = {
     val idx = state.childIndexStack.top.toInt
     awaitRequiredTermChild(isGroupTerm = false, complex, idx, sharedCtx)
-    elemUnp.writeContent1(complex.child(idx), state)
+    elemUnp.unparseTree1(complex.child(idx), state)
     state.moveOverOneElementChildOnly()
     complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
   }
 
-  private def writeGroupTerm(
-    wu: WriteUnparser,
+  private def unparseGroupTermForTree(
+    tu: TreeUnparser,
     complex: DIComplex,
     sharedCtx: UnparseSharedContext,
     state: UState
   ): Unit = {
     val idx = state.childIndexStack.top.toInt
     awaitRequiredTermChild(isGroupTerm = true, complex, idx, sharedCtx)
-    wu.writeContent1(complex, state)
+    tu.unparseTree1(complex, state)
   }
 
   /**

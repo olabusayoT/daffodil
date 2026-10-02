@@ -469,14 +469,14 @@ class DataProcessor(
   def unparse(actualInputter: api.infoset.InfosetInputter, outStream: java.io.OutputStream) = {
     // Prefetch is in use whenever the tunable was on at compile time.
     if (!ssrd.builder.isEmpty) {
-      unparseViaBuildThenWrite(actualInputter, outStream)
+      unparseWithPrefetch(actualInputter, outStream)
     } else {
       unparseSinglePass(actualInputter, outStream)
     }
   }
 
   /**
-   * Shared by unparseViaBuildThenWrite and unparseSinglePass's top-level
+   * Shared by unparseWithPrefetch and unparseSinglePass's top-level
    * catch blocks: maps an exception caught during unparsing to a failed
    * `state` plus its `unparseResult`, or rethrows if it's not one of the
    * known unparse-error categories.
@@ -525,41 +525,42 @@ class DataProcessor(
   }
 
   /**
-   * Build/write-prefetch unparse path (gated on `useBuildWritePrefetch`).
-   * `InfosetBuildState` builds the tree via a `InfosetBuildCursor`, while write recurses
-   * via `writeContent` and advances the cursor whenever it needs tree that
-   * does not exist yet. Everything runs on this one thread.
+   * Unparses with a build pass running ahead of `unparseTree` (gated on
+   * `useBuildPrefetch`). An `InfosetBuildCursor` over `InfosetBuildState`
+   * builds the infoset tree from the inputter's events, and `unparseTree`
+   * walks that tree, advancing the cursor whenever it needs a node that does
+   * not exist yet.
    */
-  private def unparseViaBuildThenWrite(
+  private def unparseWithPrefetch(
     actualInputter: api.infoset.InfosetInputter,
     outStream: java.io.OutputStream
   ): UnparseResult = {
     val rootUnparser = ssrd.unparser
     val inputter = new InfosetInputter(actualInputter)
     val sharedCtx = new UnparseSharedContext(
-      // Shared by build and write, which together tick this tracker at
+      // Shared by build and unparseTree, which together tick this tracker at
       // roughly twice the per-node rate a single traversal would;
       // doubling both thresholds restores the intended sweep density.
-      // Debugging has only write tick it, as a single-pass unparse does.
+      // Debugging has only unparseTree tick it, as a single-pass unparse does.
       new SuspensionTracker(
         tunables.unparseSuspensionWaitYoung * (if (areDebugging) 1 else 2),
         tunables.unparseSuspensionWaitOld * (if (areDebugging) 1 else 2)
       ),
       this,
       tunables,
-      // Debugging builds only what write asks for, so the infoset a debugger
+      // Debugging builds only what unparseTree asks for, so the infoset a debugger
       // shows is what a single-pass unparse would have built by that step.
       prefetchLimit = if (areDebugging) 0L else tunables.unparsePrefetchWindowNodes
     )
 
-    // Lazy so each is created only after the step before it has succeeded,
-    // and never for a run that fails earlier, since each holds an output
-    // stream that must then be cleaned up.
-    lazy val buildState = new InfosetBuildState(inputter, sharedCtx, areDebugging)
+    // Lazy so each is created only after the step before it has succeeded;
+    // unparseTreeState holds the output stream, which must be cleaned up.
+    lazy val infosetBuildState = new InfosetBuildState(inputter, sharedCtx, areDebugging)
     // The root element always has a builder: it is exactly the case that
     // gets ElementInfosetBuilder wrapped around it, regardless of schema content.
-    lazy val cursor = new InfosetBuildCursor(ssrd.builder, buildState, sharedCtx)
-    lazy val writeState = UState.createInitialUState(outStream, this, inputter, areDebugging)
+    lazy val cursor = new InfosetBuildCursor(ssrd.builder, infosetBuildState, sharedCtx)
+    lazy val unparseTreeState =
+      UState.createInitialUState(outStream, this, inputter, areDebugging)
 
     def initBuildSide(): Unit = {
       if (areDebugging) {
@@ -569,26 +570,28 @@ class DataProcessor(
       sharedCtx.setBuildCursor(cursor)
     }
 
-    def initWriteSide(): Unit = {
-      writeState.setSharedContext(sharedCtx)
+    def initUnparseSide(): Unit = {
+      unparseTreeState.setSharedContext(sharedCtx)
       if (areDebugging) {
-        writeState.notifyDebugging(true)
+        unparseTreeState.notifyDebugging(true)
       }
-      init(writeState, rootUnparser)
-      // Forces evaluation of non-constant defineVariable defaults; write
-      // is the side that reads/writes variables here, so it needs this on
-      // its own copy.
-      writeState.initializeVariables()
-      writeState.getDataOutputStream.setPriorBitOrder(ssrd.elementRuntimeData.defaultBitOrder)
+      init(unparseTreeState, rootUnparser)
+      // Forces evaluation of non-constant defineVariable defaults; the
+      // unparseTree side reads and writes variables, so it needs this on its
+      // own copy.
+      unparseTreeState.initializeVariables()
+      unparseTreeState.getDataOutputStream.setPriorBitOrder(
+        ssrd.elementRuntimeData.defaultBitOrder
+      )
     }
 
-    def writeTree(): Unit = {
+    def unparseBuiltTree(): Unit = {
       val rootElemUnp = rootUnparser.asInstanceOf[ElementUnparserBase]
       try {
         val rootNode = sharedCtx.awaitChild(inputter.documentElement, 0)
-        rootElemUnp.writeContent1(rootNode, writeState)
+        rootElemUnp.unparseTree1(rootNode, unparseTreeState)
       } catch {
-        // A genuine deadlock (if any) surfaces via finishWriteSide's
+        // A genuine deadlock (if any) surfaces via finishUnparseSide's
         // own evalSuspensions(isFinal = true) call, which runs regardless
         // of how this try block exits.
         case _: AwaitChildStalledException =>
@@ -596,12 +599,12 @@ class DataProcessor(
     }
 
     // A NotUnparsableUnparser (dfdl:parseUnparsePolicy="parseOnly") can't be
-    // cast to ElementUnparserBase or driven through the build/write split;
+    // cast to ElementUnparserBase or driven through the build/unparseTree split;
     // unparseSinglePass already runs it via unparse1 and gets the correct
     // diagnostic, so reuse that instead of a ClassCastException here.
     rootUnparser match {
       case _: NotUnparsableUnparser => return unparseSinglePass(actualInputter, outStream)
-      case _ => // fall through to the actual build/write-prefetch path below
+      case _ => // fall through to the actual build-prefetch path below
     }
 
     try {
@@ -612,30 +615,30 @@ class DataProcessor(
       // return skips the cleanup below, so it cleans up here.
       case t: Throwable =>
         try {
-          return unparseErrorResult(writeState, t)
+          return unparseErrorResult(unparseTreeState, t)
         } finally {
-          writeState.getDataOutputStream.cleanUp()
+          unparseTreeState.getDataOutputStream.cleanUp()
         }
     }
 
     try {
       initBuildSide()
-      initWriteSide()
-      writeTree()
-      // Write only ever advances build as far as it needs, so build may
+      initUnparseSide()
+      unparseBuiltTree()
+      // unparseTree only ever advances build as far as it needs, so build may
       // still have its trailing end events left to consume.
       cursor.runToCompletion()
-      finishBuildSide(buildState, rootUnparser)
-      finishWriteSide(writeState, rootUnparser)
-      writeState.unparseResult
+      finishBuildSide(infosetBuildState, rootUnparser)
+      finishUnparseSide(unparseTreeState, rootUnparser)
+      unparseTreeState.unparseResult
     } catch {
       // Build has no state of its own to report against, so its failure is
-      // reported against write's. The error carries the location it was
+      // reported against unparseTree's. The error carries the location it was
       // raised at.
-      case b: BuildAbortedException => unparseErrorResult(writeState, b.getCause)
-      case t: Throwable => unparseErrorResult(writeState, t)
+      case b: BuildAbortedException => unparseErrorResult(unparseTreeState, b.getCause)
+      case t: Throwable => unparseErrorResult(unparseTreeState, t)
     } finally {
-      writeState.getDataOutputStream.cleanUp()
+      unparseTreeState.getDataOutputStream.cleanUp()
     }
   }
 
@@ -643,53 +646,55 @@ class DataProcessor(
   // invariants below: one tripping first could mask the real
   // SuspensionDeadlockException diagnostic this ordering exists to
   // surface.
-  private def finishWriteSide(
-    writeState: UState with SuspensionCapableUState,
+  private def finishUnparseSide(
+    unparseTreeState: UState with SuspensionCapableUState,
     rootUnparser: Unparser
   ): Unit = {
-    writeState.setProcessor(rootUnparser)
+    unparseTreeState.setProcessor(rootUnparser)
 
-    // Routed via the shared SuspensionTracker, the SAME one InfosetBuildState
-    // registered into, so both build-side and write-side suspensions
-    // get resolved here.
-    writeState.evalSuspensions(isFinal = true)
+    // Uses the tracker shared through sharedCtx, which build also sweeps, so
+    // every suspension created on the unparseTree side is drained here.
+    unparseTreeState.evalSuspensions(isFinal = true)
 
-    Assert.invariant(writeState.arrayIterationIndexStack.length == 1)
-    Assert.invariant(writeState.occursIndexStack.length == 1)
-    Assert.invariant(writeState.groupIndexStack.length == 1)
-    Assert.invariant(writeState.childIndexStack.length == 1)
-    Assert.invariant(writeState.currentInfosetNodeMaybe.isEmpty)
-    Assert.invariant(writeState.escapeSchemeEVCache.isEmpty)
-    Assert.invariant(writeState.maybeTopTRD().isEmpty)
-    Assert.invariant(!writeState.withinHiddenNest)
+    Assert.invariant(unparseTreeState.arrayIterationIndexStack.length == 1)
+    Assert.invariant(unparseTreeState.occursIndexStack.length == 1)
+    Assert.invariant(unparseTreeState.groupIndexStack.length == 1)
+    Assert.invariant(unparseTreeState.childIndexStack.length == 1)
+    Assert.invariant(unparseTreeState.currentInfosetNodeMaybe.isEmpty)
+    Assert.invariant(unparseTreeState.escapeSchemeEVCache.isEmpty)
+    Assert.invariant(unparseTreeState.maybeTopTRD().isEmpty)
+    Assert.invariant(!unparseTreeState.withinHiddenNest)
 
-    Assert.invariant(!writeState.getDataOutputStream.isFinished)
+    Assert.invariant(!unparseTreeState.getDataOutputStream.isFinished)
     try {
-      writeState.getDataOutputStream.setFinished(writeState)
+      unparseTreeState.getDataOutputStream.setFinished(unparseTreeState)
     } catch {
       case boc: BitOrderChangeException =>
-        writeState.SDE(boc)
+        unparseTreeState.SDE(boc)
       case fio: FileIOException =>
-        writeState.SDE(fio)
+        unparseTreeState.SDE(fio)
     }
   }
 
   // Asserts build's stacks ended up balanced and the inputter has
   // nothing left unconsumed.
-  private def finishBuildSide(buildState: InfosetBuildState, rootUnparser: Unparser): Unit = {
-    buildState.popTRD(rootUnparser.context.asInstanceOf[TermRuntimeData])
+  private def finishBuildSide(
+    infosetBuildState: InfosetBuildState,
+    rootUnparser: Unparser
+  ): Unit = {
+    infosetBuildState.popTRD(rootUnparser.context.asInstanceOf[TermRuntimeData])
 
-    Assert.invariant(buildState.arrayIterationIndexStack.length == 1)
-    Assert.invariant(buildState.occursIndexStack.length == 1)
-    Assert.invariant(buildState.groupIndexStack.length == 1)
-    Assert.invariant(buildState.currentInfosetNodeMaybe.isEmpty)
-    Assert.invariant(buildState.maybeTopTRD().isEmpty)
+    Assert.invariant(infosetBuildState.arrayIterationIndexStack.length == 1)
+    Assert.invariant(infosetBuildState.occursIndexStack.length == 1)
+    Assert.invariant(infosetBuildState.groupIndexStack.length == 1)
+    Assert.invariant(infosetBuildState.currentInfosetNodeMaybe.isEmpty)
+    Assert.invariant(infosetBuildState.maybeTopTRD().isEmpty)
 
-    val remainingEvent = buildState.advanceMaybe
+    val remainingEvent = infosetBuildState.advanceMaybe
     if (remainingEvent.isDefined) {
       UnparseError(
         Nope,
-        buildState.maybeCurrentLocation,
+        infosetBuildState.maybeCurrentLocation,
         "Expected no remaining events, but received %s.",
         remainingEvent.get
       )

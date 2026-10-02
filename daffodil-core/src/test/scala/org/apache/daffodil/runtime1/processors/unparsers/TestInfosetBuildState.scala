@@ -60,7 +60,7 @@ class TestInfosetBuildState {
 
     val dp = UnparseSharedContextTestFixture.compileForUnparse(
       sch,
-      Map("releaseUnneededInfoset" -> "false", "useBuildWritePrefetch" -> "true")
+      Map("releaseUnneededInfoset" -> "false", "useBuildPrefetch" -> "true")
     )
 
     val inputter = UnparseSharedContextTestFixture.newInitializedInputter(infoset, dp)
@@ -69,13 +69,13 @@ class TestInfosetBuildState {
 
     val sharedCtx =
       UnparseSharedContextTestFixture.build(dp, prefetchLimit = 100)()
-    val buildState = new InfosetBuildState(inputter, sharedCtx, areDebugging = false)
+    val infosetBuildState = new InfosetBuildState(inputter, sharedCtx, areDebugging = false)
 
     // Drives through the actual InfosetBuilder frames rather than hand-driven
     // advance() calls, since next-element resolution depends on the TRD
     // push/pop the element frame performs. This schema's separator never
     // reaches InfosetBuildState: the InfosetBuilder tree skips the delimiter-stack wrapper.
-    new InfosetBuildCursor(dp.ssrd.builder, buildState, sharedCtx).runToCompletion()
+    new InfosetBuildCursor(dp.ssrd.builder, infosetBuildState, sharedCtx).runToCompletion()
 
     assertEquals(4L, sharedCtx.currentLead) // row, name, age, city
 
