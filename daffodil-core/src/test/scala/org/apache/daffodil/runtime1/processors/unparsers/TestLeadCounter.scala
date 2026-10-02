@@ -79,7 +79,7 @@ class TestLeadCounter {
     val buildState = new InfosetBuildState(buildInputter, sharedCtx, Nil, false)
 
     assertEquals(0L, sharedCtx.currentLead)
-    new InfosetBuildCursor(dp.ssrd.builder.get, buildState, sharedCtx).runToCompletion()
+    new InfosetBuildCursor(dp.ssrd.builder, buildState, sharedCtx).runToCompletion()
 
     // row itself, name, age, city = 4 elements total, each incrementing
     // once via unparseBegin's actual hookup.

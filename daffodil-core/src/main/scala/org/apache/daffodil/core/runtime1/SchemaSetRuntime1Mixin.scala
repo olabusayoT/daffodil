@@ -21,10 +21,9 @@ import org.apache.daffodil.core.dsom.SchemaSet
 import org.apache.daffodil.core.dsom.SequenceTermBase
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.util.Logger
-import org.apache.daffodil.lib.util.Maybe
-import org.apache.daffodil.lib.util.Maybe.Nope
 import org.apache.daffodil.runtime1.iapi.DFDL
 import org.apache.daffodil.runtime1.infoset.InfosetBuilder
+import org.apache.daffodil.runtime1.infoset.NadaInfosetBuilder
 import org.apache.daffodil.runtime1.layers.LayerRuntimeCompiler
 import org.apache.daffodil.runtime1.layers.LayerRuntimeData
 import org.apache.daffodil.runtime1.processors.DataProcessor
@@ -68,13 +67,13 @@ trait SchemaSetRuntime1Mixin {
   // tunable.useBuildWritePrefetch is on (the tunable is fixed at compile
   // time), so schemas that never enable it never pay to construct the
   // InfosetBuilder tree.
-  lazy val builder: Maybe[InfosetBuilder] = {
+  lazy val builder: InfosetBuilder = LV(Symbol("builder")) {
     if (generateUnparser) {
       root.document.builder
     } else {
-      Nope
+      NadaInfosetBuilder
     }
-  }
+  }.value
 
   private lazy val layerRuntimeCompiler = new LayerRuntimeCompiler
 
@@ -101,17 +100,15 @@ trait SchemaSetRuntime1Mixin {
     Assert.invariant(!root.isError)
     // Prefetch is used for every schema when the tunable is on, whether or
     // not any OVC could benefit, so the InfosetBuilder tree is built for all of them.
-    val isPrefetchInUse = tunable.useBuildWritePrefetch
     val ssrd =
       new SchemaSetRuntimeData(
         parser,
         unparser,
-        if (isPrefetchInUse) builder else Nope,
+        if (tunable.useBuildWritePrefetch) builder else NadaInfosetBuilder,
         root.elementRuntimeData,
         variableMap,
         allLayers,
-        layerRuntimeCompiler,
-        isPrefetchInUse
+        layerRuntimeCompiler
       )
     if (root.numComponents > root.numUniqueComponents)
       Logger.log.debug(

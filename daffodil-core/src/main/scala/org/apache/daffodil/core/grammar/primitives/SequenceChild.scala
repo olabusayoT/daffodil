@@ -24,9 +24,7 @@ import org.apache.daffodil.lib.schema.annotation.props.SeparatorSuppressionPolic
 import org.apache.daffodil.lib.schema.annotation.props.gen.LengthKind
 import org.apache.daffodil.lib.schema.annotation.props.gen.OccursCountKind
 import org.apache.daffodil.lib.schema.annotation.props.gen.Representation
-import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.runtime1.dpath.NodeInfo
-import org.apache.daffodil.runtime1.infoset.EmptyInfosetBuilder
 import org.apache.daffodil.runtime1.infoset.InfosetBuilder
 import org.apache.daffodil.runtime1.infoset.SequenceChildInfosetBuildInfo
 import org.apache.daffodil.runtime1.processors.parsers.*
@@ -73,7 +71,7 @@ abstract class SequenceChild(protected val sq: SequenceTermBase, child: Term, gr
 
   protected lazy val childParser = child.termContentBody.parser
   protected lazy val childUnparser = child.termContentBody.unparser
-  protected lazy val childBuilder: Maybe[InfosetBuilder] = child.termContentBody.builder
+  protected lazy val childBuilder: InfosetBuilder = child.termContentBody.builder
 
   final override lazy val parser = sequenceChildParser
   final override lazy val unparser = sequenceChildUnparser
@@ -87,15 +85,8 @@ abstract class SequenceChild(protected val sq: SequenceTermBase, child: Term, gr
   final lazy val optSequenceChildUnparser: Option[SequenceChildUnparser] =
     if (childUnparser.isEmpty) None else Some(unparser)
 
-  final lazy val optSequenceChildBuildInfo: Option[SequenceChildInfosetBuildInfo] = {
-    if (childUnparser.isEmpty) {
-      None
-    } else if (childBuilder.isDefined) {
-      Some(SequenceChildInfosetBuildInfo(unparser, childBuilder.get))
-    } else {
-      Some(SequenceChildInfosetBuildInfo(unparser, EmptyInfosetBuilder))
-    }
-  }
+  final lazy val sequenceChildBuildInfo: SequenceChildInfosetBuildInfo =
+    SequenceChildInfosetBuildInfo(unparser, childBuilder)
 
   /**
    * There's only parse result helpers here, so let's abbreviate

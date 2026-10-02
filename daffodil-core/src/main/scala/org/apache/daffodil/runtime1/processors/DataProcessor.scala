@@ -468,7 +468,7 @@ class DataProcessor(
 
   def unparse(actualInputter: api.infoset.InfosetInputter, outStream: java.io.OutputStream) = {
     // Prefetch is in use whenever the tunable was on at compile time.
-    if (ssrd.isPrefetchInUse) {
+    if (!ssrd.builder.isEmpty) {
       unparseViaBuildThenWrite(actualInputter, outStream)
     } else {
       unparseSinglePass(actualInputter, outStream)
@@ -555,7 +555,7 @@ class DataProcessor(
     lazy val buildState = new InfosetBuildState(inputter, sharedCtx, Nil, areDebugging)
     // The root element always has a builder: it is exactly the case that
     // gets ElementInfosetBuilder wrapped around it, regardless of schema content.
-    lazy val cursor = new InfosetBuildCursor(ssrd.builder.get, buildState, sharedCtx)
+    lazy val cursor = new InfosetBuildCursor(ssrd.builder, buildState, sharedCtx)
     lazy val writeState = UState.createInitialUState(outStream, this, inputter, areDebugging)
 
     def initBuildSide(): Unit = {

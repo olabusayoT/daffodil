@@ -45,7 +45,7 @@ import org.apache.daffodil.runtime1.processors.dfa.DFADelimiter
 /**
  * A `UState` subclass that consumes an actual `InfosetInputter` and provides
  * live Cursor/TRD/index-stack behavior; this is the "build" side of the
- * build/write unparse split. The write-only surface (delimiter stack,
+ * build/write unparse split. The output-writing surface (delimiter stack,
  * escape scheme cache, and the scratch buffers used for measuring/escaping
  * text) is stubbed to error, since nothing build does should ever touch it;
  * build never writes content.
@@ -108,23 +108,25 @@ final class InfosetBuildState(
   // child reference write hasn't read yet; write still frees as normal.
   override def releaseUnneededInfoset: Boolean = false
 
-  private def writeOnly =
+  private def notAvailableDuringBuild =
     Assert.usageError(
-      "InfosetBuildState never writes content, so this write-only state doesn't exist"
+      "InfosetBuildState never writes content, so this output-writing state doesn't exist"
     )
 
-  override def escapeSchemeEVCache: MStackOfMaybe[EscapeSchemeUnparserHelper] = writeOnly
+  override def escapeSchemeEVCache: MStackOfMaybe[EscapeSchemeUnparserHelper] =
+    notAvailableDuringBuild
   override def withUnparserDataInputStream: LocalStack[StringDataInputStreamForUnparse] =
-    writeOnly
+    notAvailableDuringBuild
   override def withByteArrayOutputStream
-    : LocalStack[(ByteArrayOutputStream, DirectOrBufferedDataOutputStream)] = writeOnly
-  override def allTerminatingMarkup: List[DFADelimiter] = writeOnly
-  override def localDelimiters: DelimiterStackUnparseNode = writeOnly
-  override def pushDelimiters(node: DelimiterStackUnparseNode): Unit = writeOnly
-  override def popDelimiters(): Unit = writeOnly
+    : LocalStack[(ByteArrayOutputStream, DirectOrBufferedDataOutputStream)] =
+    notAvailableDuringBuild
+  override def allTerminatingMarkup: List[DFADelimiter] = notAvailableDuringBuild
+  override def localDelimiters: DelimiterStackUnparseNode = notAvailableDuringBuild
+  override def pushDelimiters(node: DelimiterStackUnparseNode): Unit = notAvailableDuringBuild
+  override def popDelimiters(): Unit = notAvailableDuringBuild
 
   // Build tracks child position in its own frames, never in a stack.
-  override def childIndexStack: MStackOfLong = writeOnly
+  override def childIndexStack: MStackOfLong = notAvailableDuringBuild
   override def moveOverOneElementChildOnly(): Unit = ()
   override def childPos: Long = 0L
 
@@ -191,7 +193,7 @@ final class InfosetBuildState(
   // nothing build does can ever suspend, and this is never called: only
   // Suspension.suspend calls it, and that always calls cloneForSuspension
   // first, which already throws.
-  def addSuspension(se: Suspension): Unit = writeOnly
+  def addSuspension(se: Suspension): Unit = notAvailableDuringBuild
 
   /**
    * Uses evalBuildResolvableSuspensions: a suspension that
@@ -210,7 +212,7 @@ final class InfosetBuildState(
    * nothing build does can ever suspend, and this is never called.
    */
   override def cloneForSuspension(suspendedDOS: DirectOrBufferedDataOutputStream): UState =
-    writeOnly
+    notAvailableDuringBuild
 
   final override def pushTRD(trd: TermRuntimeData): Unit = inputter.pushTRD(trd)
   final override def maybeTopTRD(): Maybe[TermRuntimeData] = inputter.maybeTopTRD()

@@ -58,9 +58,9 @@ case class DelimiterStackCombinatorSequence(sq: SequenceTermBase, body: Gram)
   override lazy val unparser: DaffodilUnparser =
     new DelimiterStackUnparser(uInit, uSep, uTerm, sq.termRuntimeData, body.unparser)
 
-  // Delimiters are write-only content; the builder tree skips straight to
+  // Delimiters build no infoset events; the builder tree skips straight to
   // whatever this sequence's body itself builds, if anything.
-  override lazy val builder: Maybe[InfosetBuilder] = body.builder
+  override lazy val builder: InfosetBuilder = body.builder
 }
 
 case class DelimiterStackCombinatorChoice(ch: ChoiceTermBase, body: Gram)
@@ -84,9 +84,9 @@ case class DelimiterStackCombinatorChoice(ch: ChoiceTermBase, body: Gram)
   override lazy val unparser: DaffodilUnparser =
     new DelimiterStackUnparser(uInit, None, uTerm, ch.termRuntimeData, body.unparser)
 
-  // Delimiters are write-only content; the builder tree skips straight to
+  // Delimiters build no infoset events; the builder tree skips straight to
   // whatever this choice's body itself builds, if anything.
-  override lazy val builder: Maybe[InfosetBuilder] = body.builder
+  override lazy val builder: InfosetBuilder = body.builder
 }
 
 case class DelimiterStackCombinatorElement(e: ElementBase, body: Gram)
@@ -122,9 +122,9 @@ case class DelimiterStackCombinatorElement(e: ElementBase, body: Gram)
     else new DelimiterStackUnparser(uInit, None, uTerm, e.termRuntimeData, u)
   }
 
-  // Delimiters are write-only content; the builder tree skips straight to
+  // Delimiters build no infoset events; the builder tree skips straight to
   // whatever this element's body itself builds, if anything.
-  override lazy val builder: Maybe[InfosetBuilder] = body.builder
+  override lazy val builder: InfosetBuilder = body.builder
 }
 
 case class DynamicEscapeSchemeCombinatorElement(e: ElementBase, body: Gram)
@@ -153,5 +153,5 @@ case class DynamicEscapeSchemeCombinatorElement(e: ElementBase, body: Gram)
   // The escape scheme only governs delimiter matching in written bytes; the
   // builder tree skips straight to whatever this element's body itself
   // builds, if anything.
-  override lazy val builder: Maybe[InfosetBuilder] = body.builder
+  override lazy val builder: InfosetBuilder = body.builder
 }

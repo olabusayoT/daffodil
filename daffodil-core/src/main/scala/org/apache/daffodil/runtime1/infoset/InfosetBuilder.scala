@@ -35,9 +35,10 @@ import org.apache.daffodil.unparsers.runtime1.SequenceChildUnparser
  * A node in a much smaller, dedicated tree of InfosetBuilders that parallels the
  * full Unparser tree: only Grams that actually create or select infoset
  * content (elements, sequences, choices, hidden groups) contribute one, so
- * building the infoset never has to dispatch through the many write-only
- * wrapper unparsers (delimiters, escape schemes, layers, padding,
- * specified-length) that sit between them in the Unparser tree.
+ * building the infoset never has to dispatch through the many wrapper
+ * unparsers that build no infoset events (delimiters, escape schemes,
+ * layers, padding, specified-length) that sit between them in the
+ * Unparser tree.
  *
  * A InfosetBuilder is immutable compiled-schema state shared by every parse. The
  * per-parse position lives in the InfosetBuildFrame it creates, on a InfosetBuildCursor's
@@ -46,6 +47,12 @@ import org.apache.daffodil.unparsers.runtime1.SequenceChildUnparser
  */
 trait InfosetBuilder extends Serializable {
   def newFrame(): InfosetBuildFrame
+
+  // True only for NadaInfosetBuilder, which contributes nothing to the tree.
+  def isEmpty: Boolean = false
+
+  // This builder if it builds anything, else the other one.
+  final def orElse(other: InfosetBuilder): InfosetBuilder = if (!isEmpty) this else other
 }
 
 /**
@@ -135,15 +142,20 @@ final class InfosetBuildCursor(
 }
 
 /**
- * A no-op stand-in for a choice branch or sequence child whose content is
- * empty (e.g. an empty sequence), so its build-time presence can still be
- * recorded without anything actually needing to happen.
+ * Builder for a Gram that creates or selects no infoset content. A builder
+ * with nothing to build collapses into this one, and a sequence drops its
+ * children that have it, so a parent only holds one where it needs a value
+ * in that slot, such as a choice branch with no content, which the branch map
+ * still needs an entry for. A parent that holds one recognizes it by isEmpty
+ * and never builds it.
  */
-object EmptyInfosetBuilder extends InfosetBuilder {
-  private object EmptyFrame extends InfosetBuildFrame {
-    override def step(cursor: InfosetBuildCursor): Unit = cursor.pop()
-  }
-  override def newFrame(): InfosetBuildFrame = EmptyFrame
+object NadaInfosetBuilder extends InfosetBuilder {
+  override def isEmpty = true
+
+  override def toString = "Nada"
+
+  override def newFrame(): InfosetBuildFrame =
+    Assert.abort("NadaInfosetBuilders are all supposed to optimize out!")
 }
 
 /**
@@ -151,7 +163,8 @@ object EmptyInfosetBuilder extends InfosetBuilder {
  * `~` composition has more than one child that actually builds infoset
  * content; the common case of at most one such child never needs this.
  */
-final class SeqCompInfosetBuilder(children: Array[InfosetBuilder]) extends InfosetBuilder {
+final private class SeqCompInfosetBuilder(children: Array[InfosetBuilder])
+  extends InfosetBuilder {
   override def newFrame(): InfosetBuildFrame = new InfosetBuildFrame {
     private var i = 0
     override def step(cursor: InfosetBuildCursor): Unit = {
@@ -162,6 +175,18 @@ final class SeqCompInfosetBuilder(children: Array[InfosetBuilder]) extends Infos
       } else {
         cursor.pop()
       }
+    }
+  }
+}
+
+object SeqCompInfosetBuilder {
+  def apply(children: Array[InfosetBuilder]): InfosetBuilder = {
+    if (children.isEmpty) {
+      NadaInfosetBuilder
+    } else if (children.length == 1) {
+      children.head
+    } else {
+      new SeqCompInfosetBuilder(children)
     }
   }
 }
@@ -179,7 +204,7 @@ final class SeqCompInfosetBuilder(children: Array[InfosetBuilder]) extends Infos
 final class ElementInfosetBuilder(
   erd: ElementRuntimeData,
   elementUnparser: ElementUnparserBase,
-  contentBuilder: Maybe[InfosetBuilder]
+  contentBuilder: InfosetBuilder
 ) extends InfosetBuilder {
 
   override def newFrame(): InfosetBuildFrame = new InfosetBuildFrame {
@@ -191,9 +216,9 @@ final class ElementInfosetBuilder(
         elementUnparser.unparseBeginForBuild(state)
         if (erd.isComplexType) {
           state.pushTRD(erd.optComplexTypeModelGroupRuntimeData.get)
-          if (contentBuilder.isDefined) {
+          if (!contentBuilder.isEmpty) {
             contentPushed = true
-            cursor.push(contentBuilder.get.newFrame())
+            cursor.push(contentBuilder.newFrame())
             return
           }
         }
@@ -233,7 +258,7 @@ private enum SequenceBuildPhase {
  * Builds an entire sequence's children, scalar and array/optional alike,
  * each through its own InfosetBuilder.
  */
-final class SequenceInfosetBuilder(children: Array[SequenceChildInfosetBuildInfo])
+final private class SequenceInfosetBuilder(children: Array[SequenceChildInfosetBuildInfo])
   extends InfosetBuilder {
 
   override def newFrame(): InfosetBuildFrame = new SequenceInfosetBuildFrame
@@ -346,6 +371,17 @@ final class SequenceInfosetBuilder(children: Array[SequenceChildInfosetBuildInfo
   }
 }
 
+object SequenceInfosetBuilder {
+  def apply(children: Array[SequenceChildInfosetBuildInfo]): InfosetBuilder = {
+    val nonEmptyChildren = children.filterNot(_.childBuilder.isEmpty)
+    if (nonEmptyChildren.isEmpty) {
+      NadaInfosetBuilder
+    } else {
+      new SequenceInfosetBuilder(nonEmptyChildren)
+    }
+  }
+}
+
 /**
  * Builds just the one structurally-present branch of a choice, resolved
  * from the next infoset event, through that branch's own InfosetBuilder.
@@ -397,7 +433,9 @@ final class ChoiceInfosetBuilder(
         val (trd, builder) = resolveBranch(state)
         branchTRD = trd
         state.pushTRD(trd)
-        cursor.push(builder.newFrame())
+        if (!builder.isEmpty) {
+          cursor.push(builder.newFrame())
+        }
       } else {
         state.popTRD(branchTRD)
         cursor.pop()
@@ -412,7 +450,8 @@ final class ChoiceInfosetBuilder(
  * unparseEnd to manufacture a node instead of consuming an event that will
  * never exist.
  */
-final class HiddenGroupInfosetBuilder(bodyBuilder: InfosetBuilder) extends InfosetBuilder {
+final private class HiddenGroupInfosetBuilder(bodyBuilder: InfosetBuilder)
+  extends InfosetBuilder {
   override def newFrame(): InfosetBuildFrame = new InfosetBuildFrame {
     private var bodyPushed = false
 
@@ -429,12 +468,23 @@ final class HiddenGroupInfosetBuilder(bodyBuilder: InfosetBuilder) extends Infos
   }
 }
 
+object HiddenGroupInfosetBuilder {
+  def apply(bodyBuilder: InfosetBuilder): InfosetBuilder = {
+    if (bodyBuilder.isEmpty) {
+      NadaInfosetBuilder
+    } else {
+      new HiddenGroupInfosetBuilder(bodyBuilder)
+    }
+  }
+}
+
 /**
  * A nilled complex element has no children to build; nilled-ness is only
  * known once the node exists, so this checks it at build time rather than
  * resolving statically to either branch.
  */
-final class NilOrContentInfosetBuilder(contentBuilder: InfosetBuilder) extends InfosetBuilder {
+final private class NilOrContentInfosetBuilder(contentBuilder: InfosetBuilder)
+  extends InfosetBuilder {
   override def newFrame(): InfosetBuildFrame = new InfosetBuildFrame {
     private var contentPushed = false
 
@@ -445,6 +495,16 @@ final class NilOrContentInfosetBuilder(contentBuilder: InfosetBuilder) extends I
       } else {
         cursor.pop()
       }
+    }
+  }
+}
+
+object NilOrContentInfosetBuilder {
+  def apply(contentBuilder: InfosetBuilder): InfosetBuilder = {
+    if (contentBuilder.isEmpty) {
+      NadaInfosetBuilder
+    } else {
+      new NilOrContentInfosetBuilder(contentBuilder)
     }
   }
 }

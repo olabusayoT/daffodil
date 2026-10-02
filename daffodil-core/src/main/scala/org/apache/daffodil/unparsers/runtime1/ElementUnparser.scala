@@ -44,14 +44,14 @@ class ElementUnspecifiedLengthUnparser(
   eBeforeUnparser: Maybe[Unparser],
   eUnparser: Maybe[Unparser],
   eAfterUnparser: Maybe[Unparser],
-  eReptypeUnparser: Maybe[Unparser]
+  eRepTypeUnparser: Maybe[Unparser]
 ) extends ElementUnparserBase(
     erd,
     setVarUnparsers,
     eBeforeUnparser,
     eUnparser,
     eAfterUnparser,
-    eReptypeUnparser
+    eRepTypeUnparser
   )
   with RegularElementUnparserStartEndStrategy
   with RepMoveMixin {
@@ -143,14 +143,14 @@ sealed abstract class ElementUnparserBase(
   val eBeforeUnparser: Maybe[Unparser],
   val eUnparser: Maybe[Unparser],
   val eAfterUnparser: Maybe[Unparser],
-  val eReptypeUnparser: Maybe[Unparser]
+  val eRepTypeUnparser: Maybe[Unparser]
 ) extends CombinatorUnparser(erd)
   with RepMoveMixin
   with ElementUnparserStartEndStrategy
   with WriteUnparser {
 
   final override def childProcessors =
-    (eBeforeUnparser.toList ++ eUnparser.toList ++ eAfterUnparser.toList ++ eReptypeUnparser.toList ++ setVarUnparsers.toList).toVector
+    (eBeforeUnparser.toList ++ eUnparser.toList ++ eAfterUnparser.toList ++ eRepTypeUnparser.toList ++ setVarUnparsers.toList).toVector
 
   private val name = erd.name
 
@@ -160,7 +160,7 @@ sealed abstract class ElementUnparserBase(
       "<Element name='" + name + "'>" +
         (if (eBeforeUnparser.isDefined) eBeforeUnparser.value.toBriefXML(depthLimit - 1)
          else "") +
-        (if (eReptypeUnparser.isDefined) eReptypeUnparser.value.toBriefXML(depthLimit - 1)
+        (if (eRepTypeUnparser.isDefined) eRepTypeUnparser.value.toBriefXML(depthLimit - 1)
          else "") +
         (if (eUnparser.isDefined) eUnparser.value.toBriefXML(depthLimit - 1) else "") +
         (if (eAfterUnparser.isDefined) eAfterUnparser.value.toBriefXML(depthLimit - 1)
@@ -201,8 +201,8 @@ sealed abstract class ElementUnparserBase(
   private[runtime1] def contentSetup(state: UState): Unit = ()
 
   private[runtime1] def dispatchContentUnparser(state: UState): Unit = {
-    if (eReptypeUnparser.isDefined) {
-      eReptypeUnparser.get.unparse1(state)
+    if (eRepTypeUnparser.isDefined) {
+      eRepTypeUnparser.get.unparse1(state)
     } else if (eUnparser.isDefined) {
       eUnparser.get.unparse1(state)
     } // else nothing to do: no content unparser applies
@@ -231,9 +231,9 @@ sealed abstract class ElementUnparserBase(
   private def dispatchForWrite(containerNode: DINode, s: UState): Unit = {
     contentSetup(s)
     // A repType'd element's raw eUnparser can itself be group-wrapped, so
-    // eReptypeUnparser takes priority: without this check the raw content
+    // eRepTypeUnparser takes priority: without this check the raw content
     // would be written instead of the repType conversion.
-    if (eReptypeUnparser.isEmpty && eUnparser.isDefined) {
+    if (eRepTypeUnparser.isEmpty && eUnparser.isDefined) {
       eUnparser.get match {
         case wu: WriteUnparser => wu.writeContent(containerNode, s)
         case _ => dispatchContentUnparser(s)
@@ -393,14 +393,14 @@ class ElementSpecifiedLengthUnparser(
   eBeforeUnparser: Maybe[Unparser],
   eUnparser: Maybe[Unparser],
   eAfterUnparser: Maybe[Unparser],
-  eReptypeUnparser: Maybe[Unparser]
+  eRepTypeUnparser: Maybe[Unparser]
 ) extends ElementUnparserBase(
     context,
     setVarUnparsers,
     eBeforeUnparser,
     eUnparser,
     eAfterUnparser,
-    eReptypeUnparser
+    eRepTypeUnparser
   )
   with RegularElementUnparserStartEndStrategy
   with ElementSpecifiedLengthMixin {

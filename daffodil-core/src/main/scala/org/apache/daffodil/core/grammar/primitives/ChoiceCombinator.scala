@@ -36,8 +36,8 @@ import org.apache.daffodil.lib.util.MaybeInt
 import org.apache.daffodil.lib.util.ProperlySerializableMap.*
 import org.apache.daffodil.runtime1.infoset.ChoiceBranchEvent
 import org.apache.daffodil.runtime1.infoset.ChoiceInfosetBuilder
-import org.apache.daffodil.runtime1.infoset.EmptyInfosetBuilder
 import org.apache.daffodil.runtime1.infoset.InfosetBuilder
+import org.apache.daffodil.runtime1.infoset.NadaInfosetBuilder
 import org.apache.daffodil.runtime1.processors.RangeBound
 import org.apache.daffodil.runtime1.processors.TermRuntimeData
 import org.apache.daffodil.runtime1.processors.parsers.*
@@ -273,8 +273,15 @@ case class ChoiceCombinator(ch: ChoiceTermBase, alternatives: Seq[Gram])
     }
   }
 
+  private lazy val eventUnparserMap = ch.choiceBranchMap._1.map { case (cbe, branchTerm) =>
+    (cbe, branchTerm.termContentBody.unparser)
+  }
+
+  private lazy val hasEventBranchUnparser: Boolean =
+    eventUnparserMap.exists { case (_, branchUnparser) => !branchUnparser.isEmpty }
+
   override lazy val unparser: Unparser = {
-    val (eventRDMap, optDefaultBranch) = ch.choiceBranchMap
+    val optDefaultBranch = ch.choiceBranchMap._2
     /*
      * Since it's impossible to know the hiddenness for terms at this level (unless
      * they're a hiddenGroupRef), we always attempt to find a defaultable unparser.
@@ -320,11 +327,7 @@ case class ChoiceCombinator(ch: ChoiceTermBase, alternatives: Seq[Gram])
       optDefaultUnparser
     }
 
-    val eventUnparserMap = eventRDMap.map { case (cbe, branchTerm) =>
-      (cbe, branchTerm.termContentBody.unparser)
-    }
-    val mapValues = eventUnparserMap.map { case (k, v) => v }.filterNot(_.isEmpty)
-    if (mapValues.isEmpty) {
+    if (!hasEventBranchUnparser) {
       if (branchForUnparse.isEmpty) {
         new NadaUnparser(null)
       } else {
@@ -340,17 +343,11 @@ case class ChoiceCombinator(ch: ChoiceTermBase, alternatives: Seq[Gram])
     }
   }
 
-  override lazy val builder: Maybe[InfosetBuilder] = {
+  override lazy val builder: InfosetBuilder = {
     val (eventRDMap, optDefaultBranch) = ch.choiceBranchMap
 
     def builderFor(term: Term): (TermRuntimeData, InfosetBuilder) = {
-      val cb = term.termContentBody.builder
-      val b = if (cb.isDefined) {
-        cb.get
-      } else {
-        EmptyInfosetBuilder
-      }
-      (term.termRuntimeData, b)
+      (term.termRuntimeData, term.termContentBody.builder)
     }
 
     val branchMap: Map[ChoiceBranchEvent, (TermRuntimeData, InfosetBuilder)] =
@@ -360,10 +357,10 @@ case class ChoiceCombinator(ch: ChoiceTermBase, alternatives: Seq[Gram])
       case None => Nope
     }
 
-    if (branchMap.isEmpty && defaultBranch.isEmpty) {
-      Nope
+    if (!hasEventBranchUnparser && defaultBranch.isEmpty) {
+      NadaInfosetBuilder
     } else {
-      One(new ChoiceInfosetBuilder(ch.modelGroupRuntimeData, branchMap, defaultBranch))
+      new ChoiceInfosetBuilder(ch.modelGroupRuntimeData, branchMap, defaultBranch)
     }
   }
 }

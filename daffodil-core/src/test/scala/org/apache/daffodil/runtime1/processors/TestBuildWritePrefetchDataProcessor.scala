@@ -461,7 +461,77 @@ class TestBuildWritePrefetchDataProcessor {
     assertArrayEquals(singlePassBytes, prefetchBytes)
   }
 
-  // Escape-scheme state is confined entirely to write-only unparsers;
+  // A nillable complex element whose model group is empty has a non-empty
+  // content gram only because of its initiator and terminator, so its
+  // content builder builds nothing.
+  private val emptyNillableComplexSchema = SchemaUtils.dfdlTestSchema(
+    <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
+    <dfdl:format ref="tns:GeneralFormat"
+      encoding="ascii"
+      lengthUnits="bytes"/>,
+    <xs:element name="row" nillable="true" dfdl:lengthKind="implicit"
+      dfdl:nilKind="literalValue"
+      dfdl:nilValue="%ES;"
+      dfdl:nilValueDelimiterPolicy="none"
+      dfdl:initiator="["
+      dfdl:terminator="]">
+      <xs:complexType>
+        <xs:sequence/>
+      </xs:complexType>
+    </xs:element>,
+    elementFormDefault = "unqualified"
+  )
+
+  @Test def testNillableComplexWithEmptyContentNotNilledMatchesSinglePass(): Unit = {
+    val infoset = <ex:row xmlns:ex={example}/>
+    val (singlePassBytes, prefetchBytes) =
+      TestUtils.getSinglePassAndPrefetchBytes(emptyNillableComplexSchema, infoset)
+    assertEquals("[]", new String(singlePassBytes, StandardCharsets.US_ASCII))
+    assertArrayEquals(singlePassBytes, prefetchBytes)
+  }
+
+  @Test def testNillableComplexWithEmptyContentNilledMatchesSinglePass(): Unit = {
+    val infoset =
+      <ex:row xmlns:ex={
+        example
+      } xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"/>
+    val (singlePassBytes, prefetchBytes) =
+      TestUtils.getSinglePassAndPrefetchBytes(emptyNillableComplexSchema, infoset)
+    assertEquals("", new String(singlePassBytes, StandardCharsets.US_ASCII))
+    assertArrayEquals(singlePassBytes, prefetchBytes)
+  }
+
+  // A hidden group with no members has nothing to build, but still has to
+  // balance the hidden-depth counter around its body.
+  @Test def testHiddenGroupWithEmptyBodyMatchesSinglePass(): Unit = {
+    val sch = SchemaUtils.dfdlTestSchema(
+      <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
+      <dfdl:format ref="tns:GeneralFormat"
+        encoding="ascii"
+        lengthUnits="bytes"/>,
+      Seq(
+        <xs:group name="g1">
+          <xs:sequence/>
+        </xs:group>,
+        <xs:element name="row" dfdl:lengthKind="implicit">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:sequence dfdl:hiddenGroupRef="ex:g1"/>
+              <xs:element name="visible" type="xs:string" dfdl:lengthKind="delimited"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      ),
+      elementFormDefault = "unqualified"
+    )
+    val infoset = <ex:row xmlns:ex={example}><visible>V</visible></ex:row>
+
+    val (singlePassBytes, prefetchBytes) = TestUtils.getSinglePassAndPrefetchBytes(sch, infoset)
+    assertEquals("V", new String(singlePassBytes, StandardCharsets.US_ASCII))
+    assertArrayEquals(singlePassBytes, prefetchBytes)
+  }
+
+  // Escape-scheme state is confined entirely to unparsers that build no infoset events;
   // confirms that end to end with no frame changes needed.
   @Test def testEscapeSchemeMatchesSinglePass(): Unit = {
     val sch = SchemaUtils.dfdlTestSchema(
@@ -1367,7 +1437,7 @@ class TestBuildWritePrefetchDataProcessor {
       .asInstanceOf[DataProcessor]
     assertTrue(
       "prefetch is used whenever the tunable is on, whatever the OVCs",
-      prefetchDp.ssrd.isPrefetchInUse
+      !prefetchDp.ssrd.builder.isEmpty
     )
     val prefetchBytes = TestUtils.unparseToBytes(prefetchDp, infoset)
     assertArrayEquals(singlePassBytes, prefetchBytes)
@@ -1423,7 +1493,7 @@ class TestBuildWritePrefetchDataProcessor {
     assertTrue(
       "schema has a resolvable-without-writing OVC alongside a content-length one; " +
         "must use the prefetch path",
-      prefetchDp.ssrd.isPrefetchInUse
+      !prefetchDp.ssrd.builder.isEmpty
     )
     val prefetchBytes = TestUtils.unparseToBytes(prefetchDp, infoset)
     assertArrayEquals(singlePassBytes, prefetchBytes)
@@ -1450,7 +1520,7 @@ class TestBuildWritePrefetchDataProcessor {
       .compileNode(sch)
       .onPath("/")
       .asInstanceOf[DataProcessor]
-    assertTrue(dp.ssrd.isPrefetchInUse)
+    assertFalse(dp.ssrd.builder.isEmpty)
   }
 
   // A schema where every OVC is resolvable-without-writing uses prefetch:
@@ -1482,7 +1552,7 @@ class TestBuildWritePrefetchDataProcessor {
       .compileNode(sch)
       .onPath("/")
       .asInstanceOf[DataProcessor]
-    assertTrue(dp.ssrd.isPrefetchInUse)
+    assertFalse(dp.ssrd.builder.isEmpty)
   }
 
   // With the tunable explicitly off, prefetch is never used, even for a
@@ -1514,10 +1584,10 @@ class TestBuildWritePrefetchDataProcessor {
       .compileNode(sch)
       .onPath("/")
       .asInstanceOf[DataProcessor]
-    assertFalse(dp.ssrd.isPrefetchInUse)
+    assertTrue(dp.ssrd.builder.isEmpty)
   }
 
-  // isPrefetchInUse is baked in at compile time; confirms it survives a
+  // Whether prefetch is in use (a non-empty builder) is baked in at compile time; confirms it survives a
   // save/reload round trip.
   @Test def testIsPrefetchInUseSurvivesSaveReload(): Unit = {
     val sch = SchemaUtils.dfdlTestSchema(
@@ -1546,14 +1616,14 @@ class TestBuildWritePrefetchDataProcessor {
       .compileNode(sch)
       .onPath("/")
       .asInstanceOf[DataProcessor]
-    assertTrue(dp.ssrd.isPrefetchInUse)
+    assertFalse(dp.ssrd.builder.isEmpty)
 
     val os = new ByteArrayOutputStream()
     dp.save(java.nio.channels.Channels.newChannel(os))
     val reloadedDp = Compiler()
       .reload(new java.io.ByteArrayInputStream(os.toByteArray))
       .asInstanceOf[DataProcessor]
-    assertTrue(reloadedDp.ssrd.isPrefetchInUse)
+    assertFalse(reloadedDp.ssrd.builder.isEmpty)
 
     val infoset = <ex:row xmlns:ex={example}><data>xyz</data></ex:row>
     assertArrayEquals(

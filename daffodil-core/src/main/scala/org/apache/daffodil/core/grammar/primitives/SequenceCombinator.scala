@@ -128,14 +128,8 @@ class OrderedSequence(sq: SequenceTermBase, sequenceChildrenArg: Seq[SequenceChi
     }
   }
 
-  override lazy val builder: Maybe[InfosetBuilder] = {
-    val childBuildInfos = sequenceChildren.flatMap { _.optSequenceChildBuildInfo }
-    if (childBuildInfos.isEmpty) {
-      Maybe.Nope
-    } else {
-      Maybe.One(new SequenceInfosetBuilder(childBuildInfos.toArray))
-    }
-  }
+  override lazy val builder: InfosetBuilder =
+    SequenceInfosetBuilder(sequenceChildren.map { _.sequenceChildBuildInfo })
 }
 
 class UnorderedSequence(
@@ -233,12 +227,6 @@ class UnorderedSequence(
     }
   }
 
-  override lazy val builder: Maybe[InfosetBuilder] = {
-    val childBuildInfos = sequenceChildren.flatMap { _.optSequenceChildBuildInfo }
-    if (childBuildInfos.isEmpty) {
-      Maybe.Nope
-    } else {
-      Maybe.One(new SequenceInfosetBuilder(childBuildInfos.toArray))
-    }
-  }
+  override lazy val builder: InfosetBuilder =
+    SequenceInfosetBuilder(sequenceChildren.map { _.sequenceChildBuildInfo })
 }

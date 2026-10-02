@@ -272,7 +272,7 @@ object TestUtils {
   /**
    * Unparses infosetXML single-pass (dp must have releaseUnneededInfoset
    * disabled, so the built tree survives), then re-walks that tree through
-   * a fresh write-only UState's writeContent. Returns (singlePassBytes,
+   * a fresh UState that builds no infoset, via writeContent. Returns (singlePassBytes,
    * walkerBytes) for the caller to assert equality on.
    */
   def getSinglePassAndWriteContentBytes(
