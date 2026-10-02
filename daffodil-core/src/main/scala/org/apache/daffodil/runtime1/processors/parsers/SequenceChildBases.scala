@@ -527,6 +527,11 @@ trait MinMaxRepeatsMixin {
    */
   def maxRepeats(state: ParseOrUnparseState): Long = maxRepeats_
 
+  // The bounds do not depend on the state, so a caller with no
+  // ParseOrUnparseState can read them directly.
+  final def minRepeatsFixed: Long = minRepeats_
+  final def maxRepeatsFixed: Long = maxRepeats_
+
   private val isBoundedMax_ = maxRepeats_ < Long.MaxValue
 
   def isBoundedMax: Boolean = isBoundedMax_

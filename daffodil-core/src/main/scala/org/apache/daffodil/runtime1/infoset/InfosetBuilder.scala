@@ -24,7 +24,7 @@ import org.apache.daffodil.runtime1.processors.ElementRuntimeData
 import org.apache.daffodil.runtime1.processors.ModelGroupRuntimeData
 import org.apache.daffodil.runtime1.processors.TermRuntimeData
 import org.apache.daffodil.runtime1.processors.unparsers.BuildAbortedException
-import org.apache.daffodil.runtime1.processors.unparsers.UState
+import org.apache.daffodil.runtime1.processors.unparsers.InfosetTreeState
 import org.apache.daffodil.runtime1.processors.unparsers.UnparseError
 import org.apache.daffodil.runtime1.processors.unparsers.UnparseSharedContext
 import org.apache.daffodil.unparsers.runtime1.ElementUnparserBase
@@ -69,11 +69,11 @@ abstract class InfosetBuildFrame {
  * The explicit stack of BuildFrames that stands in for the call stack of a
  * recursive build. `advance` runs it until the lead window is full, so a
  * caller that needs more infoset tree can pull it forward directly. Driven
- * against a `InfosetBuildState`, never a write-side `UState`.
+ * against a `InfosetBuildState`, never a write-side `InfosetTreeState`.
  */
 final class InfosetBuildCursor(
   root: InfosetBuilder,
-  val state: UState,
+  val state: InfosetTreeState,
   ctx: UnparseSharedContext
 ) {
   private var stack = new Array[InfosetBuildFrame](32)
@@ -309,14 +309,14 @@ final private class SequenceInfosetBuilder(children: Array[SequenceChildInfosetB
               maxReps,
               state.arrayIterationPos - 1
             )
-            rep.endArrayOrOptional(rep.erd, state)
+            rep.consumeEndArrayEvent(rep.erd, state)
             finishRepeating(state)
           }
         }
       }
     }
 
-    private def nextChild(cursor: InfosetBuildCursor, state: UState): Unit = {
+    private def nextChild(cursor: InfosetBuildCursor, state: InfosetTreeState): Unit = {
       if (index == children.length) {
         state.groupIndexStack.pop()
         cursor.pop()
@@ -330,7 +330,7 @@ final private class SequenceInfosetBuilder(children: Array[SequenceChildInfosetB
             state.arrayIterationIndexStack.push(1L)
             state.occursIndexStack.push(1L)
             numOccurrences = 0
-            maxReps = r.maxRepeats(state)
+            maxReps = r.maxRepeatsFixed
 
             Assert.invariant(state.inspect, "No event for building.")
             val ev = state.inspectAccessor
@@ -356,14 +356,14 @@ final private class SequenceInfosetBuilder(children: Array[SequenceChildInfosetB
       }
     }
 
-    private def finishRepeating(state: UState): Unit = {
+    private def finishRepeating(state: InfosetTreeState): Unit = {
       state.arrayIterationIndexStack.pop()
       state.occursIndexStack.pop()
       rep = null
       finishChild(state)
     }
 
-    private def finishChild(state: UState): Unit = {
+    private def finishChild(state: InfosetTreeState): Unit = {
       state.popTRD(children(index).childUnparser.trd)
       index += 1
       phase = NextChild
@@ -392,7 +392,7 @@ final class ChoiceInfosetBuilder(
   defaultBranch: Maybe[(TermRuntimeData, InfosetBuilder)]
 ) extends InfosetBuilder {
 
-  private def resolveBranch(state: UState): (TermRuntimeData, InfosetBuilder) = {
+  private def resolveBranch(state: InfosetTreeState): (TermRuntimeData, InfosetBuilder) = {
     if (state.withinHiddenNest) {
       defaultBranch.get
     } else {
@@ -413,7 +413,7 @@ final class ChoiceInfosetBuilder(
       if (resolved.isEmpty) {
         UnparseError(
           One(mgrd.schemaFileLocation),
-          One(state.currentLocation),
+          state.maybeCurrentLocation,
           "Found next element %s, but expected one of %s.",
           key.qname.toExtendedSyntax,
           branchMap.keys.map { _.qname.toExtendedSyntax }.mkString(", ")

@@ -83,7 +83,7 @@ class TestBoundedPrefetch {
 
     val rootUnparser = dp.ssrd.unparser.asInstanceOf[ElementUnparserBase]
 
-    val buildState = new InfosetBuildState(buildInputter, sharedCtx, Nil, false)
+    val buildState = new InfosetBuildState(buildInputter, sharedCtx)
     val cursor = new InfosetBuildCursor(dp.ssrd.builder, buildState, sharedCtx)
     sharedCtx.setBuildCursor(cursor)
 

@@ -69,7 +69,7 @@ class TestInfosetBuildState {
 
     val sharedCtx =
       UnparseSharedContextTestFixture.build(dp, prefetchLimit = 100)()
-    val buildState = new InfosetBuildState(inputter, sharedCtx, Nil, false)
+    val buildState = new InfosetBuildState(inputter, sharedCtx)
 
     // Drives through the actual InfosetBuilder frames rather than hand-driven
     // advance() calls, since next-element resolution depends on the TRD

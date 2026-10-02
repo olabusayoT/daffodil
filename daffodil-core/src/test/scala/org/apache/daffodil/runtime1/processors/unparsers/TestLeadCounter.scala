@@ -75,7 +75,7 @@ class TestLeadCounter {
 
     val sharedCtx =
       UnparseSharedContextTestFixture.build(dp, prefetchLimit = 100)()
-    val buildState = new InfosetBuildState(buildInputter, sharedCtx, Nil, false)
+    val buildState = new InfosetBuildState(buildInputter, sharedCtx)
 
     assertEquals(0L, sharedCtx.currentLead)
     new InfosetBuildCursor(dp.ssrd.builder, buildState, sharedCtx).runToCompletion()

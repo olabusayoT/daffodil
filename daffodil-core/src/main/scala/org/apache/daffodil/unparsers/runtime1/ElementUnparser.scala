@@ -61,7 +61,7 @@ class ElementUnspecifiedLengthUnparser(
 }
 
 sealed trait RepMoveMixin {
-  def move(start: UState): Unit = {
+  def move(start: InfosetTreeState): Unit = {
     start.moveOverOneElementChildOnly()
   }
 }
@@ -80,7 +80,7 @@ private object BuildWriteLeadHookup {
    * increment must happen before any descendant's content is built, or
    * write finishing that ancestor first would underflow the counter.
    */
-  def afterNodeAdded(state: UState): Unit = {
+  def afterNodeAdded(state: InfosetTreeState): Unit = {
     state.sharedContext.get.incrementLead()
   }
 }
@@ -104,7 +104,7 @@ class ElementUnparserInputValueCalc(erd: ElementRuntimeData, setVarUnparsers: Ar
    * Move over in the element children, but not in the group.
    * This avoids separators for this IVC element.
    */
-  override def move(state: UState): Unit = {
+  override def move(state: InfosetTreeState): Unit = {
     state.moveOverOneElementChildOnly()
   }
 }
@@ -489,29 +489,30 @@ sealed trait ElementUnparserStartEndStrategy {
    * Consumes the required infoset events and changes context so that the
    * element's DIElement node is the context element.
    */
-  def unparseBegin(state: UState): Unit
+  def unparseBegin(state: InfosetTreeState): Unit
 
   /**
    * Restores prior context. Consumes end-element event. A freshly-built
    * simple node has no value yet (write still has to set it), so isBuild
    * defers finalizing it; a complex/array node is always final here.
    */
-  def unparseEnd(state: UState, isBuild: Boolean): Unit
+  def unparseEnd(state: InfosetTreeState, isBuild: Boolean): Unit
 
   /**
    * The InfosetBuilder tree's entry points: same node-creation logic as
    * unparseBegin/unparseEnd, plus the build-side lead-counter hookup that
    * only ever applies on this side.
    */
-  final def unparseBeginForBuild(state: UState): Unit = {
+  final def unparseBeginForBuild(state: InfosetTreeState): Unit = {
     unparseBegin(state)
     BuildWriteLeadHookup.afterNodeAdded(state)
   }
-  final def unparseEndForBuild(state: UState): Unit = unparseEnd(state, isBuild = true)
+  final def unparseEndForBuild(state: InfosetTreeState): Unit =
+    unparseEnd(state, isBuild = true)
 
   protected def captureRuntimeValuedExpressionValues(ustate: UState): Unit
 
-  protected def move(start: UState): Unit
+  protected def move(start: InfosetTreeState): Unit
 
   protected def erd: ElementRuntimeData
 
@@ -524,7 +525,7 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
    * Consumes the required infoset events and changes context so that the
    * element's DIElement node is the context element.
    */
-  final override def unparseBegin(state: UState): Unit = {
+  final override def unparseBegin(state: InfosetTreeState): Unit = {
     if (erd.isQuasiElement) {
       // Quasi elements are used for RepType and PrefixedLength, and have no corresponding
       // events in the infoset inputter. The parent parser will push a DIElement for us to
@@ -544,7 +545,7 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
             // this indicates that the incoming infoset (as events) doesn't match the schema
             UnparseError(
               Nope,
-              One(state.currentLocation),
+              state.maybeCurrentLocation,
               "Expected element start event for %s, but received %s.",
               erd.namedQName.toExtendedSyntax,
               event
@@ -611,7 +612,7 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
   /**
    * Restores prior context. Consumes end-element event.
    */
-  final override def unparseEnd(state: UState, isBuild: Boolean): Unit = {
+  final override def unparseEnd(state: InfosetTreeState, isBuild: Boolean): Unit = {
     if (erd.isQuasiElement) {
       // Quasi elements are used for TypeValueCalc, and have no corresponding events in the infoset inputter
       // The parent parser will handle pushing and poping the Infoset, so we do not need to do anything here.
@@ -628,7 +629,7 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
           // this indicates that the incoming infoset (as events) doesn't match the schema
           UnparseError(
             Nope,
-            One(state.currentLocation),
+            state.maybeCurrentLocation,
             "Expected element end event for %s, but received %s.",
             erd.namedQName.toExtendedSyntax,
             event
@@ -678,7 +679,7 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
 
       move(state)
 
-      state.asInstanceOf[SuspensionCapableUState].evalSuspensions(isFinal = false)
+      state.asInstanceOf[SuspensionResolver].evalSuspensions(isFinal = false)
     }
   }
 
@@ -693,7 +694,7 @@ trait OVCStartEndStrategy extends ElementUnparserStartEndStrategy {
   /**
    * For OVC, the behavior w.r.t. consuming infoset events is different.
    */
-  final override def unparseBegin(state: UState): Unit = {
+  final override def unparseBegin(state: InfosetTreeState): Unit = {
     val ovcElem =
       if (!state.withinHiddenNest) {
         // outputValueCalc elements are optional in the infoset. If the next event
@@ -748,7 +749,7 @@ trait OVCStartEndStrategy extends ElementUnparserStartEndStrategy {
     state.currentInfosetNodeStack.push(One(ovcElem))
   }
 
-  final override def unparseEnd(state: UState, isBuild: Boolean): Unit = {
+  final override def unparseEnd(state: InfosetTreeState, isBuild: Boolean): Unit = {
     // if an OVC element existed, the start AND end events were consumed in
     // unparseBegin. No need to advance the cursor here.
 

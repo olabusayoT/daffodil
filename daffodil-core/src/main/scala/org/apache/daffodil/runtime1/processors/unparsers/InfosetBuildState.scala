@@ -17,157 +17,60 @@
 
 package org.apache.daffodil.runtime1.processors.unparsers
 
-import java.io.ByteArrayOutputStream
-
-import org.apache.daffodil.api
-import org.apache.daffodil.io.DirectOrBufferedDataOutputStream
-import org.apache.daffodil.io.StringDataInputStreamForUnparse
+import org.apache.daffodil.api.DataLocation
 import org.apache.daffodil.lib.exceptions.Assert
-import org.apache.daffodil.lib.util.LocalStack
-import org.apache.daffodil.lib.util.MStackOfLong
+import org.apache.daffodil.lib.iapi.DaffodilTunables
 import org.apache.daffodil.lib.util.MStackOfMaybe
 import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.Nope
-import org.apache.daffodil.runtime1.dpath.UnparserBlocking
+import org.apache.daffodil.lib.util.Maybe.One
 import org.apache.daffodil.runtime1.infoset.DIDocument
 import org.apache.daffodil.runtime1.infoset.DINode
 import org.apache.daffodil.runtime1.infoset.InfosetAccessor
 import org.apache.daffodil.runtime1.infoset.InfosetInputter
-import org.apache.daffodil.runtime1.processors.DelimiterStackUnparseNode
-import org.apache.daffodil.runtime1.processors.EscapeSchemeUnparserHelper
 import org.apache.daffodil.runtime1.processors.Suspension
 import org.apache.daffodil.runtime1.processors.SuspensionTracker
 import org.apache.daffodil.runtime1.processors.TermRuntimeData
-import org.apache.daffodil.runtime1.processors.VariableBox
-import org.apache.daffodil.runtime1.processors.VariableMap
-import org.apache.daffodil.runtime1.processors.dfa.DFADelimiter
 
 /**
- * A `UState` subclass that consumes an actual `InfosetInputter` and provides
- * live Cursor/TRD/index-stack behavior; this is the "build" side of the
- * build/write unparse split. The output-writing surface (delimiter stack,
- * escape scheme cache, and the scratch buffers used for measuring/escaping
- * text) is stubbed to error, since nothing build does should ever touch it;
- * build never writes content.
+ * The "build" side of the build/write unparse split: it walks the infoset
+ * events from an actual `InfosetInputter` and builds the infoset tree ahead
+ * of the write pass. It needs only the tree state, so it is not a `UState`:
+ * it has no output stream, variables or debugger state, and build never
+ * writes content.
  *
- * `getDataOutputStream` is NOT stubbed: generic `UState` utility methods
- * (toString, currentLocation, bitPos0b) call into it, so `InfosetBuildState`
- * lazily constructs an actual DOS wrapping a no-op sink purely to satisfy
- * that.
- *
- * Used only when the `useBuildWritePrefetch` tunable is enabled (default
- * false); otherwise unused, and unparsing constructs `UStateMain`
- * exclusively as before.
+ * Used only when the `useBuildWritePrefetch` tunable is enabled; otherwise
+ * unparsing constructs `UStateMain` exclusively as before.
  */
 final class InfosetBuildState(
   private val inputter: InfosetInputter,
-  sharedCtx: UnparseSharedContext,
-  diagnosticsArg: Seq[api.Diagnostic],
-  areDebugging: Boolean
-) extends UState(
-    // Build never reads or writes a variable, so an empty map is enough;
-    // it's just here to satisfy UState's constructor.
-    new VariableBox(VariableMap()),
-    diagnosticsArg,
-    Maybe(sharedCtx.dataProc),
-    sharedCtx.tunable,
-    areDebugging
-  )
-  with SuspensionCapableUState
+  sharedCtx: UnparseSharedContext
+) extends InfosetTreeState
+  with SuspensionResolver
   with TraversalIndexStacks {
 
-  dState.setMode(UnparserBlocking)
-  setSharedContext(sharedCtx)
+  override def tunable: DaffodilTunables = sharedCtx.tunable
 
-  // Purely so generic UState utility methods (toString, currentLocation,
-  // bitPos0b) have something non-null to call into; never written to for
-  // real output. Created only if one of them is actually called, which an
-  // ordinary build never does.
-  private var dosCreated = false
-  private lazy val noOpDataOutputStream = {
-    dosCreated = true
-    DirectOrBufferedDataOutputStream(
-      new java.io.OutputStream { override def write(b: Int): Unit = () },
-      null,
-      false,
-      sharedCtx.tunable.outputStreamChunkSizeInBytes,
-      sharedCtx.tunable.maxByteArrayOutputStreamBufferSizeInBytes,
-      sharedCtx.tunable.tempFilePath
-    )
-  }
+  private val eventState: InfosetEventState = new InputterEventState(inputter, "building")
 
-  override def getDataOutputStream: DirectOrBufferedDataOutputStream = noOpDataOutputStream
+  override def advance: Boolean = eventState.advance
+  override def advanceAccessor: InfosetAccessor = eventState.advanceAccessor
+  override def inspect: Boolean = eventState.inspect
+  override def inspectAccessor: InfosetAccessor = eventState.inspectAccessor
+  override def fini(): Unit = Assert.usageError("Not to be used on InfosetBuildState")
+  override def inspectOrError: InfosetAccessor = eventState.inspectOrError
+  override def advanceOrError: InfosetAccessor = eventState.advanceOrError
+  override def isInspectArrayEnd: Boolean = eventState.isInspectArrayEnd
 
-  def cleanUp(): Unit = {
-    if (dosCreated) {
-      noOpDataOutputStream.cleanUp()
-    }
-  }
+  override def pushTRD(trd: TermRuntimeData): Unit = eventState.pushTRD(trd)
+  override def maybeTopTRD(): Maybe[TermRuntimeData] = eventState.maybeTopTRD()
+  override def popTRD(trd: TermRuntimeData): TermRuntimeData = eventState.popTRD(trd)
 
-  // Build runs ahead of write, so freeing a node here would null out a
-  // child reference write hasn't read yet; write still frees as normal.
-  override def releaseUnneededInfoset: Boolean = false
+  override def documentElement: DIDocument = inputter.documentElement
 
-  private def notAvailableDuringBuild =
-    Assert.usageError(
-      "InfosetBuildState never writes content, so this output-writing state doesn't exist"
-    )
+  override val currentInfosetNodeStack = new MStackOfMaybe[DINode]
 
-  override def escapeSchemeEVCache: MStackOfMaybe[EscapeSchemeUnparserHelper] =
-    notAvailableDuringBuild
-  override def withUnparserDataInputStream: LocalStack[StringDataInputStreamForUnparse] =
-    notAvailableDuringBuild
-  override def withByteArrayOutputStream
-    : LocalStack[(ByteArrayOutputStream, DirectOrBufferedDataOutputStream)] =
-    notAvailableDuringBuild
-  override def allTerminatingMarkup: List[DFADelimiter] = notAvailableDuringBuild
-  override def localDelimiters: DelimiterStackUnparseNode = notAvailableDuringBuild
-  override def pushDelimiters(node: DelimiterStackUnparseNode): Unit = notAvailableDuringBuild
-  override def popDelimiters(): Unit = notAvailableDuringBuild
-
-  // Build tracks child position in its own frames, never in a stack.
-  override def childIndexStack: MStackOfLong = notAvailableDuringBuild
-  override def moveOverOneElementChildOnly(): Unit = ()
-  override def childPos: Long = 0L
-
-  override def advance: Boolean = inputter.advance
-  override def advanceAccessor: InfosetAccessor = inputter.advanceAccessor
-  override def inspect: Boolean = inputter.inspect
-  override def inspectAccessor: InfosetAccessor = inputter.inspectAccessor
-  override def fini(): Unit = Assert.usageError("Not to be used on UState")
-
-  override def inspectOrError: InfosetAccessor = {
-    if (inspect) {
-      inspectAccessor
-    } else {
-      Assert.invariantFailed(
-        "An InfosetEvent was required for building, but no InfosetEvent was available."
-      )
-    }
-  }
-
-  override def advanceOrError: InfosetAccessor = {
-    if (advance) {
-      advanceAccessor
-    } else {
-      Assert.invariantFailed(
-        "An InfosetEvent was required for building, but no InfosetEvent was available."
-      )
-    }
-  }
-
-  override def isInspectArrayEnd: Boolean = {
-    if (!inspect) {
-      false
-    } else {
-      inspectAccessor match {
-        case e if e.isEnd && e.isArray => true
-        case _ => false
-      }
-    }
-  }
-
-  def currentInfosetNode: DINode = {
+  override def currentInfosetNode: DINode = {
     if (currentInfosetNodeMaybe.isEmpty) {
       null
     } else {
@@ -175,7 +78,7 @@ final class InfosetBuildState(
     }
   }
 
-  def currentInfosetNodeMaybe: Maybe[DINode] = {
+  override def currentInfosetNodeMaybe: Maybe[DINode] = {
     if (currentInfosetNodeStack.isEmpty) {
       Nope
     } else {
@@ -183,17 +86,25 @@ final class InfosetBuildState(
     }
   }
 
-  override val currentInfosetNodeStack = new MStackOfMaybe[DINode]
+  // Build tracks child position in its own frames, never in a stack.
+  override def moveOverOneElementChildOnly(): Unit = ()
+
+  private var hiddenDepth = 0
+  override def incrementHiddenDef(): Unit = hiddenDepth += 1
+  override def decrementHiddenDef(): Unit = hiddenDepth -= 1
+  override def withinHiddenNest: Boolean = hiddenDepth > 0
+
+  // Build runs ahead of write, so freeing a node here would null out a
+  // child reference write hasn't read yet; write still frees as normal.
+  override def releaseUnneededInfoset: Boolean = false
+
+  override def sharedContext: Maybe[UnparseSharedContext] = One(sharedCtx)
+
+  override def maybeCurrentLocation: Maybe[DataLocation] = Nope
 
   // Shared, not owned; one SuspensionTracker queue, both build and write
   // see the same one via sharedCtx.
   def suspensionTracker: SuspensionTracker = sharedCtx.suspensionTracker
-
-  // Build never evaluates an expression or writes a suspendable child, so
-  // nothing build does can ever suspend, and this is never called: only
-  // Suspension.suspend calls it, and that always calls cloneForSuspension
-  // first, which already throws.
-  def addSuspension(se: Suspension): Unit = notAvailableDuringBuild
 
   /**
    * Uses evalBuildResolvableSuspensions: a suspension that
@@ -205,23 +116,5 @@ final class InfosetBuildState(
     sharedCtx.suspensionTracker.evalBuildResolvableSuspensions()
     if (isFinal) sharedCtx.suspensionTracker.requireFinal()
   }
-  def suspensions = sharedCtx.suspensionTracker.suspensions
-
-  /**
-   * Build never evaluates an expression or writes a suspendable child, so
-   * nothing build does can ever suspend, and this is never called.
-   */
-  override def cloneForSuspension(suspendedDOS: DirectOrBufferedDataOutputStream): UState =
-    notAvailableDuringBuild
-
-  final override def pushTRD(trd: TermRuntimeData): Unit = inputter.pushTRD(trd)
-  final override def maybeTopTRD(): Maybe[TermRuntimeData] = inputter.maybeTopTRD()
-  final override def popTRD(trd: TermRuntimeData): TermRuntimeData = {
-    val poppedTRD = inputter.popTRD()
-    if (poppedTRD ne trd)
-      Assert.invariantFailed("TRDs do not match. Expected: " + trd + " got " + poppedTRD)
-    poppedTRD
-  }
-
-  final override def documentElement: DIDocument = inputter.documentElement
+  def suspensions: Seq[Suspension] = sharedCtx.suspensionTracker.suspensions
 }

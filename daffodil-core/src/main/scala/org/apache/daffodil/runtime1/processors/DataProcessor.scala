@@ -552,7 +552,7 @@ class DataProcessor(
     // Lazy so each is created only after the step before it has succeeded,
     // and never for a run that fails earlier, since each holds an output
     // stream that must then be cleaned up.
-    lazy val buildState = new InfosetBuildState(inputter, sharedCtx, Nil, areDebugging)
+    lazy val buildState = new InfosetBuildState(inputter, sharedCtx)
     // The root element always has a builder: it is exactly the case that
     // gets ElementInfosetBuilder wrapped around it, regardless of schema content.
     lazy val cursor = new InfosetBuildCursor(ssrd.builder, buildState, sharedCtx)
@@ -562,9 +562,7 @@ class DataProcessor(
       if (areDebugging) {
         Assert.invariant(optDebugger.isDefined)
         addEventHandler(debugger)
-        buildState.notifyDebugging(true)
       }
-      init(buildState, rootUnparser)
       sharedCtx.setBuildCursor(cursor)
     }
 
@@ -619,29 +617,22 @@ class DataProcessor(
 
     try {
       initBuildSide()
-      try {
-        initWriteSide()
-        writeTree()
-        // Write only ever advances build as far as it needs, so build may
-        // still have its trailing end events left to consume.
-        cursor.runToCompletion()
-        finishBuildSide(buildState, rootUnparser)
-        finishWriteSide(writeState, rootUnparser)
-        writeState.unparseResult
-      } catch {
-        // Build's own failure is reported against buildState rather than
-        // against write's partially-written state.
-        case b: BuildAbortedException => unparseErrorResult(buildState, b.getCause)
-        case t: Throwable => unparseErrorResult(writeState, t)
-      } finally {
-        writeState.getDataOutputStream.cleanUp()
-      }
+      initWriteSide()
+      writeTree()
+      // Write only ever advances build as far as it needs, so build may
+      // still have its trailing end events left to consume.
+      cursor.runToCompletion()
+      finishBuildSide(buildState, rootUnparser)
+      finishWriteSide(writeState, rootUnparser)
+      writeState.unparseResult
     } catch {
-      // Only reached for a failure before write's state existed, or one
-      // unparseErrorResult itself rethrew (which it will rethrow again).
-      case t: Throwable => unparseErrorResult(buildState, t)
+      // Build has no state of its own to report against, so its failure is
+      // reported against write's. The error carries the location it was
+      // raised at.
+      case b: BuildAbortedException => unparseErrorResult(writeState, b.getCause)
+      case t: Throwable => unparseErrorResult(writeState, t)
     } finally {
-      buildState.cleanUp()
+      writeState.getDataOutputStream.cleanUp()
     }
   }
 
@@ -684,7 +675,6 @@ class DataProcessor(
   // nothing left unconsumed.
   private def finishBuildSide(buildState: InfosetBuildState, rootUnparser: Unparser): Unit = {
     buildState.popTRD(rootUnparser.context.asInstanceOf[TermRuntimeData])
-    buildState.setProcessor(rootUnparser)
 
     Assert.invariant(buildState.arrayIterationIndexStack.length == 1)
     Assert.invariant(buildState.occursIndexStack.length == 1)
@@ -696,7 +686,7 @@ class DataProcessor(
     if (remainingEvent.isDefined) {
       UnparseError(
         Nope,
-        One(buildState.currentLocation),
+        buildState.maybeCurrentLocation,
         "Expected no remaining events, but received %s.",
         remainingEvent.get
       )

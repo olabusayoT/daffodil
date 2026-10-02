@@ -171,7 +171,7 @@ class TestBuildWriteArrayChoice {
 
     val sharedCtx =
       UnparseSharedContextTestFixture.build(dp, prefetchLimit = 100)()
-    val buildState = new InfosetBuildState(buildInputter, sharedCtx, Nil, false)
+    val buildState = new InfosetBuildState(buildInputter, sharedCtx)
 
     new InfosetBuildCursor(dp.ssrd.builder, buildState, sharedCtx).runToCompletion()
 

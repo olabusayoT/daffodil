@@ -111,8 +111,8 @@ class RepOrderedSeparatedSequenceChildUnparser(
 ) extends RepeatingChildUnparser(childUnparser, srd, erd)
   with Separated {
 
-  override def checkArrayPosAgainstMaxOccurs(state: UState) =
-    state.arrayIterationPos <= maxRepeats(state)
+  override def checkArrayPosAgainstMaxOccurs(state: InfosetTreeState) =
+    state.arrayIterationPos <= maxRepeatsFixed
 }
 
 class OrderedSeparatedSequenceUnparser(
@@ -173,8 +173,8 @@ class OrderedSeparatedSequenceUnparser(
       numOccurrences: Long
     ): Unit = {
       if (ssp != Never) return
-      // Uses erd.maxOccurs, not rep.maxRepeats(state): for
-      // occursCountKind="expression"/"parsed", maxRepeats(state) is
+      // Uses erd.maxOccurs, not rep.maxRepeatsFixed: for
+      // occursCountKind="expression"/"parsed", maxRepeatsFixed is
       // Long.MaxValue, which would loop until OOM. An unbounded array's
       // maxOccurs is -1, so sepsNeeded goes negative and this loop no-ops.
       val sepsNeeded = rep.erd.maxOccurs - numOccurrences
@@ -211,9 +211,9 @@ class OrderedSeparatedSequenceUnparser(
         !rep.isPositional || !rep.isBoundedMax ||
         (rep.isDeclaredLast && rep.isPotentiallyTrailing)
       ) return
-      // safe: isBoundedMax being true guarantees maxRepeats(state) is the
+      // safe: isBoundedMax being true guarantees maxRepeatsFixed is the
       // actual, finite erd.maxOccurs, never Long.MaxValue.
-      val maxReps = rep.maxRepeats(state)
+      val maxReps = rep.maxRepeatsFixed
       if (numOccurrences >= maxReps) return
       if (!stacksAlreadyPushed) {
         state.pushOccurrenceIndices()
@@ -758,7 +758,7 @@ class OrderedSeparatedSequenceUnparser(
           state.pushOccurrenceIndices()
           val erd = unparser.erd
           var numOccurrences = 0
-          val maxReps = unparser.maxRepeats(state)
+          val maxReps = unparser.maxRepeatsFixed
           //
           // The number of occurrances we unparse is always exactly driven
           // by the number of infoset events for the repeating/optional element.
@@ -1003,7 +1003,7 @@ class OrderedSeparatedSequenceUnparser(
           unparser.isPositional && unparser.isBoundedMax &&
           (!unparser.isDeclaredLast || !unparser.isPotentiallyTrailing)
         ) {
-          val maxReps = unparser.maxRepeats(state)
+          val maxReps = unparser.maxRepeatsFixed
           while (numOccurrences < maxReps) {
             unparseOneWithSuppression(
               unparser,
@@ -1050,7 +1050,7 @@ class OrderedSeparatedSequenceUnparser(
           Assert.invariant(erd.isRepresented) // arrays/optionals cannot have inputValueCalc
 
           var numOccurrences = 0
-          val maxReps = unparser.maxRepeats(state)
+          val maxReps = unparser.maxRepeatsFixed
 
           Assert.invariant(state.inspect)
           val ev = state.inspectAccessor
