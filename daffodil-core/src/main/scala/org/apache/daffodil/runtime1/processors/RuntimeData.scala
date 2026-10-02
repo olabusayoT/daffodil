@@ -66,6 +66,8 @@ import org.apache.daffodil.runtime1.dsom.DPathCompileInfo
 import org.apache.daffodil.runtime1.dsom.DPathElementCompileInfo
 import org.apache.daffodil.runtime1.dsom.FacetTypes
 import org.apache.daffodil.runtime1.dsom.ImplementsThrowsSDE
+import org.apache.daffodil.runtime1.infoset.ChoiceBranchEndEvent
+import org.apache.daffodil.runtime1.infoset.ChoiceBranchStartEvent
 import org.apache.daffodil.runtime1.infoset.DISimple
 import org.apache.daffodil.runtime1.infoset.DataValue
 import org.apache.daffodil.runtime1.infoset.DataValue.DataValuePrimitiveOrUseNilForDefaultOrNull
@@ -764,6 +766,12 @@ sealed class ElementRuntimeData(
   override def dfdlType: DFDLPrimType = primType.dfdlType
 
   def isComplexType = !isSimpleType
+
+  // Looked up once per element rather than per choice resolution: the
+  // shared cache behind the event factories is a contended lock across
+  // threads.
+  lazy val choiceBranchStartEvent: ChoiceBranchStartEvent = ChoiceBranchStartEvent(namedQName)
+  lazy val choiceBranchEndEvent: ChoiceBranchEndEvent = ChoiceBranchEndEvent(namedQName)
 
   lazy val prefix = this.minimizedScope.getPrefix(namedQName.namespace)
 

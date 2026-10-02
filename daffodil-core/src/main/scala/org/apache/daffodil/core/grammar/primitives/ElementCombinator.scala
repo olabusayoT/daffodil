@@ -170,8 +170,7 @@ class ElementCombinator(
       One(
         new ElementBuilder(
           context.erd,
-          eub.unparseBeginForBuild,
-          eub.unparseEndForBuild,
+          eub,
           contentBuilder
         )
       )
@@ -422,8 +421,7 @@ class ElementParseAndUnspecifiedLength(
     One(
       new ElementBuilder(
         context.erd,
-        eu.unparseBeginForBuild,
-        eu.unparseEndForBuild,
+        eu,
         contentBuilder
       )
     )

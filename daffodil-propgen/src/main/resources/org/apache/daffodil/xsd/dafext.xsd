@@ -537,12 +537,12 @@
         <xs:element name="useBuildWritePrefetch" type="xs:boolean" default="true" minOccurs="0">
           <xs:annotation>
             <xs:documentation>
-              If true, unparsing uses a build/write-prefetch path instead of the
-              default single-pass unparse: a build pass runs ahead of a write pass
-              over the same infoset tree, resolving forward references against the
-              tree directly instead of via Suspensions where possible. How far
-              build may run ahead of write is bounded by
-              unparsePrefetchWindowNodes.
+              If true (the default), unparsing uses a build/write-prefetch path for
+              every schema: a build pass runs ahead of a write pass over the same
+              infoset tree, resolving forward references against the tree directly
+              instead of via Suspensions where possible. How far build may run
+              ahead of write is bounded by unparsePrefetchWindowNodes. If false,
+              unparsing is a single pass.
             </xs:documentation>
           </xs:annotation>
         </xs:element>

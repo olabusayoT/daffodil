@@ -257,7 +257,7 @@ protected abstract class MStack[@specialized T] private[util] (
    *
    *  @param x The element to push
    */
-  @inline final def push(x: T): Unit = {
+  inline def push(x: T): Unit = {
     if (index == table.length) table = growArray(table)
     table(index) = x
     index += 1
@@ -271,7 +271,7 @@ protected abstract class MStack[@specialized T] private[util] (
    *
    *  @return the element on top of the stack
    */
-  @inline final def pop(): T = {
+  inline def pop(): T = {
     if (index == 0) Assert.usageError("Stack empty")
     index -= 1
     val x = table(index)
@@ -285,7 +285,7 @@ protected abstract class MStack[@specialized T] private[util] (
    *
    * @param x The element to set to the top of the stack
    */
-  @inline final def setTop(x: T): Unit = {
+  inline def setTop(x: T): Unit = {
     if (index == 0) Assert.usageError("Stack empty")
     table(index - 1) = x
   }
@@ -298,9 +298,9 @@ protected abstract class MStack[@specialized T] private[util] (
    *
    *  @return the element on top of the stack.
    */
-  @inline final def top: T = table(index - 1)
+  inline def top: T = table(index - 1)
 
-  @inline final def bottom: T = table(0)
+  inline def bottom: T = table(0)
 
   @inline final def isEmpty: Boolean = index == 0
 

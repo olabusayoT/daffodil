@@ -249,17 +249,17 @@ object TestUtils {
   }
 
   /**
-   * Compiles testSchema twice - once with default tunables, once with
-   * useBuildWritePrefetch (plus any extraTunables) - and unparses
-   * infosetXML both ways. Returns (singlePassBytes, prefetchBytes) for
-   * the caller to assert equality (and any expected-string checks) on.
+   * Compiles testSchema twice - once with useBuildWritePrefetch off, once
+   * with it on (plus any extraTunables) - and unparses infosetXML both
+   * ways. Returns (singlePassBytes, prefetchBytes) for the caller to
+   * assert equality (and any expected-string checks) on.
    */
   def getSinglePassAndPrefetchBytes(
     testSchema: Node,
     infosetXML: Node,
     extraTunables: Map[String, String] = Map.empty
   ): (Array[Byte], Array[Byte]) = {
-    val singlePassDp = compileForUnparse(testSchema)
+    val singlePassDp = compileForUnparse(testSchema, Map("useBuildWritePrefetch" -> "false"))
     val singlePassBytes = unparseToBytes(singlePassDp, infosetXML)
 
     val prefetchDp =

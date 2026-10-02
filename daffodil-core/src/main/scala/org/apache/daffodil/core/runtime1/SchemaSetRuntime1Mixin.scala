@@ -99,11 +99,9 @@ trait SchemaSetRuntime1Mixin {
     // null parser/unparser, and that it's impossible for a DataProcessor
     // to have an error
     Assert.invariant(!root.isError)
-    // Only reference builder/hasAnyPrefetchBeneficialOVC (a full Builder
-    // tree, a schema component scan) when prefetch will be used: a schema
-    // with no prefetch-beneficial OVC never runs the build/write path, so
-    // building the Builder tree would be waste even with the tunable on.
-    val isPrefetchInUse = tunable.useBuildWritePrefetch && root.hasAnyPrefetchBeneficialOVC
+    // Prefetch is used for every schema when the tunable is on, whether or
+    // not any OVC could benefit, so the Builder tree is built for all of them.
+    val isPrefetchInUse = tunable.useBuildWritePrefetch
     val ssrd =
       new SchemaSetRuntimeData(
         parser,

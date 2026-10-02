@@ -467,9 +467,7 @@ class DataProcessor(
   }
 
   def unparse(actualInputter: api.infoset.InfosetInputter, outStream: java.io.OutputStream) = {
-    // Prefetch is in use only if the tunable is on and some OVC could
-    // resolve early; when every OVC is content-length-dependent, no amount
-    // of racing build ahead helps, so fall back to single-pass.
+    // Prefetch is in use whenever the tunable was on at compile time.
     if (ssrd.isPrefetchInUse) {
       unparseViaBuildThenWrite(actualInputter, outStream)
     } else {
@@ -643,7 +641,7 @@ class DataProcessor(
       // unparseErrorResult itself rethrew (which it will rethrow again).
       case t: Throwable => unparseErrorResult(buildState, t)
     } finally {
-      buildState.getDataOutputStream.cleanUp()
+      buildState.cleanUp()
     }
   }
 
@@ -691,7 +689,6 @@ class DataProcessor(
     Assert.invariant(buildState.arrayIterationIndexStack.length == 1)
     Assert.invariant(buildState.occursIndexStack.length == 1)
     Assert.invariant(buildState.groupIndexStack.length == 1)
-    Assert.invariant(buildState.childIndexStack.length == 1)
     Assert.invariant(buildState.currentInfosetNodeMaybe.isEmpty)
     Assert.invariant(buildState.maybeTopTRD().isEmpty)
 

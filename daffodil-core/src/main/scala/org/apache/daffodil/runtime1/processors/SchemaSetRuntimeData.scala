@@ -37,10 +37,8 @@ final class SchemaSetRuntimeData(
   variables: VariableMap,
   allLayers: Seq[LayerRuntimeData],
   @transient layerRuntimeCompilerArg: LayerRuntimeCompiler,
-  /** True if useBuildWritePrefetch is on and this schema has an
-   * outputValueCalc element whose value could resolve without writing;
-   * baked in at compile time. Otherwise unparsing falls back to
-   * single-pass. */
+  /** True if useBuildWritePrefetch was on when this schema was compiled;
+   * otherwise unparsing is single-pass. */
   val isPrefetchInUse: Boolean
 ) extends Serializable
   with ThrowsSDE {
