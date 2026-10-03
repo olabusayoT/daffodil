@@ -39,8 +39,8 @@ import org.apache.daffodil.runtime1.processors.TermRuntimeData
  * it has no output stream, variables or debugger state, and build never
  * writes content.
  *
- * Used only when the `useBuildPrefetch` tunable is enabled; otherwise
- * only `UStateMain` is constructed.
+ * Used only when the `useBuildPrefetch` tunable is enabled when unparsing;
+ * otherwise only `UStateMain` is constructed.
  */
 final class InfosetBuildState(
   private val inputter: InfosetInputter,

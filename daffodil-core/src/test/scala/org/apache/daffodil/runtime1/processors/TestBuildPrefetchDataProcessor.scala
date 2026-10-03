@@ -30,9 +30,9 @@ import org.junit.Assert.*
 import org.junit.Test
 
 /**
- * Checks when the build-prefetch path is in use for a compiled schema
- * (a non-empty builder), and how DataProcessor.unparse behaves when it cannot
- * start. Whether unparse output is the same with and without prefetch is
+ * Checks that a compiled schema always carries an infoset builder, that the
+ * useBuildPrefetch tunable can be changed on a compiled DataProcessor, and how
+ * DataProcessor.unparse behaves when it cannot start. Whether unparse output is the same with and without prefetch is
  * covered by buildPrefetch.tdml, run with DAFFODIL_TDML_TUNABLES set to
  * each value of useBuildPrefetch.
  */
@@ -104,8 +104,8 @@ class TestBuildPrefetchDataProcessor {
     )
   }
 
-  // A schema with no OVC at all still uses prefetch when the tunable is on.
-  @Test def testSchemaWithNoOVCAtAllStillUsesPrefetch(): Unit = {
+  // A schema with no OVC at all still gets a builder.
+  @Test def testSchemaWithNoOVCAtAllStillGetsBuilder(): Unit = {
     val sch = SchemaUtils.dfdlTestSchema(
       <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
       <dfdl:format ref="tns:GeneralFormat"
@@ -128,9 +128,9 @@ class TestBuildPrefetchDataProcessor {
     assertFalse(dp.ssrd.builder.isEmpty)
   }
 
-  // A schema where every OVC is resolvable-without-writing uses prefetch:
+  // A schema where every OVC is resolvable-without-writing gets a builder:
   // the common case.
-  @Test def testSchemaWithOnlyResolvableOVCUsesPrefetch(): Unit = {
+  @Test def testSchemaWithOnlyResolvableOVCGetsBuilder(): Unit = {
     val sch = SchemaUtils.dfdlTestSchema(
       <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
       <dfdl:format ref="tns:GeneralFormat"
@@ -160,9 +160,10 @@ class TestBuildPrefetchDataProcessor {
     assertFalse(dp.ssrd.builder.isEmpty)
   }
 
-  // With the tunable explicitly off, prefetch is never used, even for a
-  // schema whose OVC could resolve early.
-  @Test def testTunableOffNeverUsesPrefetch(): Unit = {
+  // The builder exists even when the tunable is off at compile time, and the
+  // same compiled processor unparses identically with the tunable switched
+  // either way afterward.
+  @Test def testTunableCanChangeAfterCompile(): Unit = {
     val sch = SchemaUtils.dfdlTestSchema(
       <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
       <dfdl:format ref="tns:GeneralFormat"
@@ -189,12 +190,26 @@ class TestBuildPrefetchDataProcessor {
       .compileNode(sch)
       .onPath("/")
       .asInstanceOf[DataProcessor]
-    assertTrue(dp.ssrd.builder.isEmpty)
+    assertFalse(dp.ssrd.builder.isEmpty)
+
+    val infoset = <ex:row xmlns:ex={example}><actual>7</actual></ex:row>
+    val singlePass = unparseToBytes(dp, infoset)
+    val prefetch = unparseToBytes(
+      dp.copy(tunables = dp.tunables.withTunable("useBuildPrefetch", "true")),
+      infoset
+    )
+    assertArrayEquals(singlePass, prefetch)
+    assertArrayEquals(
+      singlePass,
+      unparseToBytes(
+        dp.copy(tunables = dp.tunables.withTunable("useBuildPrefetch", "false")),
+        infoset
+      )
+    )
   }
 
-  // Whether prefetch is in use (a non-empty builder) is baked in at compile time; confirms it survives a
-  // save/reload round trip.
-  @Test def testIsPrefetchInUseSurvivesSaveReload(): Unit = {
+  // Confirms the builder survives a save/reload round trip.
+  @Test def testBuilderSurvivesSaveReload(): Unit = {
     val sch = SchemaUtils.dfdlTestSchema(
       <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
       <dfdl:format ref="tns:GeneralFormat"

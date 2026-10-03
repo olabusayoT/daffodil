@@ -28,8 +28,7 @@ import org.apache.daffodil.runtime1.processors.unparsers.Unparser
 final class SchemaSetRuntimeData(
   val parser: Parser,
   val unparser: Unparser,
-  /** Nada, meaning unparsing is single-pass, unless useBuildPrefetch
-   * was on when this schema was compiled. */
+  /** Nada only when the schema was compiled without an unparser. */
   val builder: InfosetBuilder,
   val elementRuntimeData: ElementRuntimeData,
   /*

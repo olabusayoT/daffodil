@@ -63,10 +63,8 @@ trait SchemaSetRuntime1Mixin {
     unp
   }.value
 
-  // Not forced eagerly: onPath only references this when
-  // tunable.useBuildPrefetch is on (the tunable is fixed at compile
-  // time), so schemas that never enable it never pay to construct the
-  // InfosetBuilder tree.
+  // Built for every unparse-capable compile, whatever useBuildPrefetch says,
+  // so the tunable can be changed on a compiled DataProcessor.
   lazy val builder: InfosetBuilder = LV(Symbol("builder")) {
     if (generateUnparser) {
       root.document.builder
@@ -104,7 +102,7 @@ trait SchemaSetRuntime1Mixin {
       new SchemaSetRuntimeData(
         parser,
         unparser,
-        if (tunable.useBuildPrefetch) builder else NadaInfosetBuilder,
+        builder,
         root.elementRuntimeData,
         variableMap,
         allLayers,

@@ -467,8 +467,7 @@ class DataProcessor(
   }
 
   def unparse(actualInputter: api.infoset.InfosetInputter, outStream: java.io.OutputStream) = {
-    // Prefetch is in use whenever the tunable was on at compile time.
-    if (!ssrd.builder.isEmpty) {
+    if (tunables.useBuildPrefetch) {
       unparseWithPrefetch(actualInputter, outStream)
     } else {
       unparseSinglePass(actualInputter, outStream)
