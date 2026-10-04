@@ -80,8 +80,13 @@ sealed trait Unparser extends Processor {
     if (savedProc.isDefined) ustate.setMaybeProcessor(savedProc)
   }
 
+  def UE(state: UState, s: String, args: Any*) = {
+    UnparseError(One(context.schemaFileLocation), One(state.currentLocation), s, args*)
+  }
+
+  // Code shared with build has no data location to report.
   def UE(state: InfosetTreeState, s: String, args: Any*) = {
-    UnparseError(One(context.schemaFileLocation), state.maybeCurrentLocation, s, args*)
+    UnparseError(One(context.schemaFileLocation), Nope, s, args*)
   }
 
 }

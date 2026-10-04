@@ -56,4 +56,8 @@ class UnparseError(
 ) extends ProcessingError("Unparse", rd, loc, causedBy, kind, args*) {
   def this(rd: Maybe[SchemaFileLocation], loc: Maybe[DataLocation], causedBy: Throwable) =
     this(rd, loc, Maybe(causedBy), Maybe.Nope)
+
+  /** A copy of this error that reports the given data location. */
+  def withDataLocation(newLoc: Maybe[DataLocation]): UnparseError =
+    new UnparseError(rd, newLoc, maybeCause, maybeFormatString, args*)
 }

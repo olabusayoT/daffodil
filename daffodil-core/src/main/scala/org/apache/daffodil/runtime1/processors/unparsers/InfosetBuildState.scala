@@ -17,7 +17,6 @@
 
 package org.apache.daffodil.runtime1.processors.unparsers
 
-import org.apache.daffodil.api.DataLocation
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.iapi.DaffodilTunables
 import org.apache.daffodil.lib.util.MStackOfMaybe
@@ -100,8 +99,6 @@ final class InfosetBuildState(
   override def freeChildIfNoLongerNeeded(parent: DINode, index: Int): Unit = ()
 
   override def sharedContext: Maybe[UnparseSharedContext] = One(sharedCtx)
-
-  override def maybeCurrentLocation: Maybe[DataLocation] = Nope
 
   // Shared, not owned; one SuspensionTracker queue, both build and unparseTree
   // see the same one via sharedCtx.

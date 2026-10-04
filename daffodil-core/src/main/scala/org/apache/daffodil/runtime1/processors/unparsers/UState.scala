@@ -83,8 +83,6 @@ abstract class UState(
   with ThrowsSDE
   with SavesErrorsAndWarnings {
 
-  final override def maybeCurrentLocation: Maybe[DataLocation] = One(currentLocation)
-
   final override def setVariable(
     vrd: VariableRuntimeData,
     newValue: DataValuePrimitive,
@@ -506,9 +504,6 @@ trait InfosetTreeState extends Cursor[InfosetAccessor] {
   // not read yet.
   def freeChildIfNoLongerNeeded(parent: DINode, index: Int): Unit
   def sharedContext: Maybe[UnparseSharedContext]
-
-  /** Where an error is reported, if the state knows. */
-  def maybeCurrentLocation: Maybe[DataLocation]
 }
 
 /**

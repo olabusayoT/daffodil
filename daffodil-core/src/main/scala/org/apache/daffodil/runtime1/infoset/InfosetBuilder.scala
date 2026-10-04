@@ -20,6 +20,7 @@ package org.apache.daffodil.runtime1.infoset
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.util.MStackOf
 import org.apache.daffodil.lib.util.Maybe
+import org.apache.daffodil.lib.util.Maybe.Nope
 import org.apache.daffodil.lib.util.Maybe.One
 import org.apache.daffodil.runtime1.processors.ElementRuntimeData
 import org.apache.daffodil.runtime1.processors.ModelGroupRuntimeData
@@ -380,7 +381,7 @@ final class ChoiceInfosetBuilder(
       if (resolved.isEmpty) {
         UnparseError(
           One(mgrd.schemaFileLocation),
-          state.maybeCurrentLocation,
+          Nope,
           "Found next element %s, but expected one of %s.",
           key.qname.toExtendedSyntax,
           branchMap.keys.map { _.qname.toExtendedSyntax }.mkString(", ")

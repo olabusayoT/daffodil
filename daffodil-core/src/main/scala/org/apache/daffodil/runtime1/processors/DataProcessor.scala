@@ -474,6 +474,11 @@ class DataProcessor(
     }
   }
 
+  // An error raised by code shared with build has no data location, so it is
+  // reported at the unparse state's current location.
+  private def atUnparseLocation(ue: UnparseError, state: UState): UnparseError =
+    if (ue.getDataLocations.isEmpty) ue.withDataLocation(One(state.currentLocation)) else ue
+
   /**
    * Shared by unparseWithPrefetch and unparseSinglePass's top-level
    * catch blocks: maps an exception caught during unparsing to a failed
@@ -482,7 +487,7 @@ class DataProcessor(
    */
   private def unparseErrorResult(state: UState, t: Throwable): UnparseResult = t match {
     case ue: UnparseError => {
-      state.addUnparseError(ue)
+      state.addUnparseError(atUnparseLocation(ue, state))
       state.unparseResult
     }
     case procErr: ProcessingError => {
@@ -632,8 +637,7 @@ class DataProcessor(
       unparseTreeState.unparseResult
     } catch {
       // Build has no state of its own to report against, so its failure is
-      // reported against unparseTree's. The error carries the location it was
-      // raised at.
+      // reported against unparseTree's.
       case b: BuildAbortedException => unparseErrorResult(unparseTreeState, b.getCause)
       case t: Throwable => unparseErrorResult(unparseTreeState, t)
     } finally {
@@ -693,7 +697,7 @@ class DataProcessor(
     if (remainingEvent.isDefined) {
       UnparseError(
         Nope,
-        infosetBuildState.maybeCurrentLocation,
+        Nope,
         "Expected no remaining events, but received %s.",
         remainingEvent.get
       )
