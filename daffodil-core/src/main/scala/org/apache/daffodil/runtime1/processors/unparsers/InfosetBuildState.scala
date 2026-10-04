@@ -95,9 +95,9 @@ final class InfosetBuildState(
   override def decrementHiddenDef(): Unit = hiddenDepth -= 1
   override def withinHiddenNest: Boolean = hiddenDepth > 0
 
-  // Build runs ahead of unparseTree, so freeing a node here would null out a
-  // child reference unparseTree hasn't read yet; unparseTree still frees as normal.
-  override def releaseUnneededInfoset: Boolean = false
+  // Build runs ahead of unparseTree, which frees each node once it is done
+  // with it, so build leaves freeing to unparseTree.
+  override def freeChildIfNoLongerNeeded(parent: DINode, index: Int): Unit = ()
 
   override def sharedContext: Maybe[UnparseSharedContext] = One(sharedCtx)
 

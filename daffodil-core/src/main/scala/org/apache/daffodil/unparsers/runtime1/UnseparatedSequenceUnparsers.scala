@@ -135,12 +135,12 @@ class OrderedUnseparatedSequenceUnparser(
         withDebuggerEvents(rep, state) {
           rep.childUnparser.asInstanceOf[ElementUnparserBase].unparseTree1(occNode, state)
         }
-        arrayNode.freeChildIfNoLongerNeeded(arrayOcc, state.releaseUnneededInfoset)
+        state.freeChildIfNoLongerNeeded(arrayNode, arrayOcc)
         arrayOcc += 1
         state.moveOverOneArrayIterationIndexOnly()
         state.moveOverOneOccursIndexOnly()
       }
-      complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
+      state.freeChildIfNoLongerNeeded(complex, idx)
       state.moveOverOneElementChildOnly()
     } finally {
       state.popOccurrenceIndices()
@@ -164,7 +164,7 @@ class OrderedUnseparatedSequenceUnparser(
         rep.childUnparser.asInstanceOf[ElementUnparserBase].unparseTree1(readyChild, state)
       }
       state.moveOverOneElementChildOnly()
-      complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
+      state.freeChildIfNoLongerNeeded(complex, idx)
       state.moveOverOneArrayIterationIndexOnly()
       state.moveOverOneOccursIndexOnly()
     } finally {
@@ -215,7 +215,7 @@ class OrderedUnseparatedSequenceUnparser(
     awaitRequiredTermChild(isGroupTerm = false, complex, idx, sharedCtx)
     elemUnp.unparseTree1(complex.child(idx), state)
     state.moveOverOneElementChildOnly()
-    complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
+    state.freeChildIfNoLongerNeeded(complex, idx)
   }
 
   private def unparseGroupTermForTree(

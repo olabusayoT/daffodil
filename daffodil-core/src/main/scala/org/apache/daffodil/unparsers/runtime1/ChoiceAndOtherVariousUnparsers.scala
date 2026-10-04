@@ -193,7 +193,7 @@ class ChoiceCombinatorUnparser(
     // (innerSelfManagesPosition), which already did so for its own positions.
     if (resolvedChildIndex >= 0 && !innerSelfManagesPosition) {
       state.moveOverOneElementChildOnly()
-      complex.freeChildIfNoLongerNeeded(resolvedChildIndex, state.releaseUnneededInfoset)
+      state.freeChildIfNoLongerNeeded(complex, resolvedChildIndex)
     }
   }
 

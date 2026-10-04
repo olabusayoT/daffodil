@@ -575,10 +575,7 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
           val lastChild = lastChildMaybe.get
           if (lastChild.isArray && (lastChild.erd ne newElem.erd)) {
             lastChild.setFinal()
-            parentComplex.freeChildIfNoLongerNeeded(
-              parentComplex.numChildren - 1,
-              state.releaseUnneededInfoset
-            )
+            state.freeChildIfNoLongerNeeded(parentComplex, parentComplex.numChildren - 1)
           }
         }
 
@@ -636,7 +633,7 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
         val lastChild = cur.maybeLastChild
         if (lastChild.isDefined && lastChild.get.isArray) {
           lastChild.get.setFinal()
-          cur.freeChildIfNoLongerNeeded(cur.numChildren - 1, state.releaseUnneededInfoset)
+          state.freeChildIfNoLongerNeeded(cur, cur.numChildren - 1)
         }
       }
 
@@ -651,10 +648,7 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
       val curContainer =
         if (cur.erd.isArray) cur.diParent.maybeLastChild.get
         else cur.diParent
-      curContainer.freeChildIfNoLongerNeeded(
-        curContainer.numChildren - 1,
-        state.releaseUnneededInfoset
-      )
+      state.freeChildIfNoLongerNeeded(curContainer, curContainer.numChildren - 1)
 
       if (state.currentInfosetNodeStack.isEmpty) {
         // If there is nothing else on the infoset stack after popping off the
@@ -726,10 +720,7 @@ trait OVCStartEndStrategy extends ElementUnparserStartEndStrategy {
       val lastChild = lastChildMaybe.get
       if (lastChild.isArray) {
         lastChild.setFinal()
-        parentComplex.freeChildIfNoLongerNeeded(
-          parentComplex.numChildren - 1,
-          state.releaseUnneededInfoset
-        )
+        state.freeChildIfNoLongerNeeded(parentComplex, parentComplex.numChildren - 1)
       }
     }
 
@@ -745,10 +736,7 @@ trait OVCStartEndStrategy extends ElementUnparserStartEndStrategy {
     // arrays, so we can directly get the diParent to get the container DINode
     val ovcElem = state.currentInfosetNodeStack.pop
     val ovcContainer = ovcElem.get.diParent
-    ovcContainer.freeChildIfNoLongerNeeded(
-      ovcContainer.numChildren - 1,
-      state.releaseUnneededInfoset
-    )
+    state.freeChildIfNoLongerNeeded(ovcContainer, ovcContainer.numChildren - 1)
 
     if (state.currentInfosetNodeStack.isEmpty) {
       // If there is nothing else on the infoset stack after popping off the

@@ -589,6 +589,7 @@ class DataProcessor(
       try {
         val rootNode = sharedCtx.awaitChild(inputter.documentElement, 0)
         rootElemUnp.unparseTree1(rootNode, unparseTreeState)
+        unparseTreeState.freeChildIfNoLongerNeeded(inputter.documentElement, 0)
       } catch {
         // A genuine deadlock (if any) surfaces via finishUnparseSide's
         // own evalSuspensions(isFinal = true) call, which runs regardless

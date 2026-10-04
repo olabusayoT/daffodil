@@ -427,14 +427,14 @@ class OrderedSeparatedSequenceUnparser(
       while (sharedCtx.childExistsOrFinal(arrayNode, arrayOcc)) {
         val occNode = sharedCtx.awaitChild(arrayNode, arrayOcc)
         unparseOccurrenceForTree(rep, occNode, state, sepState)
-        arrayNode.freeChildIfNoLongerNeeded(arrayOcc, state.releaseUnneededInfoset)
+        state.freeChildIfNoLongerNeeded(arrayNode, arrayOcc)
         arrayOcc += 1
         state.moveOverOneArrayIterationIndexOnly()
         state.moveOverOneOccursIndexOnly()
       }
       // The whole array term occupies exactly one slot among
       // containerNode's own children, however many occurrences it held.
-      complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
+      state.freeChildIfNoLongerNeeded(complex, idx)
       state.moveOverOneElementChildOnly()
       finishRepeatingTerm(rep, arrayOcc, sepState)
     } finally {
@@ -458,7 +458,7 @@ class OrderedSeparatedSequenceUnparser(
     try {
       unparseOccurrenceForTree(rep, readyChild, state, sepState)
       state.moveOverOneElementChildOnly()
-      complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
+      state.freeChildIfNoLongerNeeded(complex, idx)
       // occursIndexStack.top must reflect the next (missing) occurrence's
       // index before the positionally-required separators loop runs, or its
       // first separator would see index 1, not 2.
@@ -571,7 +571,7 @@ class OrderedSeparatedSequenceUnparser(
         elemUnp.unparseTree1(complex.child(idx), state)
         sepState.afterSeparator()
         state.moveOverOneElementChildOnly()
-        complex.freeChildIfNoLongerNeeded(idx, state.releaseUnneededInfoset)
+        state.freeChildIfNoLongerNeeded(complex, idx)
       case tu: TreeUnparser =>
         tu.unparseTree1(complex, state)
         sepState.afterSeparator()

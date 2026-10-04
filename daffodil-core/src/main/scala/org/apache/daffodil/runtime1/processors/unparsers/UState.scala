@@ -441,9 +441,11 @@ abstract class UState(
 
   def documentElement: DIDocument
 
-  // Whether a node is freed once it is done with. False for the build side,
-  // which runs ahead of unparseTree and would free children not yet read.
-  def releaseUnneededInfoset: Boolean
+  // Whether a node is freed once it is done with.
+  private[unparsers] def releaseUnneededInfoset: Boolean
+
+  final def freeChildIfNoLongerNeeded(parent: DINode, index: Int): Unit =
+    parent.freeChildIfNoLongerNeeded(index, releaseUnneededInfoset)
 
   def delimitedParseResult = Nope
 
@@ -498,7 +500,11 @@ trait InfosetTreeState extends Cursor[InfosetAccessor] {
 
   def moveOverOneElementChildOnly(): Unit
 
-  def releaseUnneededInfoset: Boolean
+  // unparseBegin and unparseEnd free children, and build runs them too. Build
+  // runs ahead of unparseTree, which may already have freed the node, so build
+  // must not free: it would find a null slot or free a node unparseTree has
+  // not read yet.
+  def freeChildIfNoLongerNeeded(parent: DINode, index: Int): Unit
   def sharedContext: Maybe[UnparseSharedContext]
 
   /** Where an error is reported, if the state knows. */
@@ -774,7 +780,8 @@ final class UStateForSuspension(
   ) {
 
   // Follows the main state this suspension state was cloned from.
-  override def releaseUnneededInfoset: Boolean = mainUState.releaseUnneededInfoset
+  override private[unparsers] def releaseUnneededInfoset: Boolean =
+    mainUState.releaseUnneededInfoset
 
   _dataOutputStream = dataOutputStream
   dState.setMode(UnparserBlocking)
@@ -872,7 +879,8 @@ final class UStateMain private[unparsers] (
   with SuspensionCapableUState
   with TraversalIndexStacks {
 
-  final val releaseUnneededInfoset: Boolean = !areDebugging && tunable.releaseUnneededInfoset
+  private[unparsers] final val releaseUnneededInfoset: Boolean =
+    !areDebugging && tunable.releaseUnneededInfoset
 
   dState.setMode(UnparserBlocking)
 
