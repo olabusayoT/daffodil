@@ -18,6 +18,7 @@
 package org.apache.daffodil.runtime1.infoset
 
 import org.apache.daffodil.lib.exceptions.Assert
+import org.apache.daffodil.lib.util.MStackOf
 import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.One
 import org.apache.daffodil.runtime1.processors.ElementRuntimeData
@@ -76,67 +77,33 @@ final class InfosetBuildCursor(
   val state: InfosetTreeState,
   ctx: UnparseSharedContext
 ) {
-  private var stack = new Array[InfosetBuildFrame](32)
-  private var depth = 0
-  private var failure: Throwable = null
+  private val stack = new MStackOf[InfosetBuildFrame]()
 
   push(root.newFrame())
 
-  def push(frame: InfosetBuildFrame): Unit = {
-    if (depth == stack.length) {
-      stack = java.util.Arrays.copyOf(stack, depth * 2)
-    }
-    stack(depth) = frame
-    depth += 1
-  }
+  def push(frame: InfosetBuildFrame): Unit = stack.push(frame)
 
-  def pop(): Unit = {
-    depth -= 1
-    stack(depth) = null
-  }
+  def pop(): Unit = stack.pop
 
-  def isFinished: Boolean = depth == 0
+  def isFinished: Boolean = stack.isEmpty
 
   /**
-   * Steps until at least one more node is built and either the lead window
-   * is full or too many suspensions are pending, or until building
-   * completes. A failure is rethrown, here and on every later call, as a
-   * BuildAbortedException wrapping the original.
+   * Steps until the lead window is full or building completes, so it takes a
+   * single step when the window is already full. With lastAdvance it ignores
+   * the window and runs until building completes. A failure is thrown as a
+   * BuildAbortedException wrapping the original, which ends the unparse, so
+   * the cursor is not used again.
    */
-  def advance(): Unit = {
-    if (failure != null) {
-      throw new BuildAbortedException(failure)
-    }
-    var lead = ctx.currentLead
+  def advance(lastAdvance: Boolean = false): Unit = {
     try {
-      while (depth > 0) {
-        stack(depth - 1).step(this)
-        // Only a step that added a node can newly hit either limit: the
-        // lead only grows by node additions, and build never adds
-        // suspensions, so pending suspensions can only shrink here.
-        val newLead = ctx.currentLead
-        if (newLead != lead) {
-          lead = newLead
-          if (
-            ctx.leadExceedsPrefetchLimit ||
-            ctx.suspensionTracker.pendingCount > ctx.pendingSuspensionTripLimit
-          ) {
-            return
-          }
+      while (!stack.isEmpty) {
+        stack.top.step(this)
+        if (!lastAdvance && ctx.leadExceedsPrefetchLimit) {
+          return
         }
       }
     } catch {
-      case t: Throwable => {
-        failure = t
-        depth = 0
-        throw new BuildAbortedException(t)
-      }
-    }
-  }
-
-  def runToCompletion(): Unit = {
-    while (!isFinished) {
-      advance()
+      case t: Throwable => throw new BuildAbortedException(t)
     }
   }
 }

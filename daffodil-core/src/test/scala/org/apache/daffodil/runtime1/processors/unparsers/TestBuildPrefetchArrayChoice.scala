@@ -173,7 +173,8 @@ class TestBuildPrefetchArrayChoice {
     val infosetBuildState =
       new InfosetBuildState(buildInputter, sharedCtx, areDebugging = false)
 
-    new InfosetBuildCursor(dp.ssrd.builder, infosetBuildState, sharedCtx).runToCompletion()
+    new InfosetBuildCursor(dp.ssrd.builder, infosetBuildState, sharedCtx)
+      .advance(lastAdvance = true)
 
     // row, header, item x3, typeB = 6 elements total.
     assertEquals(6L, sharedCtx.currentLead)

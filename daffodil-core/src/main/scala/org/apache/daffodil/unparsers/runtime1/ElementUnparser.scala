@@ -275,9 +275,6 @@ sealed abstract class ElementUnparserBase(
       // build's unparseEnd, or they pile up unresolved until the final
       // isFinal=true call instead of resolving as data becomes available.
       state.asInstanceOf[SuspensionCapableUState].evalSuspensions(isFinal = false)
-      if (state.sharedContext.isDefined) {
-        state.sharedContext.get.relieveSuspensionBacklog()
-      }
     } finally {
       // A stall (AwaitChildStalledException) or other exception mid-recursion
       // must still unwind this node's own push, or these stacks end up

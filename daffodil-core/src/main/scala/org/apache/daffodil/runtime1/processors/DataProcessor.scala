@@ -545,7 +545,6 @@ class DataProcessor(
         tunables.unparseSuspensionWaitYoung * (if (areDebugging) 1 else 2),
         tunables.unparseSuspensionWaitOld * (if (areDebugging) 1 else 2)
       ),
-      this,
       tunables,
       // Debugging builds only what unparseTree asks for, so the infoset a debugger
       // shows is what a single-pass unparse would have built by that step.
@@ -627,7 +626,7 @@ class DataProcessor(
       unparseBuiltTree()
       // unparseTree only ever advances build as far as it needs, so build may
       // still have its trailing end events left to consume.
-      cursor.runToCompletion()
+      cursor.advance(lastAdvance = true)
       finishBuildSide(infosetBuildState, rootUnparser)
       finishUnparseSide(unparseTreeState, rootUnparser)
       unparseTreeState.unparseResult

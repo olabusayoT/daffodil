@@ -556,28 +556,6 @@
             </xs:documentation>
           </xs:annotation>
         </xs:element>
-        <xs:element name="unparsePendingSuspensionTripLimit" type="xs:long" default="500" minOccurs="0">
-          <xs:annotation>
-            <xs:documentation>
-              Only consulted when useBuildPrefetch is true. A second,
-              independent limit on how far build may run ahead of unparse,
-              alongside unparsePrefetchWindowNodes: the maximum number of
-              pending suspensions (forward references that cannot resolve
-              until unparse itself writes the referenced bytes, e.g.
-              dfdl:valueLength/dfdl:contentLength) build may accumulate
-              before it pauses to let unparse catch up, regardless of how
-              large unparsePrefetchWindowNodes is set. Without this,
-              unparsePrefetchWindowNodes alone does not bound this
-              backlog, since a node's lead-counter contribution is
-              released once unparse's structural pass reaches it, whether or
-              not that node's own suspension has resolved yet, so a large
-              window can otherwise let many resolved-but-still-
-              pending nodes accumulate unboundedly before anything
-              forces unparse to actually catch up to what they're
-              waiting on.
-            </xs:documentation>
-          </xs:annotation>
-        </xs:element>
         <xs:element name="requireBitOrderProperty" type="xs:boolean" default="false" minOccurs="0">
           <xs:annotation>
             <xs:documentation>

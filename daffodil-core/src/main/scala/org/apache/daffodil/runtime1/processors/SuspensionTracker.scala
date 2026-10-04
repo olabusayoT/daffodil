@@ -30,13 +30,6 @@ class SuspensionTracker(suspensionWaitYoung: Int, suspensionWaitOld: Int) {
 
   def suspensions: Seq[Suspension] = suspensionsYoung.toSeq ++ suspensionsOld.toSeq
 
-  /**
-   * Total not-yet-done suspensions, counted without allocating, so cheap
-   * enough to check once per node as a throttle signal for the pending
-   * backlog.
-   */
-  def pendingCount: Int = suspensionsYoung.length + suspensionsOld.length
-
   private var count: Int = 0
 
   private var suspensionStatTracked: Int = 0

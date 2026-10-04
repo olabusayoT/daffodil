@@ -79,7 +79,8 @@ class TestLeadCounter {
       new InfosetBuildState(buildInputter, sharedCtx, areDebugging = false)
 
     assertEquals(0L, sharedCtx.currentLead)
-    new InfosetBuildCursor(dp.ssrd.builder, infosetBuildState, sharedCtx).runToCompletion()
+    new InfosetBuildCursor(dp.ssrd.builder, infosetBuildState, sharedCtx)
+      .advance(lastAdvance = true)
 
     // row itself, name, age, city = 4 elements total, each incrementing
     // once via unparseBegin's actual hookup.

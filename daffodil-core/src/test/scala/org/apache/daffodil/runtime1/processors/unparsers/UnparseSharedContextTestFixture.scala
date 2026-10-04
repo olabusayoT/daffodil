@@ -44,7 +44,6 @@ object UnparseSharedContextTestFixture {
   ): UnparseSharedContext = {
     new UnparseSharedContext(
       new SuspensionTracker(suspensionWaitYoung, suspensionWaitOld),
-      dp,
       dp.tunables,
       prefetchLimit
     )
@@ -111,7 +110,6 @@ object UnparseSharedContextTestFixture {
         dp.tunables.unparseSuspensionWaitYoung,
         dp.tunables.unparseSuspensionWaitOld
       ),
-      dp,
       dp.tunables,
       prefetchLimit
     )

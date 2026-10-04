@@ -21,7 +21,6 @@ import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.iapi.DaffodilTunables
 import org.apache.daffodil.runtime1.infoset.DINode
 import org.apache.daffodil.runtime1.infoset.InfosetBuildCursor
-import org.apache.daffodil.runtime1.processors.DataProcessor
 import org.apache.daffodil.runtime1.processors.SuspensionTracker
 
 /**
@@ -34,24 +33,18 @@ import org.apache.daffodil.runtime1.processors.SuspensionTracker
  * incremented once per node build constructs and decremented once per
  * node unparseTree finishes. unparseTree pulls build forward through `buildCursor`
  * whenever it needs tree that does not exist yet; build stops advancing
- * once `leadExceedsPrefetchLimit` or the pending-suspension backlog
- * exceeds `pendingSuspensionTripLimit` (below), bounding how far ahead
- * it may run. Both sides run on the same thread.
+ * once `leadExceedsPrefetchLimit`, bounding how far ahead it may run. Both
+ * sides run on the same thread.
  */
 final class UnparseSharedContext(
   val suspensionTracker: SuspensionTracker,
-  val dataProc: DataProcessor,
   val tunable: DaffodilTunables,
   val prefetchLimit: Long
 ) {
   private var buildLead: Long = 0
-  private var peakLead_ : Long = 0
 
   def incrementLead(): Unit = {
     buildLead += 1
-    if (buildLead > peakLead_) {
-      peakLead_ = buildLead
-    }
   }
 
   def decrementLead(): Unit = {
@@ -61,41 +54,11 @@ final class UnparseSharedContext(
 
   def currentLead: Long = buildLead
 
-  /**
-   * The highest the lead has ever been, across build and unparseTree together.
-   * The lead only rises as build adds nodes and only falls as unparseTree
-   * finishes them, so this is the peak over a whole run.
-   */
-  def peakLead: Long = peakLead_
-
   def leadExceedsPrefetchLimit: Boolean = buildLead > prefetchLimit
-
-  /**
-   * A second, independent limit on how far build may run ahead of unparseTree,
-   * alongside prefetchLimit: a suspension can be created without moving
-   * the lead counter, so the lead alone doesn't bound how many pile up
-   * pending.
-   */
-  def pendingSuspensionTripLimit: Long = tunable.unparsePendingSuspensionTripLimit
 
   private var buildCursor_ : InfosetBuildCursor = null
 
   def setBuildCursor(bc: InfosetBuildCursor): Unit = buildCursor_ = bc
-
-  /**
-   * Called from unparseTree when suspensions pile up faster than unparseTree's own
-   * progress resolves them: builds a little further ahead, which gives the
-   * build-side sweeps more tree to resolve them against. Does nothing once
-   * the lead window is already full or build has finished.
-   */
-  def relieveSuspensionBacklog(): Unit = {
-    if (
-      buildCursor_ != null && !buildCursor_.isFinished && !leadExceedsPrefetchLimit &&
-      suspensionTracker.pendingCount > pendingSuspensionTripLimit
-    ) {
-      buildCursor_.advance()
-    }
-  }
 
   /**
    * True if `child` may safely be unparsed now: complex/array existing is
