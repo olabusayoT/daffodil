@@ -197,6 +197,14 @@ jobs:
       - name: Run Unit Tests
         run: $SBT test
 
+      # Prefetch is the default, so run the suite once more with it off to
+      # keep the single pass unparse path tested.
+      - name: Run Unit Tests (single pass unparse)
+        if: matrix.os == 'ubuntu-22.04' && matrix.java_version == '17'
+        env:
+          DAFFODIL_TDML_TUNABLES: useBuildPrefetch=false
+        run: $SBT test
+
       - name: Run Integration Tests
         run: $SBT daffodil-test-integration/test
 
