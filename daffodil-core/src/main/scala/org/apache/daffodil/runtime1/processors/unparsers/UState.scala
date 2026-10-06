@@ -731,17 +731,9 @@ final private class SuspendedDelimiterEscapePositionState(
  * Mixed in by a `UState` that creates `Suspension`s, which only unparse does:
  * `UStateMain`.
  */
-trait SuspensionCapableUState extends SuspensionResolver {
+trait SuspensionCapableUState {
   def addSuspension(se: Suspension): Unit
   def cloneForSuspension(suspendedDOS: DirectOrBufferedDataOutputStream): UState
-}
-
-/**
- * A state that resolves `Suspension`s against the tree it has built: both
- * `UStateMain` and `InfosetBuildState`. Build needs no more than this, since
- * it never creates a suspension.
- */
-trait SuspensionResolver {
   def suspensions: Seq[Suspension]
   def evalSuspensions(isFinal: Boolean): Unit
 }

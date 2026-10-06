@@ -34,13 +34,13 @@ import org.apache.daffodil.runtime1.processors.SuspensionTracker
 import org.apache.daffodil.unparsers.runtime1.ElementUnparserBase
 
 /**
- * Shared InfosetBuildState construction for tests. The default suspension-wait
- * thresholds are doubled, since one tracker serves both build and unparseTree.
+ * Shared InfosetBuildState construction for tests, with the suspension-wait
+ * thresholds defaulting to the tunables' values.
  */
 object UnparseSharedContextTestFixture {
   def build(dp: DataProcessor, prefetchLimit: Long)(
-    suspensionWaitYoung: Int = dp.tunables.unparseSuspensionWaitYoung * 2,
-    suspensionWaitOld: Int = dp.tunables.unparseSuspensionWaitOld * 2
+    suspensionWaitYoung: Int = dp.tunables.unparseSuspensionWaitYoung,
+    suspensionWaitOld: Int = dp.tunables.unparseSuspensionWaitOld
   ): UnparseSharedContext = {
     new UnparseSharedContext(
       new SuspensionTracker(suspensionWaitYoung, suspensionWaitOld),

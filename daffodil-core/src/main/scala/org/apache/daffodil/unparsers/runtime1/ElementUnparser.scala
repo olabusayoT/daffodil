@@ -658,7 +658,9 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
 
       move(state)
 
-      state.asInstanceOf[SuspensionResolver].evalSuspensions(isFinal = false)
+      if (!isBuild) {
+        state.asInstanceOf[SuspensionCapableUState].evalSuspensions(isFinal = false)
+      }
     }
   }
 

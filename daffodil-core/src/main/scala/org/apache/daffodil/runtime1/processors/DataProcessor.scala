@@ -542,13 +542,9 @@ class DataProcessor(
     val rootUnparser = ssrd.unparser
     val inputter = new InfosetInputter(actualInputter)
     val sharedCtx = new UnparseSharedContext(
-      // Shared by build and unparseTree, which together tick this tracker at
-      // roughly twice the per-node rate a single traversal would;
-      // doubling both thresholds restores the intended sweep density.
-      // Debugging has only unparseTree tick it, as a single-pass unparse does.
       new SuspensionTracker(
-        tunables.unparseSuspensionWaitYoung * (if (areDebugging) 1 else 2),
-        tunables.unparseSuspensionWaitOld * (if (areDebugging) 1 else 2)
+        tunables.unparseSuspensionWaitYoung,
+        tunables.unparseSuspensionWaitOld
       ),
       tunables,
       // Debugging builds only what unparseTree asks for, so the infoset a debugger
@@ -558,7 +554,7 @@ class DataProcessor(
 
     // Lazy so each is created only after the step before it has succeeded;
     // unparseTreeState holds the output stream, which must be cleaned up.
-    lazy val infosetBuildState = new InfosetBuildState(inputter, sharedCtx, areDebugging)
+    lazy val infosetBuildState = new InfosetBuildState(inputter, sharedCtx)
     // The root element always has a builder: it is exactly the case that
     // gets ElementInfosetBuilder wrapped around it, regardless of schema content.
     lazy val cursor = new InfosetBuildCursor(ssrd.builder, infosetBuildState, sharedCtx)

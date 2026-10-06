@@ -27,8 +27,6 @@ import org.apache.daffodil.runtime1.infoset.DIDocument
 import org.apache.daffodil.runtime1.infoset.DINode
 import org.apache.daffodil.runtime1.infoset.InfosetAccessor
 import org.apache.daffodil.runtime1.infoset.InfosetInputter
-import org.apache.daffodil.runtime1.processors.Suspension
-import org.apache.daffodil.runtime1.processors.SuspensionTracker
 import org.apache.daffodil.runtime1.processors.TermRuntimeData
 
 /**
@@ -43,10 +41,8 @@ import org.apache.daffodil.runtime1.processors.TermRuntimeData
  */
 final class InfosetBuildState(
   private val inputter: InfosetInputter,
-  sharedCtx: UnparseSharedContext,
-  areDebugging: Boolean
+  sharedCtx: UnparseSharedContext
 ) extends InfosetTreeState
-  with SuspensionResolver
   with TraversalIndexStacks {
 
   override def tunable: DaffodilTunables = sharedCtx.tunable
@@ -99,22 +95,4 @@ final class InfosetBuildState(
   override def freeChildIfNoLongerNeeded(parent: DINode, index: Int): Unit = ()
 
   override def sharedContext: Maybe[UnparseSharedContext] = One(sharedCtx)
-
-  // Shared, not owned; one SuspensionTracker queue, both build and unparseTree
-  // see the same one via sharedCtx.
-  def suspensionTracker: SuspensionTracker = sharedCtx.suspensionTracker
-
-  /**
-   * Uses evalBuildResolvableSuspensions: a suspension that
-   * canResolveWithoutWriting marks false (usually a forward reference) is
-   * skipped rather than genuinely retried, and left pending for a later,
-   * unfiltered sweep.
-   */
-  def evalSuspensions(isFinal: Boolean): Unit = {
-    // A debugger needs suspensions to resolve at the steps a single-pass
-    // unparse would resolve them, which only unparseTree's sweeps give it.
-    if (!areDebugging) sharedCtx.suspensionTracker.evalBuildResolvableSuspensions()
-    if (isFinal) sharedCtx.suspensionTracker.requireFinal()
-  }
-  def suspensions: Seq[Suspension] = sharedCtx.suspensionTracker.suspensions
 }

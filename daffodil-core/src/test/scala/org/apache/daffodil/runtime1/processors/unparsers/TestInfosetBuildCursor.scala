@@ -115,7 +115,7 @@ class TestInfosetBuildCursor {
     val sharedCtx = UnparseSharedContextTestFixture.build(dp, prefetchLimit)()
     val cursor = new InfosetBuildCursor(
       dp.ssrd.builder,
-      new InfosetBuildState(buildInputter, sharedCtx, areDebugging = false),
+      new InfosetBuildState(buildInputter, sharedCtx),
       sharedCtx
     )
     sharedCtx.setBuildCursor(cursor)

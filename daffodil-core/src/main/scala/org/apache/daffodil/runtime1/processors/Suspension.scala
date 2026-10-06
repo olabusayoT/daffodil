@@ -51,14 +51,6 @@ trait Suspension extends Serializable {
    */
   val isReadOnly = false
 
-  /**
-   * True if this suspension might resolve without any bytes written yet
-   * (e.g. a value or variable read); false if it needs a real DOS bit
-   * position (e.g. valueLength, padding). A static, direction-blind
-   * heuristic that lets build skip an attempt usually doomed to block.
-   */
-  def canResolveWithoutWriting: Boolean = false
-
   def UE(ustate: UState, s: String, args: Any*) = {
     UnparseError(One(rd.schemaFileLocation), One(ustate.currentLocation), s, args*)
   }

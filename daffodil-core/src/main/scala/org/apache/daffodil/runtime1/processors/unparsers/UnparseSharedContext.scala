@@ -25,9 +25,8 @@ import org.apache.daffodil.runtime1.processors.SuspensionTracker
 
 /**
  * What build and unparseTree genuinely need to share by reference: the
- * `SuspensionTracker` (one queue; build opportunistically resolves
- * unparseTree-created suspensions early against the tree it has already
- * built, and unparseTree drains whatever remains at the end).
+ * `SuspensionTracker`, which only unparseTree registers suspensions with and
+ * sweeps; the context holds it so waiting on build can retry them.
  *
  * Also owns the lead counter: how far build is ahead of unparseTree,
  * incremented once per node build constructs and decremented once per

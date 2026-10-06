@@ -47,24 +47,12 @@ class SuspensionTracker(suspensionWaitYoung: Int, suspensionWaitOld: Int) {
    * suspensions, we attempt to evaluate them first, with the hope that their
    * resolution might make the young suspensions more likely to evaluate.
    */
-  def evalSuspensions(): Unit = evalSuspensionsThrottled(buildResolvableOnly = false)
-
-  /**
-   * Same cadence as evalSuspensions, but a suspension whose
-   * canResolveWithoutWriting is false is skipped and requeued instead of
-   * genuinely attempted, since it usually cannot resolve until unparseTree
-   * has written the bytes it needs; it stays pending for a later unfiltered
-   * sweep.
-   */
-  def evalBuildResolvableSuspensions(): Unit =
-    evalSuspensionsThrottled(buildResolvableOnly = true)
-
-  private def evalSuspensionsThrottled(buildResolvableOnly: Boolean): Unit = {
+  def evalSuspensions(): Unit = {
     if (count % suspensionWaitOld == 0) {
-      evalSuspensionQueue(suspensionsOld, buildResolvableOnly = buildResolvableOnly)
+      evalSuspensionQueue(suspensionsOld)
     }
     if (count % suspensionWaitYoung == 0) {
-      evalSuspensionQueue(suspensionsYoung, buildResolvableOnly = buildResolvableOnly)
+      evalSuspensionQueue(suspensionsYoung)
       while (suspensionsYoung.nonEmpty) {
         suspensionsOld.enqueue(suspensionsYoung.dequeue())
       }
@@ -120,30 +108,23 @@ class SuspensionTracker(suspensionWaitYoung: Int, suspensionWaitOld: Int) {
   }
 
   /**
-   * Attempts to evaluate the suspensions on the provided queue, repeating
-   * while progress is made: successes are removed and blocked ones stay on
-   * the queue. buildResolvableOnly skips and requeues a suspension whose
-   * canResolveWithoutWriting is false instead of genuinely attempting it.
+   * Attempt to evaluate suspensions on the provie queue. Keep repeating the
+   * evaluates as long as some progress is being made. Suspensions that
+   * evaluate sucessfully are removed from the queue. Once suspensions make no
+   * further progress and are all blocked, we return. Blocked suspensions put
+   * back on the same queue.
    */
-  private def evalSuspensionQueue(
-    queue: Queue[Suspension],
-    buildResolvableOnly: Boolean = false
-  ): Unit = {
+  private def evalSuspensionQueue(queue: Queue[Suspension]): Unit = {
     var countOfNotMakingProgress = 0
     while (!queue.isEmpty && countOfNotMakingProgress < queue.length) {
       val s = queue.dequeue()
-      if (buildResolvableOnly && !s.canResolveWithoutWriting) {
-        queue.enqueue(s)
-        countOfNotMakingProgress += 1
+      suspensionStatRuns += 1
+      s.runSuspension()
+      if (!s.isDone) queue.enqueue(s)
+      if (s.isDone || s.isMakingProgress) {
+        countOfNotMakingProgress = 0
       } else {
-        suspensionStatRuns += 1
-        s.runSuspension()
-        if (!s.isDone) queue.enqueue(s)
-        if (s.isDone || s.isMakingProgress) {
-          countOfNotMakingProgress = 0
-        } else {
-          countOfNotMakingProgress += 1
-        }
+        countOfNotMakingProgress += 1
       }
     }
   }
