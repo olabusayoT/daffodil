@@ -22,12 +22,12 @@ import org.apache.daffodil.junit.tdml.TdmlTests
 
 import org.junit.Test
 
-object TestBuildPrefetch extends TdmlSuite {
-  val tdmlResource = "/org/apache/daffodil/unparser/buildPrefetch.tdml"
+object TestBuildAhead extends TdmlSuite {
+  val tdmlResource = "/org/apache/daffodil/unparser/buildAhead.tdml"
 }
 
-class TestBuildPrefetch extends TdmlTests {
-  val tdmlSuite = TestBuildPrefetch
+class TestBuildAhead extends TdmlTests {
+  val tdmlSuite = TestBuildAhead
 
   @Test def ovcSuspension = test
   @Test def arrayChoiceSeparator = test
@@ -36,7 +36,7 @@ class TestBuildPrefetch extends TdmlTests {
   @Test def trailingArrayPostfixSeparator = test
   @Test def choiceBranchWithAbsentOptionalElement = test
   @Test def choiceBranchWithPresentOptionalElement = test
-  @Test def manyOccurrenceArrayWithSmallPrefetchLimit = test
+  @Test def manyOccurrenceArrayWithSmallBuildAheadLimit = test
   @Test def nestedBareSequence = test
   @Test def fixedLengthChoicePadding = test
   @Test def hiddenGroup = test

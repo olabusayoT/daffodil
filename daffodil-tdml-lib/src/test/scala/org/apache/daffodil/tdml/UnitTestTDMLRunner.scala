@@ -876,8 +876,8 @@ class UnitTestTDMLRunner {
 
   @Test def testEnvTunablesSingle(): Unit = {
     assertEquals(
-      Map("useBuildPrefetch" -> "false"),
-      TDMLEnvTunables.parse("useBuildPrefetch=false")
+      Map("infosetBuilderMode" -> "eventDriven"),
+      TDMLEnvTunables.parse("infosetBuilderMode=eventDriven")
     )
   }
 

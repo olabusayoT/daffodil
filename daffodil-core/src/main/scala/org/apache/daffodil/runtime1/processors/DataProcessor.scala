@@ -39,6 +39,7 @@ import org.apache.daffodil.api.validation.ValidatorInitializationException
 import org.apache.daffodil.api.validation.Validators
 import org.apache.daffodil.lib.equality.*
 import org.apache.daffodil.lib.iapi.DaffodilTunables
+import org.apache.daffodil.lib.iapi.InfosetBuilderMode
 import org.apache.daffodil.lib.iapi.WithDiagnostics
 import org.apache.daffodil.runtime1.dsom.*
 import org.apache.daffodil.runtime1.iapi.DFDL
@@ -69,16 +70,12 @@ import org.apache.daffodil.runtime1.infoset.XMLTextInfosetOutputter
 import org.apache.daffodil.runtime1.processors.parsers.PState
 import org.apache.daffodil.runtime1.processors.parsers.ParseError
 import org.apache.daffodil.runtime1.processors.parsers.Parser
-import org.apache.daffodil.runtime1.processors.unparsers.AwaitChildStalledException
-import org.apache.daffodil.runtime1.processors.unparsers.BuildAbortedException
+import org.apache.daffodil.runtime1.processors.unparsers.ChildNotBuiltException
 import org.apache.daffodil.runtime1.processors.unparsers.InfosetBuildState
 import org.apache.daffodil.runtime1.processors.unparsers.NotUnparsableUnparser
-import org.apache.daffodil.runtime1.processors.unparsers.SuspensionCapableUState
+import org.apache.daffodil.runtime1.processors.unparsers.TreeEventState
 import org.apache.daffodil.runtime1.processors.unparsers.UState
 import org.apache.daffodil.runtime1.processors.unparsers.UnparseError
-import org.apache.daffodil.runtime1.processors.unparsers.UnparseSharedContext
-import org.apache.daffodil.runtime1.processors.unparsers.Unparser
-import org.apache.daffodil.unparsers.runtime1.ElementUnparserBase
 
 /**
  * Implementation mixin - provides simple helper methods
@@ -467,27 +464,26 @@ class DataProcessor(
   }
 
   def unparse(actualInputter: api.infoset.InfosetInputter, outStream: java.io.OutputStream) = {
-    if (tunables.useBuildPrefetch) {
-      unparseWithPrefetch(actualInputter, outStream)
+    // A NotUnparsableUnparser (dfdl:parseUnparsePolicy="parseOnly") has no
+    // builders to run ahead, and unparseEventDriven already gives the correct
+    // diagnostic for it, so it never builds ahead.
+    val canBuildAhead = !ssrd.unparser.isInstanceOf[NotUnparsableUnparser]
+    if ((tunables.infosetBuilderMode eq InfosetBuilderMode.BuildAhead) && canBuildAhead) {
+      unparseBuildAhead(actualInputter, outStream)
     } else {
-      unparseSinglePass(actualInputter, outStream)
+      unparseEventDriven(actualInputter, outStream)
     }
   }
 
-  // An error raised by code shared with build has no data location, so it is
-  // reported at the unparse state's current location.
-  private def atUnparseLocation(ue: UnparseError, state: UState): UnparseError =
-    if (ue.getDataLocations.isEmpty) ue.withDataLocation(One(state.currentLocation)) else ue
-
   /**
-   * Shared by unparseWithPrefetch and unparseSinglePass's top-level
+   * Shared by unparseBuildAhead and unparseEventDriven's top-level
    * catch blocks: maps an exception caught during unparsing to a failed
    * `state` plus its `unparseResult`, or rethrows if it's not one of the
    * known unparse-error categories.
    */
   private def unparseErrorResult(state: UState, t: Throwable): UnparseResult = t match {
     case ue: UnparseError => {
-      state.addUnparseError(atUnparseLocation(ue, state))
+      state.addUnparseError(ue)
       state.unparseResult
     }
     case procErr: ProcessingError => {
@@ -529,178 +525,125 @@ class DataProcessor(
   }
 
   /**
-   * Unparses with a build pass running ahead of `unparseTree` (gated on
-   * `useBuildPrefetch`). An `InfosetBuildCursor` over `InfosetBuildState`
-   * builds the infoset tree from the inputter's events, and `unparseTree`
-   * walks that tree, advancing the cursor whenever it needs a node that does
-   * not exist yet.
+   * Unparses with a build pass running ahead of the unparse (gated on
+   * `infosetBuilderMode`). An `InfosetBuildCursor` over `InfosetBuildState`
+   * builds the infoset tree from the inputter's events, and the unparse
+   * reads that tree back as events, advancing the cursor whenever it needs a
+   * node that does not exist yet.
    */
-  private def unparseWithPrefetch(
+  private def unparseBuildAhead(
     actualInputter: api.infoset.InfosetInputter,
     outStream: java.io.OutputStream
   ): UnparseResult = {
     val rootUnparser = ssrd.unparser
+
     val inputter = new InfosetInputter(actualInputter)
-    val sharedCtx = new UnparseSharedContext(
-      new SuspensionTracker(
-        tunables.unparseSuspensionWaitYoung,
-        tunables.unparseSuspensionWaitOld
-      ),
-      tunables,
-      // Debugging builds only what unparseTree asks for, so the infoset a debugger
-      // shows is what a single-pass unparse would have built by that step.
-      prefetchLimit = if (areDebugging) 0L else tunables.unparsePrefetchWindowNodes
+
+    // Build side. The root element always has a builder: it is exactly the
+    // case that gets ElementInfosetBuilder wrapped around it, regardless of
+    // schema content.
+    val infosetBuildState = new InfosetBuildState(inputter, tunables)
+    val cursor = new InfosetBuildCursor(ssrd.builder, infosetBuildState)
+
+    // Unparse side. The tree events are the events of the tree build is making,
+    // so the unparsers read it as they read an inputter's. The state holds the
+    // output stream, which must be cleaned up.
+    val treeEvents = new TreeEventState(
+      cursor,
+      !areDebugging && tunables.releaseUnneededInfoset
     )
+    val unparseState =
+      UState.createInitialUStateForBuildAhead(
+        outStream,
+        this,
+        inputter,
+        areDebugging,
+        treeEvents
+      )
 
-    // Lazy so each is created only after the step before it has succeeded;
-    // unparseTreeState holds the output stream, which must be cleaned up.
-    lazy val infosetBuildState = new InfosetBuildState(inputter, sharedCtx)
-    // The root element always has a builder: it is exactly the case that
-    // gets ElementInfosetBuilder wrapped around it, regardless of schema content.
-    lazy val cursor = new InfosetBuildCursor(ssrd.builder, infosetBuildState, sharedCtx)
-    lazy val unparseTreeState =
-      UState.createInitialUState(outStream, this, inputter, areDebugging)
+    try {
+      inputter.initialize(ssrd.elementRuntimeData, tunables)
 
-    def initBuildSide(): Unit = {
       if (areDebugging) {
         Assert.invariant(optDebugger.isDefined)
         addEventHandler(debugger)
       }
-      sharedCtx.setBuildCursor(cursor)
-    }
-
-    def initUnparseSide(): Unit = {
-      unparseTreeState.setSharedContext(sharedCtx)
       if (areDebugging) {
-        unparseTreeState.notifyDebugging(true)
+        unparseState.notifyDebugging(true)
       }
-      init(unparseTreeState, rootUnparser)
-      // Forces evaluation of non-constant defineVariable defaults; the
-      // unparseTree side reads and writes variables, so it needs this on its
-      // own copy.
-      unparseTreeState.initializeVariables()
-      unparseTreeState.getDataOutputStream.setPriorBitOrder(
+      // The root TRD is on the stack of the tree events, as it is
+      // on an inputter's when it is initialized.
+      unparseState.pushTRD(ssrd.elementRuntimeData)
+      init(unparseState, rootUnparser)
+      // Forces evaluation of non-constant defineVariable defaults; the unparse
+      // side reads and writes variables, so it needs this on its own copy.
+      unparseState.initializeVariables()
+      unparseState.getDataOutputStream.setPriorBitOrder(
         ssrd.elementRuntimeData.defaultBitOrder
       )
-    }
 
-    def unparseBuiltTree(): Unit = {
-      val rootElemUnp = rootUnparser.asInstanceOf[ElementUnparserBase]
       try {
-        val rootNode = sharedCtx.awaitChild(inputter.documentElement, 0)
-        rootElemUnp.unparseTree1(rootNode, unparseTreeState)
-        unparseTreeState.freeChildIfNoLongerNeeded(inputter.documentElement, 0)
+        rootUnparser.unparse1(unparseState)
+        unparseState.popTRD(rootUnparser.context.asInstanceOf[TermRuntimeData])
       } catch {
-        // A genuine deadlock (if any) surfaces via finishUnparseSide's
-        // own evalSuspensions(isFinal = true) call, which runs regardless
-        // of how this try block exits.
-        case _: AwaitChildStalledException =>
+        // A genuine deadlock (if any) surfaces via the final
+        // evalSuspensions(isFinal = true) below.
+        case _: ChildNotBuiltException =>
       }
-    }
 
-    // A NotUnparsableUnparser (dfdl:parseUnparsePolicy="parseOnly") can't be
-    // cast to ElementUnparserBase or driven through the build/unparseTree split;
-    // unparseSinglePass already runs it via unparse1 and gets the correct
-    // diagnostic, so reuse that instead of a ClassCastException here.
-    rootUnparser match {
-      case _: NotUnparsableUnparser => return unparseSinglePass(actualInputter, outStream)
-      case _ => // fall through to the actual build-prefetch path below
-    }
-
-    try {
-      inputter.initialize(ssrd.elementRuntimeData, tunables)
-    } catch {
-      // Safe before initialize() completes: creating the state only copies
-      // variableMap, never touching inputter.documentElement. This early
-      // return skips the cleanup below, so it cleans up here.
-      case t: Throwable =>
-        try {
-          return unparseErrorResult(unparseTreeState, t)
-        } finally {
-          unparseTreeState.getDataOutputStream.cleanUp()
-        }
-    }
-
-    try {
-      initBuildSide()
-      initUnparseSide()
-      unparseBuiltTree()
-      // unparseTree only ever advances build as far as it needs, so build may
+      // The unparse only ever advances build as far as it needs, so build may
       // still have its trailing end events left to consume.
       cursor.advance(lastAdvance = true)
-      finishBuildSide(infosetBuildState, rootUnparser)
-      finishUnparseSide(unparseTreeState, rootUnparser)
-      unparseTreeState.unparseResult
+
+      // Build's stacks must end up balanced and the inputter must have nothing
+      // left unconsumed.
+      infosetBuildState.popTRD(rootUnparser.context.asInstanceOf[TermRuntimeData])
+      Assert.invariant(infosetBuildState.arrayIterationIndexStack.length == 1)
+      Assert.invariant(infosetBuildState.occursIndexStack.length == 1)
+      Assert.invariant(infosetBuildState.groupIndexStack.length == 1)
+      Assert.invariant(infosetBuildState.currentInfosetNodeMaybe.isEmpty)
+      Assert.invariant(infosetBuildState.maybeTopTRD().isEmpty)
+      val remainingEvent = infosetBuildState.advanceMaybe
+      if (remainingEvent.isDefined) {
+        UnparseError(
+          Nope,
+          Nope,
+          "Expected no remaining events, but received %s.",
+          remainingEvent.get
+        )
+      }
+
+      // The final suspension sweep runs BEFORE the stack-depth invariants: one
+      // tripping first could mask the real SuspensionDeadlockException diagnostic
+      // this ordering exists to surface.
+      unparseState.setProcessor(rootUnparser)
+      unparseState.evalSuspensions(isFinal = true)
+      Assert.invariant(unparseState.arrayIterationIndexStack.length == 1)
+      Assert.invariant(unparseState.occursIndexStack.length == 1)
+      Assert.invariant(unparseState.groupIndexStack.length == 1)
+      Assert.invariant(unparseState.childIndexStack.length == 1)
+      Assert.invariant(unparseState.currentInfosetNodeMaybe.isEmpty)
+      Assert.invariant(unparseState.escapeSchemeEVCache.isEmpty)
+      Assert.invariant(unparseState.maybeTopTRD().isEmpty)
+      Assert.invariant(!unparseState.withinHiddenNest)
+      Assert.invariant(!unparseState.getDataOutputStream.isFinished)
+      try {
+        unparseState.getDataOutputStream.setFinished(unparseState)
+      } catch {
+        case boc: BitOrderChangeException =>
+          unparseState.SDE(boc)
+        case fio: FileIOException =>
+          unparseState.SDE(fio)
+      }
+      unparseState.unparseResult
     } catch {
-      // Build has no state of its own to report against, so its failure is
-      // reported against unparseTree's.
-      case b: BuildAbortedException => unparseErrorResult(unparseTreeState, b.getCause)
-      case t: Throwable => unparseErrorResult(unparseTreeState, t)
+      case t: Throwable => unparseErrorResult(unparseState, t)
     } finally {
-      unparseTreeState.getDataOutputStream.cleanUp()
+      unparseState.getDataOutputStream.cleanUp()
     }
   }
 
-  // evalSuspensions(isFinal = true) runs BEFORE the stack-depth
-  // invariants below: one tripping first could mask the real
-  // SuspensionDeadlockException diagnostic this ordering exists to
-  // surface.
-  private def finishUnparseSide(
-    unparseTreeState: UState with SuspensionCapableUState,
-    rootUnparser: Unparser
-  ): Unit = {
-    unparseTreeState.setProcessor(rootUnparser)
-
-    // Uses the tracker shared through sharedCtx, which build also sweeps, so
-    // every suspension created on the unparseTree side is drained here.
-    unparseTreeState.evalSuspensions(isFinal = true)
-
-    Assert.invariant(unparseTreeState.arrayIterationIndexStack.length == 1)
-    Assert.invariant(unparseTreeState.occursIndexStack.length == 1)
-    Assert.invariant(unparseTreeState.groupIndexStack.length == 1)
-    Assert.invariant(unparseTreeState.childIndexStack.length == 1)
-    Assert.invariant(unparseTreeState.currentInfosetNodeMaybe.isEmpty)
-    Assert.invariant(unparseTreeState.escapeSchemeEVCache.isEmpty)
-    Assert.invariant(unparseTreeState.maybeTopTRD().isEmpty)
-    Assert.invariant(!unparseTreeState.withinHiddenNest)
-
-    Assert.invariant(!unparseTreeState.getDataOutputStream.isFinished)
-    try {
-      unparseTreeState.getDataOutputStream.setFinished(unparseTreeState)
-    } catch {
-      case boc: BitOrderChangeException =>
-        unparseTreeState.SDE(boc)
-      case fio: FileIOException =>
-        unparseTreeState.SDE(fio)
-    }
-  }
-
-  // Asserts build's stacks ended up balanced and the inputter has
-  // nothing left unconsumed.
-  private def finishBuildSide(
-    infosetBuildState: InfosetBuildState,
-    rootUnparser: Unparser
-  ): Unit = {
-    infosetBuildState.popTRD(rootUnparser.context.asInstanceOf[TermRuntimeData])
-
-    Assert.invariant(infosetBuildState.arrayIterationIndexStack.length == 1)
-    Assert.invariant(infosetBuildState.occursIndexStack.length == 1)
-    Assert.invariant(infosetBuildState.groupIndexStack.length == 1)
-    Assert.invariant(infosetBuildState.currentInfosetNodeMaybe.isEmpty)
-    Assert.invariant(infosetBuildState.maybeTopTRD().isEmpty)
-
-    val remainingEvent = infosetBuildState.advanceMaybe
-    if (remainingEvent.isDefined) {
-      UnparseError(
-        Nope,
-        Nope,
-        "Expected no remaining events, but received %s.",
-        remainingEvent.get
-      )
-    }
-  }
-
-  private def unparseSinglePass(
+  private def unparseEventDriven(
     actualInputter: api.infoset.InfosetInputter,
     outStream: java.io.OutputStream
   ) = {

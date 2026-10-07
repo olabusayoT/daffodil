@@ -20,9 +20,7 @@ package org.apache.daffodil.runtime1.processors.unparsers
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.util.Maybe.*
 import org.apache.daffodil.runtime1.dsom.RuntimeSchemaDefinitionError
-import org.apache.daffodil.runtime1.infoset.DINode
 import org.apache.daffodil.runtime1.processors.*
-import org.apache.daffodil.unparsers.runtime1.TreeUnparser
 
 sealed trait Unparser extends Processor {
 
@@ -50,6 +48,7 @@ sealed trait Unparser extends Processor {
     // keeping track of prior bit order. Finding those has been problematic.
     //
     // So this is a temporary fix, until we can figure out where else to do this.
+    //
     this match {
       // bit order only applies to primitives, not combinators, nor "noData" unparsers.
       case af: AlignmentPrimUnparser => // ok. Don't check bitOrder before Aligning.
@@ -73,15 +72,11 @@ sealed trait Unparser extends Processor {
       ustate.resetFormatInfoCaches()
     }
     if (ustate.dataProc.isDefined) ustate.dataProc.get.after(ustate, this)
-    // Restore the prior processor only if one existed. Nope means this is
-    // the first unparse1 call on a freshly cloned suspension UState, which
-    // starts with none; resetting to Nope would discard the only context
-    // it will ever have, which is still needed once the suspension completes.
-    if (savedProc.isDefined) ustate.setMaybeProcessor(savedProc)
+    ustate.setMaybeProcessor(savedProc)
   }
 
-  def UE(state: UState, s: String, args: Any*) = {
-    UnparseError(One(context.schemaFileLocation), One(state.currentLocation), s, args*)
+  def UE(ustate: UState, s: String, args: Any*) = {
+    UnparseError(One(context.schemaFileLocation), One(ustate.currentLocation), s, args*)
   }
 
   // Code shared with build has no data location to report.
@@ -157,8 +152,7 @@ final class ErrorUnparser(override val context: TermRuntimeData = null)
 
 final class SeqCompUnparser(context: RuntimeData, val childUnparsers: Array[Unparser])
   extends CombinatorUnparser(context)
-  with ToBriefXMLImpl
-  with TreeUnparser {
+  with ToBriefXMLImpl {
 
   override val runtimeDependencies = Array()
 
@@ -169,26 +163,9 @@ final class SeqCompUnparser(context: RuntimeData, val childUnparsers: Array[Unpa
   def unparse(ustate: UState): Unit = {
     var i = 0
     while (i < childUnparsers.length) {
-      childUnparsers(i).unparse1(ustate)
+      val unparser = childUnparsers(i)
       i += 1
-    }
-  }
-
-  /**
-   * A child that is a `TreeUnparser` unparses the same container through its
-   * own unparseTree1; every other child (a delimiter or value unparser, for
-   * example) runs through unparse1 against the current state.
-   */
-  override def unparseTree(containerNode: DINode, ustate: UState): Unit = {
-    var i = 0
-    while (i < childUnparsers.length) {
-      childUnparsers(i) match {
-        case tu: TreeUnparser =>
-          tu.unparseTree1(containerNode, ustate)
-        case cu =>
-          cu.unparse1(ustate)
-      }
-      i += 1
+      unparser.unparse1(ustate)
     }
   }
 

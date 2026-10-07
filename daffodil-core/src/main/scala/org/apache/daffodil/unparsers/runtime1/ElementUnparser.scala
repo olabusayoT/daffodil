@@ -23,8 +23,6 @@ import org.apache.daffodil.lib.util.Maybe.*
 import org.apache.daffodil.lib.util.MaybeULong
 import org.apache.daffodil.runtime1.dpath.SuspendableExpression
 import org.apache.daffodil.runtime1.dsom.CompiledExpression
-import org.apache.daffodil.runtime1.infoset.DIComplex
-import org.apache.daffodil.runtime1.infoset.DINode
 import org.apache.daffodil.runtime1.infoset.DISimple
 import org.apache.daffodil.runtime1.infoset.DataValue.DataValuePrimitive
 import org.apache.daffodil.runtime1.infoset.RetryableException
@@ -127,8 +125,7 @@ sealed abstract class ElementUnparserBase(
   val eRepTypeUnparser: Maybe[Unparser]
 ) extends CombinatorUnparser(erd)
   with RepMoveMixin
-  with ElementUnparserStartEndStrategy
-  with TreeUnparser {
+  with ElementUnparserStartEndStrategy {
 
   final override def childProcessors =
     (eBeforeUnparser.toList ++ eUnparser.toList ++ eAfterUnparser.toList ++ eRepTypeUnparser.toList ++ setVarUnparsers.toList).toVector
@@ -163,129 +160,21 @@ sealed abstract class ElementUnparserBase(
     }
   }
 
-  private[runtime1] def doBeforeContentUnparser(state: UState): Unit = {
+  protected def doBeforeContentUnparser(state: UState): Unit = {
     if (eBeforeUnparser.isDefined)
       eBeforeUnparser.get.unparse1(state)
   }
 
-  private[runtime1] def doAfterContentUnparser(state: UState): Unit = {
+  protected def doAfterContentUnparser(state: UState): Unit = {
     if (eAfterUnparser.isDefined)
       eAfterUnparser.get.unparse1(state)
   }
 
-  /**
-   * Registers the suspensions this element's content depends on
-   * (dfdl:length, dfdl:outputValueCalc) before content bytes are written.
-   * No-op by default. unparseTree calls it unconditionally, before its
-   * group-unparser check, so wrapped elements don't skip it.
-   */
-  private[runtime1] def contentSetup(state: UState): Unit = ()
-
-  private[runtime1] def dispatchContentUnparser(state: UState): Unit = {
+  protected def runContentUnparser(state: UState): Unit = {
     if (eRepTypeUnparser.isDefined) {
       eRepTypeUnparser.get.unparse1(state)
-    } else if (eUnparser.isDefined) {
+    } else if (eUnparser.isDefined)
       eUnparser.get.unparse1(state)
-    } // else nothing to do: no content unparser applies
-  }
-
-  private[runtime1] def runContentUnparser(state: UState): Unit = {
-    contentSetup(state)
-    dispatchContentUnparser(state)
-  }
-
-  private def dispatchForUnparse(s: UState): Unit = {
-    // Push the TermRuntimeData of the complex type's model-group (simple
-    // types have none). Only unparse's event-driven dispatch needs it, to
-    // resolve a raw event's tag name; unparseTree never consumes events.
-    if (erd.isComplexType) {
-      s.pushTRD(erd.optComplexTypeModelGroupRuntimeData.get)
-    }
-
-    runContentUnparser(s)
-
-    if (erd.isComplexType) {
-      s.popTRD(erd.optComplexTypeModelGroupRuntimeData.get)
-    }
-  }
-
-  private def dispatchForTree(containerNode: DINode, s: UState): Unit = {
-    contentSetup(s)
-    // A repType'd element's raw eUnparser can itself be group-wrapped, so
-    // eRepTypeUnparser takes priority: without this check the raw content
-    // would be written instead of the repType conversion.
-    if (eRepTypeUnparser.isEmpty && eUnparser.isDefined) {
-      eUnparser.get match {
-        case tu: TreeUnparser => tu.unparseTree1(containerNode, s)
-        case _ => dispatchContentUnparser(s)
-      }
-    } else {
-      dispatchContentUnparser(s)
-    }
-  }
-
-  /**
-   * The steps common to unparseTree and unparse: before-content, content
-   * dispatch, after-content, and setVariables. A Nope containerNode selects
-   * unparse's event-driven dispatch; a One selects unparseTree's, which
-   * reaches a nested group's own unparseTree.
-   */
-  private[runtime1] def runElementContent(state: UState, containerNode: Maybe[DINode]): Unit = {
-    captureRuntimeValuedExpressionValues(state)
-    doBeforeContentUnparser(state)
-    if (containerNode.isEmpty) {
-      dispatchForUnparse(state)
-    } else {
-      dispatchForTree(containerNode.get, state)
-    }
-    doAfterContentUnparser(state)
-    computeSetVariables(state)
-  }
-
-  /**
-   * Unparses this element's content against an already-built
-   * `containerNode`, without consuming any InfosetInputter events:
-   * dispatches to whatever `eUnparser` turns out to be, a group
-   * unparser or a plain simple-element value unparser.
-   */
-  override def unparseTree(containerNode: DINode, state: UState): Unit = {
-    if (state.areDebugging) state.dataProc.value.startElement(state, this)
-    state.currentInfosetNodeStack.push(One(containerNode))
-    state.childIndexStack.push(0L)
-    try {
-      // contentSetup can suspend, and suspending reads state.processor.
-      // That's normally set by the ordinary unparse dispatch, which this
-      // call bypasses entirely, so it's set explicitly here to match.
-      state.setProcessor(this)
-      runElementContent(state, One(containerNode))
-      // Only a simple node needs finalizing here (complex/array nodes were
-      // already finalized in build's unparseEnd; re-finalizing trips
-      // setFinal()'s !isFinal assert). An OVC node may still be valueless
-      // here, so check hasValue rather than assert it.
-      if (containerNode.isSimple && !containerNode.isFinal && containerNode.asSimple.hasValue) {
-        containerNode.setFinal()
-      }
-      // The unparseTree half of the shared lead counter, decremented once per
-      // node; no-op unless this UState has a shared context.
-      if (state.sharedContext.isDefined) {
-        state.sharedContext.get.decrementLead()
-      }
-      // Content/value-length suspensions can only unblock once unparseTree has
-      // actually written the bytes, so this must run here too, not just
-      // build's unparseEnd, or they pile up unresolved until the final
-      // isFinal=true call instead of resolving as data becomes available.
-      state.asInstanceOf[SuspensionCapableUState].evalSuspensions(isFinal = false)
-    } finally {
-      // A stall (AwaitChildStalledException) or other exception mid-recursion
-      // must still unwind this node's own push, or these stacks end up
-      // unbalanced and later invariant checks fail with a confusing internal
-      // assertion instead of the real diagnostic.
-      state.childIndexStack.pop()
-      state.currentInfosetNodeStack.pop
-    }
-    // After the node is popped, as unparse does, so a debugger sees the same
-    // context at the end of an element. Skipped when content failed.
-    if (state.areDebugging) state.dataProc.value.endElement(state, this)
   }
 
   override def unparse(state: UState): Unit = {
@@ -294,9 +183,30 @@ sealed abstract class ElementUnparserBase(
 
     unparseBegin(state)
 
-    runElementContent(state, Nope)
+    captureRuntimeValuedExpressionValues(state)
 
-    unparseEnd(state, isBuild = false)
+    doBeforeContentUnparser(state)
+
+    //
+    // We must push the TermRuntimeData for all model-groups.
+    // The starting point for this is the model-group of a complex type.
+    // Simple types don't have model groups, so no pushing those.
+    //
+    if (erd.isComplexType)
+      state.pushTRD(erd.optComplexTypeModelGroupRuntimeData.get)
+
+    runContentUnparser(state)
+
+    if (erd.isComplexType)
+      state.popTRD(erd.optComplexTypeModelGroupRuntimeData.get)
+
+    doAfterContentUnparser(state)
+
+    computeSetVariables(state)
+
+    unparseEnd(state)
+
+    retrySuspensionsAfterEnd(state)
 
     if (state.dataProc.isDefined) state.dataProc.value.endElement(state, this)
 
@@ -389,10 +299,11 @@ class ElementSpecifiedLengthUnparser(
 
   override val runtimeDependencies = maybeTargetLengthEv.toArray
 
-  // Must happen before dispatchContentUnparser so we can take
-  // advantage of knowing the length.
-  override private[runtime1] def contentSetup(state: UState): Unit = {
-    computeTargetLength(state)
+  override def runContentUnparser(state: UState): Unit = {
+    computeTargetLength(
+      state
+    ) // must happen before run() so that we can take advantage of knowing the length
+    super.runContentUnparser(state) // setup unparsing, which will block for no valu
   }
 
 }
@@ -414,10 +325,12 @@ class ElementOVCSpecifiedLengthUnparserSuspendableExpression(
     val diSimple = state.currentInfosetNode.asSimple
 
     diSimple.setDataValue(v)
-    // Do NOT setFinal here: a chained retry for this value's own
-    // conversion may still be pending, and finalizing now would trip
-    // that retry's own not-yet-final assertion; unparseTree's own
-    // hasValue-guarded setFinal covers the synchronous common case.
+
+    //
+    // These are now done in the main unparse, but they will
+    // suspend if they cannot be evaluated because there is not data value yet.
+    //
+    // callingUnparser.computeSetVariables(state)
   }
 
   override protected def maybeKnownLengthInBits(ustate: UState): MaybeULong = MaybeULong(0L)
@@ -450,14 +363,12 @@ class ElementOVCSpecifiedLengthUnparser(
 
   Assert.invariant(context.dpathElementCompileInfo.isOutputValueCalc)
 
-  override private[runtime1] def contentSetup(state: UState): Unit = {
-    // Must happen before dispatchContentUnparser so we can take
-    // advantage of knowing the length.
-    computeTargetLength(state)
-    if (!state.currentInfosetNode.asSimple.hasValue) {
-      // run the expression. It might or might not have a value.
-      suspendableExpression.run(state)
-    }
+  override def runContentUnparser(state: UState): Unit = {
+    computeTargetLength(
+      state
+    ) // must happen before run() so that we can take advantage of knowing the length
+    suspendableExpression.run(state) // run the expression. It might or might not have a value.
+    super.runContentUnparser(state) // setup unparsing, which will block for no valu
   }
 
 }
@@ -474,28 +385,15 @@ sealed trait ElementUnparserStartEndStrategy {
   def unparseBegin(state: InfosetTreeState): Unit
 
   /**
-   * Restores prior context. Consumes end-element event. A freshly-built
-   * simple node has no value yet (unparseTree still has to set it), so isBuild
-   * defers finalizing it; a complex/array node is always final here.
+   * Restores prior context. Consumes end-element event.
    */
-  def unparseEnd(state: InfosetTreeState, isBuild: Boolean): Unit
-
-  /**
-   * The InfosetBuilder tree's entry points: same node-creation logic as
-   * unparseBegin/unparseEnd, plus the build-side lead-counter hookup that
-   * only ever applies on this side.
-   */
-  final def unparseBeginForBuild(state: InfosetTreeState): Unit = {
-    unparseBegin(state)
-    // Counted after unparseBegin, not unparseEnd: an ancestor's increment must
-    // precede any descendant's, or unparseTree finishing the ancestor first
-    // would underflow the counter.
-    state.sharedContext.get.incrementLead()
-  }
-  final def unparseEndForBuild(state: InfosetTreeState): Unit =
-    unparseEnd(state, isBuild = true)
+  def unparseEnd(state: InfosetTreeState): Unit
 
   protected def captureRuntimeValuedExpressionValues(ustate: UState): Unit
+
+  // Only an unparse creates suspensions, so retrying them is not part of
+  // unparseEnd, which build runs too.
+  protected def retrySuspensionsAfterEnd(ustate: UState): Unit
 
   protected def move(start: InfosetTreeState): Unit
 
@@ -539,50 +437,11 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
           event.info.element
         } else {
           Assert.invariant(state.withinHiddenNest)
-          // Since we never get events for elements in hidden contexts, their infoset elements
-          // will have never been created. This means we need to manually create them
-          val hiddenElem = if (erd.isComplexType) new DIComplex(erd) else new DISimple(erd)
-          hiddenElem.setHidden()
-          hiddenElem
+          state.getHiddenElement(erd)
         }
 
       // now add this new elem to the infoset
-      val parentNodeMaybe = state.currentInfosetNodeMaybe
-      if (parentNodeMaybe.isDefined) {
-        val parentComplex = parentNodeMaybe.get.asComplex
-        Assert.invariant(!parentComplex.isFinal)
-        if (parentComplex.isNilled) {
-          // cannot add content to a nilled complex element
-          UnparseError(
-            One(erd.schemaFileLocation),
-            Nope,
-            "Nilled complex element %s has content from %s",
-            parentComplex.erd.namedQName.toExtendedSyntax,
-            newElem.erd.namedQName.toExtendedSyntax
-          )
-        }
-
-        // We are about to add a child to this complex element. Before we do
-        // that, if the last child added to this complex is a DIArray, and this
-        // new child isn't part of that array, that implies that the DIArray
-        // will have no more children added and should be marked as final, and
-        // we can attempt to free that array.
-        val lastChildMaybe = parentComplex.maybeLastChild
-        if (lastChildMaybe.isDefined) {
-          val lastChild = lastChildMaybe.get
-          if (lastChild.isArray && (lastChild.erd ne newElem.erd)) {
-            lastChild.setFinal()
-            state.freeChildIfNoLongerNeeded(parentComplex, parentComplex.numChildren - 1)
-          }
-        }
-
-        parentComplex.addChild(newElem, state.tunable)
-      } else {
-        // We do not yet have an infoset element (this new element is the
-        // root), so add the infoset node to the DIDocument
-        val doc = state.documentElement
-        doc.addChild(newElem, state.tunable)
-      }
+      state.attachElement(newElem)
 
       // When the infoset events are being advanced, the currentInfosetNodeStack
       // is pushing and popping to match the events. This provides the proper
@@ -594,7 +453,7 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
   /**
    * Restores prior context. Consumes end-element event.
    */
-  final override def unparseEnd(state: InfosetTreeState, isBuild: Boolean): Unit = {
+  final override def unparseEnd(state: InfosetTreeState): Unit = {
     if (erd.isQuasiElement) {
       // Quasi elements are used for TypeValueCalc, and have no corresponding events in the infoset inputter
       // The parent parser will handle pushing and poping the Infoset, so we do not need to do anything here.
@@ -620,47 +479,15 @@ sealed trait RegularElementUnparserStartEndStrategy extends ElementUnparserStart
       }
 
       val cur = state.currentInfosetNodeStack.pop.get
-
-      if (cur.isComplex) {
-        // We are ending a complex element. If the last child of this complex
-        // is a DIArray, that implies that the array will have no more children
-        // and should be marked as isFinal. Normally this happens when we add a
-        // new sibling after an array in unparseBegin, but in this case there
-        // is no sibling following the array, so it must be set here.
-        val lastChild = cur.maybeLastChild
-        if (lastChild.isDefined && lastChild.get.isArray) {
-          lastChild.get.setFinal()
-          state.freeChildIfNoLongerNeeded(cur, cur.numChildren - 1)
-        }
-      }
-
-      // cur is finished: mark it final and free via its container (not
-      // parent, so an array-member frees from the array), except hidden
-      // IVC elements (never get a value) and, for build, SIMPLE elements
-      // (unparseTree still needs to set their actual value afterward).
-      if (
-        (!state.withinHiddenNest || erd.isRepresented) &&
-        !(isBuild && cur.isSimple)
-      ) cur.setFinal()
-      val curContainer =
-        if (cur.erd.isArray) cur.diParent.maybeLastChild.get
-        else cur.diParent
-      state.freeChildIfNoLongerNeeded(curContainer, curContainer.numChildren - 1)
-
-      if (state.currentInfosetNodeStack.isEmpty) {
-        // If there is nothing else on the infoset stack after popping off the
-        // current infoset node, that means we have finished the root element,
-        // so mark the DIDocument as final
-        val doc = state.documentElement
-        Assert.invariant(!doc.isFinal)
-        doc.setFinal()
-      }
+      state.finishElement(cur, erd)
 
       move(state)
+    }
+  }
 
-      if (!isBuild) {
-        state.asInstanceOf[SuspensionCapableUState].evalSuspensions(isFinal = false)
-      }
+  final override protected def retrySuspensionsAfterEnd(ustate: UState): Unit = {
+    if (!erd.isQuasiElement) {
+      ustate.runSuspensions()
     }
   }
 
@@ -691,11 +518,7 @@ trait OVCStartEndStrategy extends ElementUnparserStartEndStrategy {
           val endEv = state.advanceOrError // Consume the end event
           Assert.invariant(endEv.isEnd && endEv.erd == erd)
 
-          val e = new DISimple(erd)
-          // Remove any state that was set by what created this event. Later
-          // code asserts that OVC elements do not have a value
-          e.resetValue()
-          e
+          state.getOvcElement(startEv, erd)
         } else {
           // Event was optional and didn't exist, create a new InfosetElement and add it
           val e = new DISimple(erd)
@@ -703,51 +526,23 @@ trait OVCStartEndStrategy extends ElementUnparserStartEndStrategy {
         }
       } else {
         // Event was hidden and will never exist, create a new InfosetElement and add it
-        val e = new DISimple(erd)
-        e.setHidden()
-        e
+        state.getHiddenElement(erd)
       }
 
-    // We are about to add a new OVC child to this complex element. Before we
-    // do that, if the last child added to this complex is a DIArray, that
-    // implies that the DIArray will have no more children added and should be
-    // marked as final, and we can attempt to free that array.
-    val parentNode = state.currentInfosetNode
-    val parentComplex = parentNode.asComplex
-    val lastChildMaybe = parentComplex.maybeLastChild
-    if (lastChildMaybe.isDefined) {
-      val lastChild = lastChildMaybe.get
-      if (lastChild.isArray) {
-        lastChild.setFinal()
-        state.freeChildIfNoLongerNeeded(parentComplex, parentComplex.numChildren - 1)
-      }
-    }
-
-    parentComplex.addChild(ovcElem, state.tunable)
+    state.attachElement(ovcElem)
     state.currentInfosetNodeStack.push(One(ovcElem))
   }
 
-  final override def unparseEnd(state: InfosetTreeState, isBuild: Boolean): Unit = {
+  final override def unparseEnd(state: InfosetTreeState): Unit = {
     // if an OVC element existed, the start AND end events were consumed in
     // unparseBegin. No need to advance the cursor here.
-
-    // ovcElem is finished, free it if possible. OVC elements are not allowed in
-    // arrays, so we can directly get the diParent to get the container DINode
     val ovcElem = state.currentInfosetNodeStack.pop
-    val ovcContainer = ovcElem.get.diParent
-    state.freeChildIfNoLongerNeeded(ovcContainer, ovcContainer.numChildren - 1)
-
-    if (state.currentInfosetNodeStack.isEmpty) {
-      // If there is nothing else on the infoset stack after popping off the
-      // current infoset node, that means we have finished the root element,
-      // so mark the DIDocument as final
-      val doc = state.documentElement
-      Assert.invariant(!doc.isFinal)
-      doc.setFinal()
-    }
+    state.finishOvcElement(ovcElem.get)
 
     move(state)
   }
+
+  final override protected def retrySuspensionsAfterEnd(ustate: UState): Unit = {}
 
   // For OVC, or for a target length expression,
   //

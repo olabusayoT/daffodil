@@ -22,13 +22,13 @@ import org.apache.daffodil.lib.util.MStackOf
 import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.Nope
 import org.apache.daffodil.lib.util.Maybe.One
+import org.apache.daffodil.lib.xml.NamedQName
 import org.apache.daffodil.runtime1.processors.ElementRuntimeData
 import org.apache.daffodil.runtime1.processors.ModelGroupRuntimeData
 import org.apache.daffodil.runtime1.processors.TermRuntimeData
-import org.apache.daffodil.runtime1.processors.unparsers.BuildAbortedException
+import org.apache.daffodil.runtime1.processors.unparsers.InfosetBuildState
 import org.apache.daffodil.runtime1.processors.unparsers.InfosetTreeState
 import org.apache.daffodil.runtime1.processors.unparsers.UnparseError
-import org.apache.daffodil.runtime1.processors.unparsers.UnparseSharedContext
 import org.apache.daffodil.unparsers.runtime1.ElementUnparserBase
 import org.apache.daffodil.unparsers.runtime1.RepeatingChildUnparser
 import org.apache.daffodil.unparsers.runtime1.SequenceChildUnparser
@@ -75,10 +75,11 @@ abstract class InfosetBuildFrame {
  */
 final class InfosetBuildCursor(
   root: InfosetBuilder,
-  val state: InfosetTreeState,
-  ctx: UnparseSharedContext
+  val buildState: InfosetBuildState
 ) {
-  private val stack = new MStackOf[InfosetBuildFrame]()
+  def state: InfosetTreeState = buildState
+
+  private val stack = new MStackOf[InfosetBuildFrame](64)
 
   push(root.newFrame())
 
@@ -91,20 +92,15 @@ final class InfosetBuildCursor(
   /**
    * Steps until the lead window is full or building completes, so it takes a
    * single step when the window is already full. With lastAdvance it ignores
-   * the window and runs until building completes. A failure is thrown as a
-   * BuildAbortedException wrapping the original, which ends the unparse, so
-   * the cursor is not used again.
+   * the window and runs until building completes. A failure propagates and
+   * ends the unparse, so the cursor is not used again.
    */
   def advance(lastAdvance: Boolean = false): Unit = {
-    try {
-      while (!stack.isEmpty) {
-        stack.top.step(this)
-        if (!lastAdvance && ctx.leadExceedsPrefetchLimit) {
-          return
-        }
+    while (!stack.isEmpty) {
+      stack.top.step(this)
+      if (!lastAdvance && buildState.leadExceedsBuildAheadLimit) {
+        return
       }
-    } catch {
-      case t: Throwable => throw new BuildAbortedException(t)
     }
   }
 }
@@ -181,7 +177,7 @@ final class ElementInfosetBuilder(
     override def step(cursor: InfosetBuildCursor): Unit = {
       val state = cursor.state
       if (!contentPushed) {
-        elementUnparser.unparseBeginForBuild(state)
+        elementUnparser.unparseBegin(state)
         if (erd.isComplexType) {
           state.pushTRD(erd.optComplexTypeModelGroupRuntimeData.get)
           if (!contentBuilder.isEmpty) {
@@ -194,7 +190,7 @@ final class ElementInfosetBuilder(
       if (erd.isComplexType) {
         state.popTRD(erd.optComplexTypeModelGroupRuntimeData.get)
       }
-      elementUnparser.unparseEndForBuild(state)
+      elementUnparser.unparseEnd(state)
       cursor.pop()
     }
   }
@@ -298,7 +294,7 @@ final private class SequenceInfosetBuilder(children: Array[SequenceChildInfosetB
             state.arrayIterationIndexStack.push(1L)
             state.occursIndexStack.push(1L)
             numOccurrences = 0
-            maxReps = r.maxRepeatsFixed
+            maxReps = r.maxRepeatsConst
 
             Assert.invariant(state.inspect, "No event for building.")
             val ev = state.inspectAccessor
@@ -356,7 +352,7 @@ object SequenceInfosetBuilder {
  */
 final class ChoiceInfosetBuilder(
   mgrd: ModelGroupRuntimeData,
-  branchMap: Map[ChoiceBranchEvent, (TermRuntimeData, InfosetBuilder)],
+  branchMap: Map[NamedQName, (TermRuntimeData, InfosetBuilder)],
   defaultBranch: Maybe[(TermRuntimeData, InfosetBuilder)]
 ) extends InfosetBuilder {
 
@@ -366,13 +362,12 @@ final class ChoiceInfosetBuilder(
     } else {
       state.pushTRD(mgrd)
       val event = state.inspectOrError
-      val key: ChoiceBranchEvent = event match {
-        case e if e.isStart && (e.isElement || e.isArray) =>
-          e.erd.choiceBranchStartEvent
-        case e if e.isEnd && (e.isElement || e.isArray) =>
-          e.erd.choiceBranchEndEvent
+      // An end event never starts a branch, so it always takes the default.
+      val fromTable = if (event.isStart) {
+        branchMap.get(event.erd.namedQName)
+      } else {
+        None
       }
-      val fromTable = branchMap.get(key)
       val resolved = if (fromTable.isDefined) {
         fromTable
       } else {
@@ -383,8 +378,8 @@ final class ChoiceInfosetBuilder(
           One(mgrd.schemaFileLocation),
           Nope,
           "Found next element %s, but expected one of %s.",
-          key.qname.toExtendedSyntax,
-          branchMap.keys.map { _.qname.toExtendedSyntax }.mkString(", ")
+          event.erd.namedQName.toExtendedSyntax,
+          branchMap.keys.map { _.toExtendedSyntax }.mkString(", ")
         )
       }
       state.popTRD(mgrd)

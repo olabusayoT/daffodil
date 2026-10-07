@@ -25,16 +25,18 @@ import org.apache.daffodil.lib.util.SchemaUtils
 import org.apache.daffodil.lib.xml.XMLUtils
 import org.apache.daffodil.runtime1.infoset.DIArray
 import org.apache.daffodil.runtime1.infoset.InfosetBuildCursor
-import org.apache.daffodil.unparsers.runtime1.ElementUnparserBase
+import org.apache.daffodil.runtime1.infoset.StreamingInfosetWalker
+import org.apache.daffodil.runtime1.infoset.XMLTextInfosetOutputter
+import org.apache.daffodil.runtime1.processors.TermRuntimeData
 
 import org.junit.Assert.*
 import org.junit.Test
 
 /**
- * Tests the infoset build cursor and build state against the unparseTree
- * pass: the event sequence build surfaces, the shared lead counter, the
- * prefetch window, and unparseTree matching a single-pass unparse for scalar,
- * array and choice content.
+ * Tests the infoset build cursor and build state against the unparse that
+ * reads the built tree as events: the event sequence build surfaces, the lead
+ * counter, the build ahead window, and the build ahead unparse matching an
+ * event-driven unparse for scalar, array and choice content.
  */
 class TestInfosetBuildCursor {
 
@@ -104,37 +106,42 @@ class TestInfosetBuildCursor {
 
   /**
    * A build side, an InfosetBuildCursor over an InfosetBuildState, and an
-   * unparseTree side sharing one UnparseSharedContext.
+   * unparse side that reads the tree the build side makes.
    */
-  private final class PrefetchRun(sch: Node, infoset: Node, prefetchLimit: Long = 100) {
-    val dp = UnparseSharedContextTestFixture.compileForUnparse(
+  private final class BuildAheadRun(sch: Node, infoset: Node, buildAheadLimit: Long = 100) {
+    val dp = InfosetBuildTestFixture.compileForUnparse(
       sch,
-      Map("releaseUnneededInfoset" -> "false", "useBuildPrefetch" -> "true")
+      Map(
+        "releaseUnneededInfoset" -> "false",
+        "infosetBuilderMode" -> "buildAhead",
+        "unparseBuildAheadWindowNodes" -> buildAheadLimit.toString
+      )
     )
-    val buildInputter = UnparseSharedContextTestFixture.newInitializedInputter(infoset, dp)
-    val sharedCtx = UnparseSharedContextTestFixture.build(dp, prefetchLimit)()
-    val cursor = new InfosetBuildCursor(
-      dp.ssrd.builder,
-      new InfosetBuildState(buildInputter, sharedCtx),
-      sharedCtx
-    )
-    sharedCtx.setBuildCursor(cursor)
+    val buildInputter = InfosetBuildTestFixture.newInitializedInputter(infoset, dp)
+    val buildState = new InfosetBuildState(buildInputter, dp.tunables)
+    val cursor = new InfosetBuildCursor(dp.ssrd.builder, buildState)
 
     def buildAll(): Unit = cursor.advance(lastAdvance = true)
 
     def rootNode = buildInputter.documentElement.child(0).asComplex
 
-    // Unparses the tree build produced, pulling build forward as unparseTree
+    // Unparses the tree build produced, pulling build forward as the unparse
     // needs it, and returns the output.
-    def unparseTree(): String = {
+    def unparseBuiltTree(): String = {
       val out = new ByteArrayOutputStream()
-      val inputter = UnparseSharedContextTestFixture.newInitializedInputter(infoset, dp)
-      val state = UState.createInitialUState(out, dp, inputter, false)
-      state.setSharedContext(sharedCtx)
+      val state = UState.createInitialUStateForBuildAhead(
+        out,
+        dp,
+        buildInputter,
+        false,
+        new TreeEventState(cursor, false)
+      )
       state.getDataOutputStream.setPriorBitOrder(dp.ssrd.elementRuntimeData.defaultBitOrder)
 
-      val rootUnparser = dp.ssrd.unparser.asInstanceOf[ElementUnparserBase]
-      rootUnparser.unparseTree(sharedCtx.awaitChild(buildInputter.documentElement, 0), state)
+      val rootUnparser = dp.ssrd.unparser
+      state.pushTRD(dp.ssrd.elementRuntimeData)
+      rootUnparser.unparse1(state)
+      state.popTRD(rootUnparser.context.asInstanceOf[TermRuntimeData])
       // Build may still have trailing end events to consume, and a speculative
       // separator is written via a suspension that must drain before the DOS
       // is finalized.
@@ -145,21 +152,21 @@ class TestInfosetBuildCursor {
     }
   }
 
-  // A tree built outside a single pass, compared against that single pass.
-  private def assertUnparseTreeMatchesSinglePass(sch: Node, infoset: Node): Array[Byte] = {
-    // Single-pass on purpose: the tunable would otherwise replace it.
-    val dp = UnparseSharedContextTestFixture.compileForUnparse(
+  // A tree built outside an event-driven unparse, compared against that unparse.
+  private def assertBuildAheadMatchesEventDriven(sch: Node, infoset: Node): Array[Byte] = {
+    // Event-driven on purpose: the tunable would otherwise replace it.
+    val dp = InfosetBuildTestFixture.compileForUnparse(
       sch,
-      Map("releaseUnneededInfoset" -> "false", "useBuildPrefetch" -> "false")
+      Map("releaseUnneededInfoset" -> "false", "infosetBuilderMode" -> "eventDriven")
     )
-    val (singlePassBytes, unparseTreeBytes) =
-      UnparseSharedContextTestFixture.getSinglePassAndUnparseTreeBytes(dp, infoset)
-    assertArrayEquals(singlePassBytes, unparseTreeBytes)
-    singlePassBytes
+    val (eventDrivenBytes, buildAheadBytes) =
+      InfosetBuildTestFixture.getEventDrivenAndBuildAheadBytes(dp, infoset)
+    assertArrayEquals(eventDrivenBytes, buildAheadBytes)
+    eventDrivenBytes
   }
 
   @Test def testBuildStateSurfacesCorrectEventSequence(): Unit = {
-    val run = new PrefetchRun(separatedRowSchema, separatedRowInfoset)
+    val run = new BuildAheadRun(separatedRowSchema, separatedRowInfoset)
 
     // Drives through the actual InfosetBuilder frames rather than hand-driven
     // advance() calls, since next-element resolution depends on the TRD
@@ -168,7 +175,7 @@ class TestInfosetBuildCursor {
     // delimiter-stack wrapper.
     run.buildAll()
 
-    assertEquals(4L, run.sharedCtx.currentLead) // row, name, age, city
+    assertEquals(4L, run.buildState.currentLead) // row, name, age, city
 
     assertEquals(3, run.rootNode.numChildren)
     assertEquals("name", run.rootNode.child(0).erd.name)
@@ -197,29 +204,29 @@ class TestInfosetBuildCursor {
       elementFormDefault = "unqualified"
     )
 
-    val run = new PrefetchRun(sch, separatedRowInfoset)
+    val run = new BuildAheadRun(sch, separatedRowInfoset)
 
-    assertEquals(0L, run.sharedCtx.currentLead)
+    assertEquals(0L, run.buildState.currentLead)
     run.buildAll()
     // row itself, name, age, city = 4 elements total, each incrementing once
     // via unparseBegin's actual hookup.
-    assertEquals(4L, run.sharedCtx.currentLead)
+    assertEquals(4L, run.buildState.currentLead)
 
-    // unparseTree unparses the same already-built tree against the same
-    // shared context, decrementing the lead counter as it goes.
-    assertEquals("Alice30Boston", run.unparseTree())
+    // The unparse reads the same already-built tree, decrementing the lead
+    // counter as it goes.
+    assertEquals("Alice30Boston", run.unparseBuiltTree())
 
-    // unparseTree decremented once per element too, so the counter is back to
-    // 0: build and unparseTree agree on how many nodes exist.
-    assertEquals(0L, run.sharedCtx.currentLead)
+    // The unparse decremented once per element too, so the counter is back to
+    // 0: build and the unparse agree on how many nodes exist.
+    assertEquals(0L, run.buildState.currentLead)
   }
 
-  // With a small prefetchLimit, one advance() leaves the lead counter just
-  // past it, and the unparse is still correct across the refills unparseTree
+  // With a small buildAheadLimit, one advance() leaves the lead counter just
+  // past it, and the unparse is still correct across the refills the unparse
   // triggers while it runs.
-  @Test def testBuildStopsAtPrefetchLimit(): Unit = {
+  @Test def testBuildStopsAtBuildAheadLimit(): Unit = {
     val numItems = 40
-    val prefetchLimit = 3L
+    val buildAheadLimit = 3L
 
     val sch = SchemaUtils.dfdlTestSchema(
       <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>,
@@ -245,48 +252,48 @@ class TestInfosetBuildCursor {
       </ex:row>
     val expectedBytes = (0 until numItems).map(i => s"i$i").mkString(",")
 
-    val run = new PrefetchRun(sch, infoset, prefetchLimit)
+    val run = new BuildAheadRun(sch, infoset, buildAheadLimit)
 
     run.cursor.advance()
 
     // numItems + 1 (row + all items) is what currentLead would equal here if
-    // advance() ignored the prefetch limit. It counts one node per element, so
+    // advance() ignored the build ahead limit. It counts one node per element, so
     // it stops at the first node past the limit.
     assertFalse("expected build to stop with more left to build", run.cursor.isFinished)
     assertEquals(
-      s"expected build to stop as soon as the lead passed prefetchLimit=$prefetchLimit " +
+      s"expected build to stop as soon as the lead passed buildAheadLimit=$buildAheadLimit " +
         s"(numItems=$numItems)",
-      prefetchLimit + 1,
-      run.sharedCtx.currentLead
+      buildAheadLimit + 1,
+      run.buildState.currentLead
     )
 
-    // unparseTree pulls the rest of the tree forward as it needs it; the
+    // The unparse pulls the rest of the tree forward as it needs it; the
     // output must be byte-for-byte correct despite having been built across
     // many separate advance() calls rather than a single one-shot build pass.
-    assertEquals(expectedBytes, run.unparseTree())
+    assertEquals(expectedBytes, run.unparseBuiltTree())
   }
 
-  @Test def testUnparseTreeMatchesSinglePass(): Unit = {
-    assertUnparseTreeMatchesSinglePass(separatedRowSchema, separatedRowInfoset)
+  @Test def testBuildAheadMatchesEventDriven(): Unit = {
+    assertBuildAheadMatchesEventDriven(separatedRowSchema, separatedRowInfoset)
   }
 
-  @Test def testArrayAndChoiceUnparseTreeMatchesSinglePass(): Unit = {
-    val singlePassBytes =
-      assertUnparseTreeMatchesSinglePass(arrayChoiceSchema, arrayChoiceInfoset)
-    assertEquals("H,a,b,c,X", new String(singlePassBytes, StandardCharsets.US_ASCII))
+  @Test def testArrayAndChoiceBuildAheadMatchesEventDriven(): Unit = {
+    val eventDrivenBytes =
+      assertBuildAheadMatchesEventDriven(arrayChoiceSchema, arrayChoiceInfoset)
+    assertEquals("H,a,b,c,X", new String(eventDrivenBytes, StandardCharsets.US_ASCII))
   }
 
-  // Drives InfosetBuildState directly, then feeds its tree to unparseTree
-  // (end-to-end build-then-unparseTree).
+  // Drives InfosetBuildState directly, then feeds its tree to the unparse
+  // (end-to-end build-then-unparse).
   @Test def testStandaloneBuildStateNavigatesArrayChoiceSeparator(): Unit = {
-    val run = new PrefetchRun(arrayChoiceSchema, arrayChoiceInfoset)
+    val run = new BuildAheadRun(arrayChoiceSchema, arrayChoiceInfoset)
 
     // The cursor builds the whole tree from the inputter, including the array
     // and choice content.
     run.buildAll()
 
     // row, header, item x3, typeB = 6 elements total.
-    assertEquals(6L, run.sharedCtx.currentLead)
+    assertEquals(6L, run.buildState.currentLead)
 
     assertEquals(3, run.rootNode.numChildren)
     assertEquals("header", run.rootNode.child(0).erd.name)
@@ -296,6 +303,117 @@ class TestInfosetBuildCursor {
 
     // Unparsing the tree InfosetBuildState just constructed confirms it's a
     // usable, fully-built tree, not just a navigation exercise.
-    assertEquals("H,a,b,c,X", run.unparseTree())
+    assertEquals("H,a,b,c,X", run.unparseBuiltTree())
+  }
+
+  // Each event as "start element name", "end array name" and so on.
+  private def eventDescriptions(events: InfosetEventState): List[String] = {
+    val descriptions = List.newBuilder[String]
+    while (events.advance) {
+      val event = events.advanceAccessor
+      val position = if (event.isStart) {
+        "start"
+      } else {
+        "end"
+      }
+      val kind = if (event.isElement) {
+        "element"
+      } else {
+        "array"
+      }
+      descriptions += position + " " + kind + " " + event.erd.name
+    }
+    descriptions.result()
+  }
+
+  @Test def testTreeEventsForScalars(): Unit = {
+    val run = new BuildAheadRun(separatedRowSchema, separatedRowInfoset)
+    val treeEvents = new TreeEventState(run.cursor, true)
+    assertEquals(
+      List(
+        "start element row",
+        "start element name",
+        "end element name",
+        "start element age",
+        "end element age",
+        "start element city",
+        "end element city",
+        "end element row"
+      ),
+      eventDescriptions(treeEvents)
+    )
+  }
+
+  private val arrayChoiceEvents = List(
+    "start element row",
+    "start element header",
+    "end element header",
+    "start array item",
+    "start element item",
+    "end element item",
+    "start element item",
+    "end element item",
+    "start element item",
+    "end element item",
+    "end array item",
+    "start element typeB",
+    "end element typeB",
+    "end element row"
+  )
+
+  @Test def testTreeEventsForArrayAndChoice(): Unit = {
+    val run = new BuildAheadRun(arrayChoiceSchema, arrayChoiceInfoset)
+    val treeEvents = new TreeEventState(run.cursor, true)
+    assertEquals(arrayChoiceEvents, eventDescriptions(treeEvents))
+  }
+
+  @Test def testTreeEventsPullBuildOnlyAsFarAsNeeded(): Unit = {
+    val run = new BuildAheadRun(arrayChoiceSchema, arrayChoiceInfoset, buildAheadLimit = 1)
+    val treeEvents = new TreeEventState(run.cursor, true)
+    assertTrue(treeEvents.advance)
+    assertEquals("row", treeEvents.advanceAccessor.erd.name)
+    // Only the root has been needed so far, so build has not run to the end.
+    assertFalse(run.cursor.isFinished)
+    assertEquals(arrayChoiceEvents.tail, eventDescriptions(treeEvents))
+    assertTrue(run.cursor.isFinished)
+  }
+
+  // The infoset as a debugger shows it: the whole built tree, limited to what
+  // the unparse has reached.
+  private def reachedInfoset(run: BuildAheadRun, treeEvents: TreeEventState): String = {
+    val out = new ByteArrayOutputStream()
+    val xml = new XMLTextInfosetOutputter(out, pretty = false, minimal = true)
+    StreamingInfosetWalker(
+      run.buildInputter.documentElement,
+      xml,
+      walkHidden = false,
+      ignoreBlocks = true,
+      releaseUnneededInfoset = false,
+      visibleChildCounts = treeEvents.reachedChildCounts()
+    ).walk(lastWalk = true)
+    out.toString("UTF-8")
+  }
+
+  @Test def testReachedChildCountsLimitTheDebuggerInfoset(): Unit = {
+    val run = new BuildAheadRun(separatedRowSchema, separatedRowInfoset)
+    run.buildAll()
+    val treeEvents = new TreeEventState(run.cursor, false)
+
+    // start row, start name, end name
+    assertTrue(treeEvents.advance)
+    assertTrue(treeEvents.advance)
+    assertTrue(treeEvents.advance)
+    val afterName = reachedInfoset(run, treeEvents)
+    assertTrue(afterName, afterName.contains("Alice"))
+    assertFalse(afterName, afterName.contains("30"))
+
+    // The start of age is computed but not consumed, so age is not reached.
+    assertTrue(treeEvents.inspect)
+    assertFalse(reachedInfoset(run, treeEvents).contains("30"))
+
+    assertTrue(treeEvents.advance)
+    val afterAgeStart = reachedInfoset(run, treeEvents)
+    assertTrue(afterAgeStart, afterAgeStart.contains("30"))
+    assertFalse(afterAgeStart, afterAgeStart.contains("Boston"))
   }
 }

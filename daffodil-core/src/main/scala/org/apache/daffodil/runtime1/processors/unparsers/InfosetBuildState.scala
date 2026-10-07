@@ -22,30 +22,47 @@ import org.apache.daffodil.lib.iapi.DaffodilTunables
 import org.apache.daffodil.lib.util.MStackOfMaybe
 import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.Nope
-import org.apache.daffodil.lib.util.Maybe.One
 import org.apache.daffodil.runtime1.infoset.DIDocument
+import org.apache.daffodil.runtime1.infoset.DIElement
 import org.apache.daffodil.runtime1.infoset.DINode
 import org.apache.daffodil.runtime1.infoset.InfosetAccessor
 import org.apache.daffodil.runtime1.infoset.InfosetInputter
+import org.apache.daffodil.runtime1.processors.ElementRuntimeData
 import org.apache.daffodil.runtime1.processors.TermRuntimeData
 
 /**
- * The "build" side of the build/unparseTree split: it walks the infoset
+ * The "build" side of the build and unparse split: it walks the infoset
  * events from an actual `InfosetInputter` and builds the infoset tree ahead
- * of unparseTree. It needs only the tree state, so it is not a `UState`:
+ * of the unparse. It needs only the tree state, so it is not a `UState`:
  * it has no output stream, variables or debugger state, and build never
  * writes content.
  *
- * Used only when the `useBuildPrefetch` tunable is enabled when unparsing;
+ * Used only when the `infosetBuilderMode` tunable is buildAhead when unparsing;
  * otherwise only `UStateMain` is constructed.
  */
 final class InfosetBuildState(
   private val inputter: InfosetInputter,
-  sharedCtx: UnparseSharedContext
+  override val tunable: DaffodilTunables
 ) extends InfosetTreeState
-  with TraversalIndexStacks {
+  with TraversalIndexStacks
+  with InfosetFromEvents {
 
-  override def tunable: DaffodilTunables = sharedCtx.tunable
+  // Build never frees a node, so finishing one only marks it final. A simple
+  // node stays open for the unparse, which gives it its value.
+  override def finishElement(cur: DINode, erd: ElementRuntimeData): Unit = {
+    if (cur.isComplex) {
+      val lastChild = cur.maybeLastChild
+      if (lastChild.isDefined && lastChild.get.isArray) {
+        lastChild.get.setFinal()
+      }
+      if (!withinHiddenNest || erd.isRepresented) {
+        cur.setFinal()
+      }
+    }
+    markDocumentFinalIfRootEnded()
+  }
+
+  override def finishOvcElement(cur: DINode): Unit = markDocumentFinalIfRootEnded()
 
   private val eventState: InfosetEventState = new InputterEventState(inputter, "building")
 
@@ -90,9 +107,29 @@ final class InfosetBuildState(
   override def decrementHiddenDef(): Unit = hiddenDepth -= 1
   override def withinHiddenNest: Boolean = hiddenDepth > 0
 
-  // Build runs ahead of unparseTree, which frees each node once it is done
-  // with it, so build leaves freeing to unparseTree.
+  // Build runs ahead of the unparse, which frees each node once it is done
+  // with it, so build leaves freeing to the unparse.
   override def freeChildIfNoLongerNeeded(parent: DINode, index: Int): Unit = ()
 
-  override def sharedContext: Maybe[UnparseSharedContext] = One(sharedCtx)
+  // The lead is how far build is ahead of the unparse: the nodes build has
+  // constructed that the unparse has not yet finished. Build counts a node when
+  // it joins the tree, which keeps an ancestor's count ahead of its
+  // descendants', and the unparse uncounts it when it finishes the node.
+  private var lead: Long = 0
+
+  override def attachElement(newElem: DIElement): Unit = {
+    super.attachElement(newElem)
+    lead += 1
+  }
+
+  def decrementLead(): Unit = {
+    lead -= 1
+    Assert.invariant(lead >= 0)
+  }
+
+  def currentLead: Long = lead
+
+  // Build stops advancing once the lead exceeds the build ahead limit, which
+  // bounds how far ahead of the unparse it may run.
+  def leadExceedsBuildAheadLimit: Boolean = lead > tunable.unparseBuildAheadWindowNodes
 }

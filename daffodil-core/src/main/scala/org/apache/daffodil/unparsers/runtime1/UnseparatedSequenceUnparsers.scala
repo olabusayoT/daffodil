@@ -18,9 +18,6 @@ package org.apache.daffodil.unparsers.runtime1
 
 import org.apache.daffodil.lib.exceptions.Assert
 import org.apache.daffodil.lib.schema.annotation.props.gen.OccursCountKind
-import org.apache.daffodil.runtime1.infoset.DIArray
-import org.apache.daffodil.runtime1.infoset.DIComplex
-import org.apache.daffodil.runtime1.infoset.DINode
 import org.apache.daffodil.runtime1.processors.ElementRuntimeData
 import org.apache.daffodil.runtime1.processors.SequenceRuntimeData
 import org.apache.daffodil.runtime1.processors.TermRuntimeData
@@ -50,7 +47,7 @@ class RepOrderedUnseparatedSequenceChildUnparser(
 
   override def checkArrayPosAgainstMaxOccurs(state: InfosetTreeState): Boolean = {
     if (ock eq OccursCountKind.Implicit)
-      state.arrayIterationPos <= maxRepeatsFixed
+      state.arrayIterationPos <= maxRepeatsConst
     else
       true
   }
@@ -59,8 +56,7 @@ class RepOrderedUnseparatedSequenceChildUnparser(
 class OrderedUnseparatedSequenceUnparser(
   rd: SequenceRuntimeData,
   childUnparsers: Array[SequenceChildUnparser]
-) extends OrderedSequenceUnparserBase(rd)
-  with TreeUnparser {
+) extends OrderedSequenceUnparserBase(rd) {
 
   // Sequences of nothing (no initiator, no terminator, nothing at all) should
   // have been optimized away
@@ -69,165 +65,6 @@ class OrderedUnseparatedSequenceUnparser(
   override val runtimeDependencies = Array()
 
   override def childProcessors = childUnparsers.toVector
-
-  /**
-   * Walks childUnparsers positionally against an already-built
-   * containerNode. Without this override, the outer dispatch's
-   * TreeUnparser check would be false and dispatch would fall through to
-   * event-driven unparse against an untouched inputter.
-   */
-  override def unparseTree(containerNode: DINode, state: UState): Unit = {
-    val sharedCtx = state.sharedContext.get
-    val complex = containerNode.asComplex
-
-    var index = 0
-    while (index < childUnparsers.length) {
-      childUnparsers(index) match {
-        case rep: RepeatingChildUnparser =>
-          unparseRepeatingTermForTree(rep, complex, sharedCtx, state)
-        case cu =>
-          withDebuggerEvents(cu, state) {
-            unparseRequiredTermForTree(cu, complex, sharedCtx, state)
-          }
-      }
-      index += 1
-    }
-  }
-
-  /**
-   * Unparses an array/optional term's occurrences, if it produced any;
-   * nothing to do otherwise. This sequence has no separator bookkeeping to
-   * resolve either way.
-   */
-  private def unparseRepeatingTermForTree(
-    rep: RepeatingChildUnparser,
-    complex: DIComplex,
-    sharedCtx: UnparseSharedContext,
-    state: UState
-  ): Unit = {
-    val idx = state.childIndexStack.top.toInt
-    if (hasOccurrences(rep, complex, idx, sharedCtx)) {
-      complex.child(idx) match {
-        case arrayNode: DIArray =>
-          unparseArrayOccurrencesForTree(rep, arrayNode, complex, idx, sharedCtx, state)
-        case _ =>
-          unparseScalarOptionalOccurrenceForTree(rep, complex, idx, sharedCtx, state)
-      }
-    }
-  }
-
-  private def unparseArrayOccurrencesForTree(
-    rep: RepeatingChildUnparser,
-    arrayNode: DIArray,
-    complex: DIComplex,
-    idx: Int,
-    sharedCtx: UnparseSharedContext,
-    state: UState
-  ): Unit = {
-    // A dfdl:occursIndex() expression in the occurrence's own content reads
-    // state.occursIndexStack.top, which must track the actual occurrence
-    // being written.
-    state.pushOccurrenceIndices()
-    try {
-      var arrayOcc = 0
-      while (sharedCtx.childExistsOrFinal(arrayNode, arrayOcc)) {
-        val occNode = sharedCtx.awaitChild(arrayNode, arrayOcc)
-        withDebuggerEvents(rep, state) {
-          rep.childUnparser.asInstanceOf[ElementUnparserBase].unparseTree1(occNode, state)
-        }
-        state.freeChildIfNoLongerNeeded(arrayNode, arrayOcc)
-        arrayOcc += 1
-        state.moveOverOneArrayIterationIndexOnly()
-        state.moveOverOneOccursIndexOnly()
-      }
-      state.freeChildIfNoLongerNeeded(complex, idx)
-      state.moveOverOneElementChildOnly()
-    } finally {
-      state.popOccurrenceIndices()
-    }
-  }
-
-  // A scalar optional is still a RepeatingChildUnparser, just one that can
-  // never hold more than one occurrence, so it pushes the same occurrence
-  // indices a true array does.
-  private def unparseScalarOptionalOccurrenceForTree(
-    rep: RepeatingChildUnparser,
-    complex: DIComplex,
-    idx: Int,
-    sharedCtx: UnparseSharedContext,
-    state: UState
-  ): Unit = {
-    val readyChild = sharedCtx.awaitChild(complex, idx)
-    state.pushOccurrenceIndices()
-    try {
-      withDebuggerEvents(rep, state) {
-        rep.childUnparser.asInstanceOf[ElementUnparserBase].unparseTree1(readyChild, state)
-      }
-      state.moveOverOneElementChildOnly()
-      state.freeChildIfNoLongerNeeded(complex, idx)
-      state.moveOverOneArrayIterationIndexOnly()
-      state.moveOverOneOccursIndexOnly()
-    } finally {
-      state.popOccurrenceIndices()
-    }
-  }
-
-  /**
-   * Unparses a required term: a simple or complex element, a nested bare
-   * group, or a statement-only term with no tree child of its own.
-   */
-  private def unparseRequiredTermForTree(
-    cu: SequenceChildUnparser,
-    complex: DIComplex,
-    sharedCtx: UnparseSharedContext,
-    state: UState
-  ): Unit = {
-    cu.childUnparser match {
-      case elemUnp: ElementUnparserBase =>
-        unparseElementTermForTree(elemUnp, complex, sharedCtx, state)
-      case tu: TreeUnparser =>
-        unparseGroupTermForTree(tu, complex, sharedCtx, state)
-      case nvi: NewVariableInstanceStartUnparser =>
-        nvi.unparse1(state)
-      case sv: SetVariableUnparser =>
-        sv.unparse1(state)
-      case nvi: NewVariableInstanceEndUnparser =>
-        nvi.unparse1(state)
-      case align: AlignmentPrimUnparser =>
-        // Padding has no non-idempotent side effect (unlike assert/
-        // discriminator), and the build pass skips it, so it runs here.
-        align.unparse1(state)
-      case _ =>
-        // No tree child, so nothing to wait on.
-        ()
-    }
-  }
-
-  // A plain scalar element term: await its one tree child, unparse its
-  // content, then advance the element-child position.
-  private def unparseElementTermForTree(
-    elemUnp: ElementUnparserBase,
-    complex: DIComplex,
-    sharedCtx: UnparseSharedContext,
-    state: UState
-  ): Unit = {
-    val idx = state.childIndexStack.top.toInt
-    awaitRequiredTermChild(isGroupTerm = false, complex, idx, sharedCtx)
-    elemUnp.unparseTree1(complex.child(idx), state)
-    state.moveOverOneElementChildOnly()
-    state.freeChildIfNoLongerNeeded(complex, idx)
-  }
-
-  private def unparseGroupTermForTree(
-    tu: TreeUnparser,
-    complex: DIComplex,
-    sharedCtx: UnparseSharedContext,
-    state: UState
-  ): Unit = {
-    val idx = state.childIndexStack.top.toInt
-    awaitRequiredTermChild(isGroupTerm = true, complex, idx, sharedCtx)
-    tu.unparseTree1(complex, state)
-  }
 
   /**
    * Unparses one iteration of an array/optional element
@@ -264,10 +101,11 @@ class OrderedUnseparatedSequenceUnparser(
       //
       childUnparser match {
         case unparser: RepeatingChildUnparser => {
-          state.pushOccurrenceIndices()
+          state.arrayIterationIndexStack.push(1L)
+          state.occursIndexStack.push(1L)
           val erd = unparser.erd
           var numOccurrences = 0
-          val maxReps = unparser.maxRepeatsFixed
+          val maxReps = unparser.maxRepeatsConst
 
           //
           // The number of occurrances we unparse is always exactly driven
@@ -339,7 +177,8 @@ class OrderedUnseparatedSequenceUnparser(
             )
           }
 
-          state.popOccurrenceIndices()
+          state.arrayIterationIndexStack.pop()
+          state.occursIndexStack.pop()
         }
         //
         case scalarUnparser => {

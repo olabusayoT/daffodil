@@ -1329,19 +1329,19 @@ class TestCLIDebugger {
   }
 
   /**
-   * Tracing an unparse must step through the same unparsers, at the same bit
-   * positions, whether or not the build-prefetch path is used. The
+   * Tracing an unparse must step through the same bit positions whether or not
+   * the build-ahead path is used. The
    * trace also shows the infoset, data and diff at each step; those differ
-   * in small ways on the prefetch path (the child and group indexes, and
+   * in small ways on the build ahead path (the child and group indexes, and
    * nodes built one step ahead), so they are not compared.
    */
-  @Test def test_CLI_Tdml_Trace_prefetchUnparseMatchesSinglePass(): Unit = {
+  @Test def test_CLI_Tdml_Trace_buildAheadUnparseMatchesEventDriven(): Unit = {
     val tdml = path(
-      "daffodil-test/src/test/resources/org/apache/daffodil/unparser/buildPrefetch.tdml"
+      "daffodil-test/src/test/resources/org/apache/daffodil/unparser/buildAhead.tdml"
     )
 
-    def steps(prefetch: Boolean): Seq[String] = {
-      val tunables = Map("DAFFODIL_TDML_TUNABLES" -> s"useBuildPrefetch=$prefetch")
+    def steps(buildAhead: Boolean): Seq[String] = {
+      val tunables = Map("DAFFODIL_TDML_TUNABLES" -> s"infosetBuilderMode=${if (buildAhead) "buildAhead" else "eventDriven"}")
       var transcript = ""
       runCLI(
         args"test -t $tdml nviScopedVariableWithValueLengthOVC",
@@ -1352,26 +1352,25 @@ class TestCLIDebugger {
       }(ExitCode.Success)
       transcript.linesIterator
         .filter { line =>
-          line.startsWith("unparser:") || line.startsWith("bitPosition:") ||
-          line.startsWith("-----")
+          line.startsWith("bitPosition:") || line.startsWith("-----")
         }
         .map(_.replaceAll("@[0-9a-f]+", ""))
         .toSeq
     }
 
-    val singlePass = steps(prefetch = false)
-    val prefetch = steps(prefetch = true)
-    assertTrue("expected a trace of unparser steps", singlePass.exists(_.startsWith("unparser:")))
-    val firstDifference = singlePass.zipAll(prefetch, "<none>", "<none>").indexWhere {
+    val eventDriven = steps(buildAhead = false)
+    val buildAhead = steps(buildAhead = true)
+    assertTrue("expected a trace of steps", eventDriven.exists(_.startsWith("bitPosition:")))
+    val firstDifference = eventDriven.zipAll(buildAhead, "<none>", "<none>").indexWhere {
       case (a, b) => a != b
     }
     if (firstDifference >= 0) {
       def around(lines: Seq[String]) =
         lines.slice(firstDifference - 3, firstDifference + 3).mkString("\n    ")
       fail(
-        s"first difference at line $firstDifference of ${singlePass.length} single-pass and " +
-          s"${prefetch.length} prefetch lines\n  single-pass:\n    ${around(singlePass)}" +
-          s"\n  prefetch:\n    ${around(prefetch)}"
+        s"first difference at line $firstDifference of ${eventDriven.length} event-driven and " +
+          s"${buildAhead.length} build ahead lines\n  event-driven:\n    ${around(eventDriven)}" +
+          s"\n  build ahead:\n    ${around(buildAhead)}"
       )
     }
   }

@@ -17,10 +17,6 @@
 
 package org.apache.daffodil.unparsers.runtime1
 
-import org.apache.daffodil.lib.util.Maybe
-import org.apache.daffodil.lib.util.Maybe.Nope
-import org.apache.daffodil.lib.util.Maybe.One
-import org.apache.daffodil.runtime1.infoset.DINode
 import org.apache.daffodil.runtime1.processors.ModelGroupRuntimeData
 import org.apache.daffodil.runtime1.processors.unparsers.*
 
@@ -31,28 +27,19 @@ import org.apache.daffodil.runtime1.processors.unparsers.*
  * we unwind from the refs, we'll decrement.
  */
 class HiddenGroupCombinatorUnparser(ctxt: ModelGroupRuntimeData, bodyUnparser: Unparser)
-  extends CombinatorUnparser(ctxt)
-  with TreeUnparser {
+  extends CombinatorUnparser(ctxt) {
 
   override def childProcessors = Vector(bodyUnparser)
 
   override val runtimeDependencies = Array()
 
-  // The hidden-depth counter must stay incremented for the whole body,
-  // since anything the body writes needs it (e.g. choice-branch
-  // resolution branches on state.withinHiddenNest, and RepType conversion
-  // asserts it's never true).
-  private def run(containerNode: Maybe[DINode], start: UState): Unit = {
-    start.incrementHiddenDef()
+  def unparse(start: UState): Unit = {
     try {
-      dispatchBody(containerNode, bodyUnparser, start)
+      start.incrementHiddenDef()
+      // unparse
+      bodyUnparser.unparse1(start)
     } finally {
       start.decrementHiddenDef()
     }
   }
-
-  override def unparseTree(containerNode: DINode, start: UState): Unit =
-    run(One(containerNode), start)
-
-  def unparse(start: UState): Unit = run(Nope, start)
 }

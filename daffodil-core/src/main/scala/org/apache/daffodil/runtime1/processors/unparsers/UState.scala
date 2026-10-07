@@ -54,6 +54,7 @@ import org.apache.daffodil.runtime1.infoset.InfosetInputter
 import org.apache.daffodil.runtime1.processors.DataLoc
 import org.apache.daffodil.runtime1.processors.DataProcessor
 import org.apache.daffodil.runtime1.processors.DelimiterStackUnparseNode
+import org.apache.daffodil.runtime1.processors.ElementRuntimeData
 import org.apache.daffodil.runtime1.processors.EscapeSchemeUnparserHelper
 import org.apache.daffodil.runtime1.processors.Failure
 import org.apache.daffodil.runtime1.processors.NonTermRuntimeData
@@ -421,10 +422,10 @@ abstract class UState(
       // clone the UState so it can no longer change, and pass that clone into
       // setFinished.
       val finfo = this match {
-        case m: SuspensionCapableUState => m.cloneForSuspension(dos)
+        case m: UStateMain => m.cloneForSuspension(dos)
         case _ =>
           Assert.invariantFailed(
-            "State must be SuspensionCapableUState when splitting for bit order change"
+            "State must be UStateMain when splitting for bit order change"
           )
       }
 
@@ -447,27 +448,37 @@ abstract class UState(
 
   def delimitedParseResult = Nope
 
-  // UStateMain owns the real one; UStateForSuspension delegates to its
-  // mainUState so that a Suspension can always reach its tracker via
-  // savedUstate, even after it's been cloned off for suspension.
-  def suspensionTracker: SuspensionTracker
+  // Retries the suspensions that can be resolved now.
+  def runSuspensions(): Unit
 
-  // The context shared with the build side when unparsing with prefetch; Nope
-  // for a single-pass unparse, which has no build side.
-  private var sharedContextMaybe: Maybe[UnparseSharedContext] = Nope
-  final def setSharedContext(ctx: UnparseSharedContext): Unit = sharedContextMaybe = One(ctx)
-  final def sharedContext: Maybe[UnparseSharedContext] = sharedContextMaybe
 }
 
 /**
  * The state of the infoset tree as unparsing builds it: the event cursor, the
  * TRD and node stacks, and the position within the current group, array and
- * occurrence. Both a single-pass unparse (UState) and the prefetch build
+ * occurrence. Both an event-driven unparse (UState) and the build ahead build
  * (InfosetBuildState) walk the infoset through it; the build has no output
  * stream, variables or debugger state, so it is not a UState.
  */
 trait InfosetTreeState extends Cursor[InfosetAccessor] {
   def tunable: DaffodilTunables
+
+  // How the infoset's nodes are made and kept as unparsing consumes events.
+  // InfosetFromEvents does it for the events of an inputter; a state that
+  // unparses a tree that was already built overrides these.
+
+  // The node of an element in a hidden group, which has no events.
+  def getHiddenElement(erd: ElementRuntimeData): DIElement
+
+  // The node of an outputValueCalc element whose start event was just consumed.
+  def getOvcElement(startEvent: InfosetAccessor, erd: ElementRuntimeData): DIElement
+
+  // Adds a node whose start was just reached to the infoset.
+  def attachElement(newElem: DIElement): Unit
+
+  // Finishes a node whose end was just reached.
+  def finishElement(cur: DINode, erd: ElementRuntimeData): Unit
+  def finishOvcElement(cur: DINode): Unit
 
   def inspectOrError: InfosetAccessor
   def advanceOrError: InfosetAccessor
@@ -499,11 +510,10 @@ trait InfosetTreeState extends Cursor[InfosetAccessor] {
   def moveOverOneElementChildOnly(): Unit
 
   // unparseBegin and unparseEnd free children, and build runs them too. Build
-  // runs ahead of unparseTree, which may already have freed the node, so build
-  // must not free: it would find a null slot or free a node unparseTree has
+  // runs ahead of the unparse, which may already have freed the node, so build
+  // must not free: it would find a null slot or free a node the unparse has
   // not read yet.
   def freeChildIfNoLongerNeeded(parent: DINode, index: Int): Unit
-  def sharedContext: Maybe[UnparseSharedContext]
 }
 
 /**
@@ -728,17 +738,6 @@ final private class SuspendedDelimiterEscapePositionState(
 }
 
 /**
- * Mixed in by a `UState` that creates `Suspension`s, which only unparse does:
- * `UStateMain`.
- */
-trait SuspensionCapableUState {
-  def addSuspension(se: Suspension): Unit
-  def cloneForSuspension(suspendedDOS: DirectOrBufferedDataOutputStream): UState
-  def suspensions: Seq[Suspension]
-  def evalSuspensions(isFinal: Boolean): Unit
-}
-
-/**
  * When we create a suspension during unparse, we need to clone the UStateMain
  * for when the suspension is later resumed. However, we do not need nearly as
  * much information for these cloned ustates as the main unparse. Either we can
@@ -747,7 +746,7 @@ trait SuspensionCapableUState {
  * memory.
  */
 final class UStateForSuspension(
-  val mainUState: UState with SuspensionCapableUState,
+  val mainUState: UStateMain,
   val dataOutputStream: DirectOrBufferedDataOutputStream,
   vbox: VariableBox,
   override val currentInfosetNode: DINode,
@@ -783,14 +782,15 @@ final class UStateForSuspension(
   override def getEncoder(cs: BitsCharset): BitsCharsetEncoder = mainUState.getEncoder(cs)
 
   override def suspensions = mainUState.suspensions
-  override val suspensionTracker = mainUState.suspensionTracker
-  // sharedContext/setSharedContext are final on UState (a single mutable
-  // field, not overridable), so this clone's copy is primed explicitly here
-  // rather than delegated.
-  if (mainUState.sharedContext.isDefined) setSharedContext(mainUState.sharedContext.get)
 
   // $COVERAGE-OFF$
   override def currentInfosetNodeStack = die
+  override def getHiddenElement(erd: ElementRuntimeData) = die
+  override def getOvcElement(startEvent: InfosetAccessor, erd: ElementRuntimeData) = die
+  override def attachElement(newElem: DIElement) = die
+  override def finishElement(cur: DINode, erd: ElementRuntimeData) = die
+  override def finishOvcElement(cur: DINode) = die
+  override def runSuspensions() = die
   override def arrayIterationIndexStack = die
   override def moveOverOneArrayIterationIndexOnly() = die
   override def occursIndexStack = die
@@ -845,7 +845,7 @@ trait TraversalIndexStacks { self: InfosetTreeState =>
   override def groupPos = groupIndexStack.top
 }
 
-final class UStateMain private[unparsers] (
+class UStateMain private[unparsers] (
   private val inputter: InfosetInputter,
   outStream: java.io.OutputStream,
   vbox: VariableBox,
@@ -853,18 +853,21 @@ final class UStateMain private[unparsers] (
   dataProcArg: DataProcessor,
   tunable: DaffodilTunables,
   areDebugging: Boolean,
-  mainDelimiterEscapePosition: MainDelimiterEscapePositionState
+  mainDelimiterEscapePosition: MainDelimiterEscapePositionState,
+  eventState: InfosetEventState
 ) extends UState(
     vbox,
     diagnosticsArg,
     One(dataProcArg),
     tunable,
     areDebugging,
-    new InputterEventState(inputter, "unparsing"),
+    eventState,
     mainDelimiterEscapePosition
   )
-  with SuspensionCapableUState
-  with TraversalIndexStacks {
+  with TraversalIndexStacks
+  with InfosetFromEvents {
+
+  override def runSuspensions(): Unit = evalSuspensions(isFinal = false)
 
   private[unparsers] final val releaseUnneededInfoset: Boolean =
     !areDebugging && tunable.releaseUnneededInfoset
@@ -878,7 +881,8 @@ final class UStateMain private[unparsers] (
     diagnosticsArg: Seq[api.Diagnostic],
     dataProcArg: DataProcessor,
     tunable: DaffodilTunables,
-    areDebugging: Boolean
+    areDebugging: Boolean,
+    eventState: InfosetEventState
   ) =
     this(
       inputter,
@@ -888,7 +892,8 @@ final class UStateMain private[unparsers] (
       dataProcArg,
       tunable,
       areDebugging,
-      new MainDelimiterEscapePositionState(tunable)
+      new MainDelimiterEscapePositionState(tunable),
+      eventState
     )
 
   setDataOutputStream({
@@ -938,19 +943,8 @@ final class UStateMain private[unparsers] (
    * All the other clones used for outputValueCalc, those never
    * need to add any.
    */
-  private val ownSuspensionTracker =
+  private val suspensionTracker =
     new SuspensionTracker(tunable.unparseSuspensionWaitYoung, tunable.unparseSuspensionWaitOld)
-
-  // When sharedContext is set, route through the SAME tracker the other
-  // side of that split uses, or these suspensions would queue where
-  // nothing ever drains them.
-  override def suspensionTracker: SuspensionTracker = {
-    if (sharedContext.isDefined) {
-      sharedContext.get.suspensionTracker
-    } else {
-      ownSuspensionTracker
-    }
-  }
 
   def addSuspension(se: Suspension): Unit = {
     suspensionTracker.trackSuspension(se)
@@ -997,8 +991,33 @@ object UState {
       diagnostics,
       dataProc.asInstanceOf[DataProcessor],
       dataProc.tunables,
-      areDebugging
+      areDebugging,
+      new InputterEventState(inputter, "unparsing")
     )
     newState
+  }
+
+  /**
+   * For the unparse of a tree that is being built, which reads it as events.
+   * The inputter still owns the infoset document the events refer to.
+   */
+  def createInitialUStateForBuildAhead(
+    outStream: java.io.OutputStream,
+    dataProc: DFDL.DataProcessor,
+    inputter: InfosetInputter,
+    areDebugging: Boolean,
+    treeEvents: TreeEventState
+  ): UStateMainForBuildAhead = {
+    val variables = dataProc.variableMap.copy()
+    new UStateMainForBuildAhead(
+      inputter,
+      outStream,
+      variables,
+      Nil,
+      dataProc.asInstanceOf[DataProcessor],
+      dataProc.tunables,
+      areDebugging,
+      treeEvents
+    )
   }
 }

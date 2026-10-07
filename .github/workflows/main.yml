@@ -197,12 +197,12 @@ jobs:
       - name: Run Unit Tests
         run: $SBT test
 
-      # Prefetch is the default, so run the suite once more with it off to
-      # keep the single pass unparse path tested.
-      - name: Run Unit Tests (single pass unparse)
+      # Build ahead is the default, so run the suite once more event driven to
+      # keep that unparse path tested.
+      - name: Run Unit Tests (event-driven unparse)
         if: matrix.os == 'ubuntu-22.04' && matrix.java_version == '17'
         env:
-          DAFFODIL_TDML_TUNABLES: useBuildPrefetch=false
+          DAFFODIL_TDML_TUNABLES: infosetBuilderMode=eventDriven
         run: $SBT test
 
       - name: Run Integration Tests

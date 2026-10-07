@@ -25,8 +25,8 @@ import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.*
 import org.apache.daffodil.lib.util.MaybeInt
 import org.apache.daffodil.lib.util.MaybeULong
-import org.apache.daffodil.runtime1.processors.unparsers.SuspensionCapableUState
 import org.apache.daffodil.runtime1.processors.unparsers.UState
+import org.apache.daffodil.runtime1.processors.unparsers.UStateMain
 import org.apache.daffodil.runtime1.processors.unparsers.UnparseError
 
 /**
@@ -111,7 +111,7 @@ trait Suspension extends Serializable {
     //
     // As written, we have a bunch of suspensions that occur, but have
     // specifically known length of zero bits. So nothing being written out.
-    // TODO: In that case, why do we need to split at all?
+    // In that case, why do we need to split at all?
     //
     val original = ustate.getDataOutputStream
     if (mkl.isEmpty || (mkl.isDefined && mkl.get > 0)) {
@@ -175,19 +175,18 @@ trait Suspension extends Serializable {
     //
     // clone the ustate for use when evaluating the expression
     //
-    // A targeted partial clone (shallow VariableMap copy, stack tops only)
-    // that still copies the full escapeSchemeEVCache/delimiterStack contents.
-    // TODO: Performance: a copy-on-write scheme could avoid that copy.
+    // TODO: Performance - copying this whole state, just for OVC is painful.
+    // Some sort of copy-on-write scheme would be better.
     //
     val didSplit = (ustate.getDataOutputStream ne original)
-    val cloneUState = ustate.asInstanceOf[SuspensionCapableUState].cloneForSuspension(original)
+    val cloneUState = ustate.asInstanceOf[UStateMain].cloneForSuspension(original)
     if (isReadOnly && didSplit) {
       Assert.invariantFailed("Shouldn't have split. read-only case")
     }
 
     savedUstate_ = cloneUState
 
-    ustate.asInstanceOf[SuspensionCapableUState].addSuspension(this)
+    ustate.asInstanceOf[UStateMain].addSuspension(this)
   }
 
   final def explain(): Unit = {

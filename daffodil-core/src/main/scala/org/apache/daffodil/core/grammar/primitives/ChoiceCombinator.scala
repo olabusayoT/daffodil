@@ -34,7 +34,7 @@ import org.apache.daffodil.lib.util.Maybe.Nope
 import org.apache.daffodil.lib.util.Maybe.One
 import org.apache.daffodil.lib.util.MaybeInt
 import org.apache.daffodil.lib.util.ProperlySerializableMap.*
-import org.apache.daffodil.runtime1.infoset.ChoiceBranchEvent
+import org.apache.daffodil.lib.xml.NamedQName
 import org.apache.daffodil.runtime1.infoset.ChoiceInfosetBuilder
 import org.apache.daffodil.runtime1.infoset.InfosetBuilder
 import org.apache.daffodil.runtime1.infoset.NadaInfosetBuilder
@@ -273,8 +273,8 @@ case class ChoiceCombinator(ch: ChoiceTermBase, alternatives: Seq[Gram])
     }
   }
 
-  private lazy val eventUnparserMap = ch.choiceBranchMap._1.map { case (cbe, branchTerm) =>
-    (cbe, branchTerm.termContentBody.unparser)
+  private lazy val eventUnparserMap = ch.choiceBranchMap._1.map { case (qname, branchTerm) =>
+    (qname, branchTerm.termContentBody.unparser)
   }
 
   private lazy val hasEventBranchUnparser: Boolean =
@@ -336,7 +336,7 @@ case class ChoiceCombinator(ch: ChoiceTermBase, alternatives: Seq[Gram])
         branchForUnparse.get
       }
     } else {
-      val serializableMap: ProperlySerializableMap[ChoiceBranchEvent, Unparser] =
+      val serializableMap: ProperlySerializableMap[NamedQName, Unparser] =
         eventUnparserMap.toProperlySerializableMap
       val cbm = ChoiceBranchMap(serializableMap, branchForUnparse)
       new ChoiceCombinatorUnparser(ch.modelGroupRuntimeData, cbm, choiceLengthInBits)
@@ -346,20 +346,17 @@ case class ChoiceCombinator(ch: ChoiceTermBase, alternatives: Seq[Gram])
   override lazy val builder: InfosetBuilder = {
     val (eventRDMap, optDefaultBranch) = ch.choiceBranchMap
 
-    def builderFor(term: Term): (TermRuntimeData, InfosetBuilder) = {
-      (term.termRuntimeData, term.termContentBody.builder)
-    }
-
-    val branchMap: Map[ChoiceBranchEvent, (TermRuntimeData, InfosetBuilder)] =
-      eventRDMap.map { case (cbe, branchTerm) => (cbe, builderFor(branchTerm)) }
-    val defaultBranch: Maybe[(TermRuntimeData, InfosetBuilder)] = optDefaultBranch match {
-      case Some(term) => One(builderFor(term))
-      case None => Nope
-    }
-
-    if (!hasEventBranchUnparser && defaultBranch.isEmpty) {
+    if (!hasEventBranchUnparser && optDefaultBranch.isEmpty) {
       NadaInfosetBuilder
     } else {
+      val branchMap: Map[NamedQName, (TermRuntimeData, InfosetBuilder)] =
+        eventRDMap.map { case (qname, branchTerm) =>
+          (qname, (branchTerm.termRuntimeData, branchTerm.termContentBody.builder))
+        }
+      val defaultBranch: Maybe[(TermRuntimeData, InfosetBuilder)] = optDefaultBranch match {
+        case Some(term) => One((term.termRuntimeData, term.termContentBody.builder))
+        case None => Nope
+      }
       new ChoiceInfosetBuilder(ch.modelGroupRuntimeData, branchMap, defaultBranch)
     }
   }

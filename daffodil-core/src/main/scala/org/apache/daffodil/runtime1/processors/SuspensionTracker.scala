@@ -66,20 +66,6 @@ class SuspensionTracker(suspensionWaitYoung: Int, suspensionWaitOld: Int) {
   }
 
   /**
-   * Attempts every currently-tracked suspension once, bypassing throttling,
-   * without treating remaining blocks as an error. Intended for a caller
-   * whose own traversal has fully finished and needs an already-resolvable
-   * suspension to actually resolve before it can continue.
-   */
-  def evalSuspensionsUnthrottled(): Unit = {
-    evalSuspensionQueue(suspensionsOld)
-    evalSuspensionQueue(suspensionsYoung)
-    while (suspensionsYoung.nonEmpty) {
-      suspensionsOld.enqueue(suspensionsYoung.dequeue())
-    }
-  }
-
-  /**
    * Evaluates all suspensions until either they are all evaluated or a
    * deadlock is detected. This moves all young suspensions to the old queue,
    * and evaluates all old suspensions. If the old queue is non-empty, that

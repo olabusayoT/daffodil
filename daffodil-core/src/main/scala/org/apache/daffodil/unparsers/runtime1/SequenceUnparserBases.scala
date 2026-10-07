@@ -16,7 +16,6 @@
  */
 package org.apache.daffodil.unparsers.runtime1
 
-import org.apache.daffodil.runtime1.infoset.DIComplex
 import org.apache.daffodil.runtime1.processors.SequenceRuntimeData
 import org.apache.daffodil.runtime1.processors.unparsers.*
 
@@ -24,33 +23,4 @@ abstract class OrderedSequenceUnparserBase(
   srd: SequenceRuntimeData
 ) extends CombinatorUnparser(srd) {
   override def nom = "Sequence"
-
-  // False when no more children will ever come, or when a different term's
-  // child appeared in this tree position instead.
-  protected final def hasOccurrences(
-    rep: RepeatingChildUnparser,
-    complex: DIComplex,
-    idx: Int,
-    sharedCtx: UnparseSharedContext
-  ): Boolean =
-    sharedCtx.childExistsOrFinal(complex, idx) && (complex.child(idx).erd eq rep.erd)
-
-  protected final def isGroupTerm(cu: SequenceChildUnparser): Boolean =
-    !cu.childUnparser.isInstanceOf[ElementUnparserBase] &&
-      cu.childUnparser.isInstanceOf[TreeUnparser]
-
-  // A nested bare group (e.g. a choice) may resolve to a branch with no
-  // infoset footprint at all; once build is done and no child showed up, the
-  // group's own dispatch decides. A plain element term always needs an
-  // actual child, so it always waits.
-  protected final def awaitRequiredTermChild(
-    isGroupTerm: Boolean,
-    complex: DIComplex,
-    idx: Int,
-    sharedCtx: UnparseSharedContext
-  ): Unit = {
-    if (!isGroupTerm || sharedCtx.childExistsOrFinal(complex, idx)) {
-      sharedCtx.awaitChild(complex, idx)
-    }
-  }
 }

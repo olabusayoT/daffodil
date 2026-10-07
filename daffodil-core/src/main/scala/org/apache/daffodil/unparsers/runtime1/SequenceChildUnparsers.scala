@@ -212,7 +212,7 @@ abstract class RepeatingChildUnparser(
   ): Unit = {
     import OccursCountKind.*
 
-    val minReps = unparser.minRepeatsFixed
+    val minReps = unparser.minRepeatsConst
     val ev = state.inspectAccessor
     val erd = unparser.erd
 

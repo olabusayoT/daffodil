@@ -17,8 +17,8 @@
 -->
 
 <tdml:testSuite
-  suiteName="buildPrefetch"
-  description="Unparse tests whose output must not depend on whether the build-prefetch path is used. Run the suite with DAFFODIL_TDML_TUNABLES=useBuildPrefetch=false and =true."
+  suiteName="buildAhead"
+  description="Unparse tests whose output must not depend on whether the build-ahead path is used. Run the suite with DAFFODIL_TDML_TUNABLES=infosetBuilderMode=eventDriven and =buildAhead."
   xmlns:tdml="http://www.ibm.com/xmlns/dfdl/testData"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xmlns:dfdl="http://www.ogf.org/dfdl/dfdl-1.0/"
@@ -30,13 +30,13 @@
 
   <tdml:defineConfig name="cfg1">
     <daf:tunables>
-      <daf:unparsePrefetchWindowNodes>3</daf:unparsePrefetchWindowNodes>
+      <daf:unparseBuildAheadWindowNodes>3</daf:unparseBuildAheadWindowNodes>
     </daf:tunables>
   </tdml:defineConfig>
 
   <tdml:defineConfig name="cfg2">
     <daf:tunables>
-      <daf:unparsePrefetchWindowNodes>2</daf:unparsePrefetchWindowNodes>
+      <daf:unparseBuildAheadWindowNodes>2</daf:unparseBuildAheadWindowNodes>
       <daf:unparseSuspensionWaitOld>1</daf:unparseSuspensionWaitOld>
       <daf:unparseSuspensionWaitYoung>1</daf:unparseSuspensionWaitYoung>
     </daf:tunables>
@@ -44,7 +44,7 @@
 
   <tdml:defineConfig name="cfg3">
     <daf:tunables>
-      <daf:unparsePrefetchWindowNodes>2</daf:unparsePrefetchWindowNodes>
+      <daf:unparseBuildAheadWindowNodes>2</daf:unparseBuildAheadWindowNodes>
     </daf:tunables>
   </tdml:defineConfig>
 
@@ -53,7 +53,7 @@
       <daf:bind name="ex:runningVar">-1</daf:bind>
     </daf:externalVariableBindings>
     <daf:tunables>
-      <daf:unparsePrefetchWindowNodes>2</daf:unparsePrefetchWindowNodes>
+      <daf:unparseBuildAheadWindowNodes>2</daf:unparseBuildAheadWindowNodes>
     </daf:tunables>
   </tdml:defineConfig>
 
@@ -295,7 +295,7 @@
     <tdml:document>first_defaultable01</tdml:document>
   </tdml:unparserTestCase>
 
-  <tdml:defineSchema name="s_manyOccurrenceArrayWithSmallPrefetchLimit" elementFormDefault="unqualified">
+  <tdml:defineSchema name="s_manyOccurrenceArrayWithSmallBuildAheadLimit" elementFormDefault="unqualified">
     <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>
     <dfdl:format ref="ex:GeneralFormat"
       encoding="ascii"
@@ -313,7 +313,7 @@
     </xs:element>
   </tdml:defineSchema>
 
-  <tdml:unparserTestCase name="manyOccurrenceArrayWithSmallPrefetchLimit" root="row" model="s_manyOccurrenceArrayWithSmallPrefetchLimit" config="cfg1">
+  <tdml:unparserTestCase name="manyOccurrenceArrayWithSmallBuildAheadLimit" root="row" model="s_manyOccurrenceArrayWithSmallBuildAheadLimit" config="cfg1">
     <tdml:infoset>
       <tdml:dfdlInfoset xmlns:ex="http://example.com">
         <ex:row>
@@ -335,7 +335,7 @@
     <tdml:document>i0,i1,i2,i3,i4,i5,i6,i7,i8,i9,i10,i11</tdml:document>
   </tdml:unparserTestCase>
 
-  <!-- A bare nested xs:sequence has no tree node of its own; the enclosing unparseTree must not advance/free a tree-child position recursing into it. -->
+  <!-- A bare nested xs:sequence has no tree node of its own; the unparse of the enclosing element must not advance/free a tree-child position recursing into it. -->
   <tdml:defineSchema name="s_nestedBareSequence" elementFormDefault="unqualified">
     <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>
     <dfdl:format ref="ex:GeneralFormat"
@@ -566,7 +566,7 @@
     <tdml:document>one#, two,three</tdml:document>
   </tdml:unparserTestCase>
 
-  <!-- A dfdlx:layer-wrapped sequence: confirms the layer's DOS-splitting setup produces byte-identical output under prefetch. -->
+  <!-- A dfdlx:layer-wrapped sequence: confirms the layer's DOS-splitting setup produces byte-identical output under build ahead. -->
   <tdml:defineSchema name="s_layeredSequence" elementFormDefault="unqualified">
     <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>
     <xs:import
@@ -607,7 +607,7 @@
     <tdml:document>ABCDEFGHQ</tdml:document>
   </tdml:unparserTestCase>
 
-  <!-- A layer's length-exceeded error must surface under prefetch as it does in single-pass, not hang or leak a raw exception. -->
+  <!-- A layer's length-exceeded error must surface under build ahead as it does event-driven, not hang or leak a raw exception. -->
   <tdml:defineSchema name="s_layeredSequenceLengthMismatchError" elementFormDefault="unqualified">
     <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>
     <xs:import
@@ -1363,7 +1363,7 @@
     <tdml:document>03|xyz</tdml:document>
   </tdml:unparserTestCase>
 
-  <!-- A schema where every OVC is content-length-dependent (never resolvable early) still uses prefetch when the tunable is on, and unparses the same. -->
+  <!-- A schema where every OVC is content-length-dependent (never resolvable early) still builds ahead when the tunable is on, and unparses the same. -->
   <tdml:defineSchema name="s_purelyContentLengthOVC" elementFormDefault="unqualified">
     <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>
     <dfdl:format ref="ex:GeneralFormat"
@@ -1394,7 +1394,7 @@
     <tdml:document>03xyz</tdml:document>
   </tdml:unparserTestCase>
 
-  <!-- A schema mixing a resolvable OVC with an unrelated content-length-dependent one must still use the prefetch path. -->
+  <!-- A schema mixing a resolvable OVC with an unrelated content-length-dependent one must still use the build ahead path. -->
   <tdml:defineSchema name="s_mixedResolvableAndContentLengthOVC" elementFormDefault="unqualified">
     <xs:include schemaLocation="/org/apache/daffodil/xsd/DFDLGeneralFormat.dfdl.xsd"/>
     <dfdl:format ref="ex:GeneralFormat"

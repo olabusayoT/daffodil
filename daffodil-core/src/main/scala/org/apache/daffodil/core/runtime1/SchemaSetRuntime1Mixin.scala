@@ -63,7 +63,7 @@ trait SchemaSetRuntime1Mixin {
     unp
   }.value
 
-  // Built for every unparse-capable compile, whatever useBuildPrefetch says,
+  // Built for every unparse-capable compile, whatever infosetBuilderMode says,
   // so the tunable can be changed on a compiled DataProcessor.
   lazy val builder: InfosetBuilder = LV(Symbol("builder")) {
     if (generateUnparser) {
@@ -96,8 +96,6 @@ trait SchemaSetRuntime1Mixin {
     // null parser/unparser, and that it's impossible for a DataProcessor
     // to have an error
     Assert.invariant(!root.isError)
-    // Prefetch is used for every schema when the tunable is on, whether or
-    // not any OVC could benefit, so the InfosetBuilder tree is built for all of them.
     val ssrd =
       new SchemaSetRuntimeData(
         parser,

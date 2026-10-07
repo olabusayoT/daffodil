@@ -25,7 +25,6 @@ class TraceDebuggerRunner(out: PrintStream = System.out) extends DaffodilDebugge
   val traceIter = Seq(
     "set infosetParents 1",
     "display info parser",
-    "display info unparser",
     "display info bitPosition",
     "display info data",
     "display info infoset",
