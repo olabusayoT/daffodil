@@ -348,20 +348,20 @@ trait DataOutputStreamImplMixin
 
   private var _dosState: DOSState = Active // active when new.
 
-  @inline final def dosState = _dosState
+  final inline def dosState = _dosState
 
-  @inline protected final def setDOSState(newState: DOSState): Unit = { _dosState = newState }
+  protected final inline def setDOSState(newState: DOSState): Unit = { _dosState = newState }
 
   private[io] def isBuffering: Boolean
 
-  @inline private[io] final def isDirect = !isBuffering
+  private[io] final inline def isDirect = !isBuffering
 
-  @inline private[io] final def isDead = { _dosState =:= Uninitialized }
-  @inline override final def isFinished = { _dosState =:= Finished }
+  private[io] final inline def isDead = { _dosState =:= Uninitialized }
+  override final def isFinished = { _dosState =:= Finished }
   // @inline override def setFinished(finfo: FormatInfo) { _dosState = Finished }
-  @inline private[io] final def isActive = { _dosState =:= Active }
-  @inline private[io] final def isReadOnly = { isFinished && isBuffering }
-  @inline private[io] final def isWritable = {
+  private[io] final inline def isActive = { _dosState =:= Active }
+  private[io] final inline def isReadOnly = { isFinished && isBuffering }
+  private[io] final inline def isWritable = {
     isActive ||
     // This can happen if merging streams A and B and C, where A, the direct stream) is being setFinished.
     // if B is finished, then the result of merging A into B is a finished stream (now direct), but we still
@@ -369,7 +369,7 @@ trait DataOutputStreamImplMixin
     // Hence, the stream could be writable or finished.
     (isFinished && isDirect)
   }
-  @inline private[io] final def isReadable = { !isDead }
+  private[io] final inline def isReadable = { !isDead }
 
   protected def setJavaOutputStream(newOutputStream: java.io.OutputStream): Unit
 

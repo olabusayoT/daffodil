@@ -33,9 +33,8 @@ object NS extends UniquenessCache[String, NS] {
   /**
    * Import these implicit conversions for convenience if you like
    */
-  import scala.language.implicitConversions
-  implicit def implicitNStoString(ns: NS): String = ns.toString
-  implicit def implicitNStoURI(ns: NS): URI = ns.uri
+  given implicitNStoString: Conversion[NS, String] = ns => ns.toString
+  given implicitNStoURI: Conversion[NS, URI] = ns => ns.uri
 
   def apply(uri: URI): NS = {
     Assert.usage(uri != null)

@@ -25,7 +25,7 @@ import org.apache.daffodil.core.util.TestUtils.intercept
 import org.apache.daffodil.lib.util.Misc
 import org.apache.daffodil.lib.xml.XMLUtils
 
-import Converter.*
+import Converter.given
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -86,11 +86,8 @@ object Converter {
     o.flush();
   }
 
-  import scala.language.implicitConversions
-
-  implicit def intArrayToByteArray(intArray: Array[Int]): Array[Byte] = {
+  given intArrayToByteArray: Conversion[Array[Int], Array[Byte]] = intArray =>
     intArray.map(int => int.asInstanceOf[Byte]).toArray
-  }
 }
 
 class TestUnicodeErrorTolerance {

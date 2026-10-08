@@ -506,20 +506,17 @@ class StreamingInfosetWalker private (
     }
   }
 
-  @inline
-  private def moveToFirstChild(newContainer: DINode): Unit = {
+  private inline def moveToFirstChild(newContainer: DINode): Unit = {
     containerNodeStack.push(newContainer)
     containerIndexStack.push(0)
   }
 
-  @inline
-  private def moveToContainer(): Unit = {
+  private inline def moveToContainer(): Unit = {
     containerNodeStack.pop
     containerIndexStack.pop()
   }
 
-  @inline
-  private def moveToNextSibling(): Unit = {
+  private inline def moveToNextSibling(): Unit = {
     val top = containerIndexStack.top
     containerIndexStack.setTop(top + 1)
   }

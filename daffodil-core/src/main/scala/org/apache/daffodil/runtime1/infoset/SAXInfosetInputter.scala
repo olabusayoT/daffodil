@@ -75,8 +75,7 @@ class SAXInfosetInputter(
    * in the batchedInfosetEvents array. This is the event that the InfosetInputter is
    * currently returning information about to the unparse().
    */
-  @inline
-  private def currentEvent = batchedInfosetEvents(currentIndex)
+  private inline def currentEvent = batchedInfosetEvents(currentIndex)
 
   override def getEventType(): InfosetInputterEventType = currentEvent.eventType.get
 

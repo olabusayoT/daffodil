@@ -304,8 +304,7 @@ trait ConvertTextNumberMixin {
   /**
    * Convenience. The original value of textNumberPattern
    */
-  @inline
-  final protected def pattern = e.textNumberPattern
+  final protected inline def pattern = e.textNumberPattern
 
   /**
    * Analogous to the property dfdl:binaryDecimalVirtualPoint

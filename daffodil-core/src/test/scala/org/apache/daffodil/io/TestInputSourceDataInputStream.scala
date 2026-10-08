@@ -21,6 +21,7 @@ import java.math.BigInteger as JBigInt
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
 import java.util.regex.Pattern
+import scala.annotation.targetName
 
 import org.apache.daffodil.core.util.TestUtils.intercept
 import org.apache.daffodil.io.processors.charset.StandardBitsCharsets
@@ -45,7 +46,8 @@ class TestInputSourceDataInputStream {
 
   val finfo = FormatInfoForUnitTest()
 
-  implicit class ExactTypeEqual[L](left: L) {
+  extension [L](left: L) {
+    @targetName("assertEqualsTypedExtension")
     def assertEqualsTyped[R, D >: L <: R, D2 >: R <: L](right: R): Unit =
       assertEquals(left, right)
   }

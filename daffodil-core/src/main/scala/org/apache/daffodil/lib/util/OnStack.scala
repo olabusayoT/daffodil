@@ -30,7 +30,7 @@ sealed abstract class LocalStackBase[T](constructorFunc: => T, optionalResetFunc
    * function. The whole point of this is NOT to allocate objects. I.e., one uses OnStack to avoid
    * allocation of "little crud objects".
    */
-  @inline final def apply[R](body: T => R): R = {
+  final inline def apply[R](body: T => R): R = {
     val thing =
       if (stack.isEmpty) constructorFunc
       else stack.pop()

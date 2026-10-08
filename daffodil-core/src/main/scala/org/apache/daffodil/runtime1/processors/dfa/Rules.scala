@@ -617,8 +617,7 @@ class CharState(
     }
   })
 
-  @inline
-  private def checkMatchIgnoreCase(charIn: Char): Boolean = {
+  private inline def checkMatchIgnoreCase(charIn: Char): Boolean = {
     // note that we must check both toUpper and toLower. This is based on
     // String.java's equalsIgnoreCase method, which mentions that it is
     // possible for toUpper to not match but toLower to match due to the

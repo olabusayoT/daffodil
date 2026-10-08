@@ -184,9 +184,9 @@ abstract class Evaluatable[+T <: AnyRef](
 
   protected def isNeverConstant = false
 
-  @inline final def isCompiled = isCompiled_
+  final inline def isCompiled = isCompiled_
 
-  @inline final def ensureCompiled(): Unit = {
+  final inline def ensureCompiled(): Unit = {
     ci.initialize()
     if (!isCompiled)
       Assert.invariantFailed("not compiled Ev: " + this.qName)
@@ -297,15 +297,15 @@ abstract class Evaluatable[+T <: AnyRef](
   /**
    * Preferred for use in the runtime.
    */
-  @inline final def maybeConstant = Maybe.fromMaybeAnyRef[T](constValue_)
-  @inline final def isConstant = constValue_.isDefined
-  @inline final def constValue = maybeConstant.get
+  final inline def maybeConstant = Maybe.fromMaybeAnyRef[T](constValue_)
+  final inline def isConstant = constValue_.isDefined
+  final inline def constValue = maybeConstant.get
 
   /**
    * Schema compiler wants to use map call, so we need a scala option type
    * for that. So this variant supplies that.
    */
-  @inline final def optConstant = {
+  final inline def optConstant = {
     maybeConstant.toOption
   }
 

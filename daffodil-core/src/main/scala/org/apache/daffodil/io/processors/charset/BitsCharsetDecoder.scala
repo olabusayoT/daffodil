@@ -98,7 +98,7 @@ abstract class BitsCharsetDecoder {
   /**
    * Attempts to decode a single char, handling error encoding policy
    */
-  @inline private def decodeOneHandleMalformed(
+  private inline def decodeOneHandleMalformed(
     dis: InputSourceDataInputStream,
     finfo: FormatInfo
   ): MaybeChar = {
@@ -141,7 +141,7 @@ abstract class BitsCharsetDecoder {
 abstract class BitsCharsetDecoderByteSize extends BitsCharsetDecoder {
 
   // gets the next byte from the data, returns an int in the range 0 to 255
-  @inline protected final def getByte(
+  protected final inline def getByte(
     dis: InputSourceDataInputStream,
     bitsConsumedSoFar: Int
   ): Int = {

@@ -41,6 +41,6 @@ object OKOrError {
 }
 
 class OKOrError private (val errMsg: String) extends AnyVal {
-  @inline def isOK = this.errMsg eq OKOrError.okValue
-  @inline def isError = !isOK
+  inline def isOK = this.errMsg eq OKOrError.okValue
+  inline def isError = !isOK
 }

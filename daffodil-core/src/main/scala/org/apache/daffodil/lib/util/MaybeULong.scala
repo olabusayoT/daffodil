@@ -30,14 +30,14 @@ import passera.unsigned.ULong
  * toLong of that if you want a plain Long.
  */
 final class MaybeULong private (val __rep: Long) extends AnyVal {
-  @inline final def get: Long = if (isDefined) __rep else noneGet
-  @inline final def getULong: ULong = ULong(__rep)
+  final inline def get: Long = if (isDefined) __rep else noneGet
+  final inline def getULong: ULong = ULong(__rep)
   // @inline final def getOrElse(alternate: Long): Long = if (isDefined) get else alternate
   // @inline final def getULongOrElse(alternate: ULong): ULong = ULong(getOrElse(alternate.toLong))
   private def noneGet = throw new NoSuchElementException("Nope.get")
-  @inline final def isDefined = __rep != MaybeULong.undefValue
-  @inline final def isEmpty = !isDefined
-  @inline final def toOption: Option[Long] = if (isDefined) Some(get) else None
+  final inline def isDefined = __rep != MaybeULong.undefValue
+  final inline def isEmpty = !isDefined
+  final inline def toOption: Option[Long] = if (isDefined) Some(get) else None
   override def toString = if (isEmpty) "Nope" else "One(" + get + ")"
 
   // No map function or other monad features because we don't want usage
@@ -46,14 +46,14 @@ final class MaybeULong private (val __rep: Long) extends AnyVal {
   // The work-around: write an if-then-else like if (foo.isDefined) foo.get else MaybeULong.Nope
   // verbose but known-to-be-fast
 
-  @inline def toMaybeJULong =
+  inline def toMaybeJULong =
     if (isEmpty) MaybeJULong.Nope else new MaybeJULong(MaybeULong(__rep))
 }
 
 object MaybeULong {
   private val undefValue = -1L
 
-  @inline final def apply(v: Long) = {
+  final def apply(v: Long) = {
     Assert.usage(v >= 0)
     new MaybeULong(v)
   }
@@ -72,21 +72,21 @@ object MaybeULong {
  * stored within it.
  */
 final class MaybeJULong(mi: MaybeULong) extends Serializable {
-  @inline final def get: Long = mi.get
-  @inline final def getULong = mi.getULong
+  final inline def get: Long = mi.get
+  final inline def getULong = mi.getULong
   // @inline final def getOrElse(alternate: Long): Long = mi.getOrElse(alternate)
   // @inline final def getULongOrElse(alternate: ULong): ULong = mi.getULongOrElse(alternate)
-  @inline final def isDefined = mi.isDefined
-  @inline final def isEmpty = !isDefined
-  @inline final def toOption: Option[Long] = if (isDefined) Some(get) else None
+  final inline def isDefined = mi.isDefined
+  final inline def isEmpty = !isDefined
+  final inline def toOption: Option[Long] = if (isDefined) Some(get) else None
   override def toString = mi.toString
 
-  @inline def toMaybeULong = mi
+  inline def toMaybeULong = mi
 }
 
 object MaybeJULong {
 
-  @inline def apply(v: Long) = new MaybeJULong(MaybeULong(v))
+  inline def apply(v: Long) = new MaybeJULong(MaybeULong(v))
 
   val Nope = new MaybeJULong(MaybeULong.Nope)
 }

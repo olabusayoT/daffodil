@@ -64,7 +64,7 @@ final class TestMaybeInlineForeach {
    * If the tests that avoid _foreach are always superior, then we should drop the foreach and related
    * methods from Maybe that take function object arguments.
    */
-  @inline private def limit = 1000000000L // 50000000000L runs for about a minute
+  private inline def limit = 1000000000L // 50000000000L runs for about a minute
 
   def testForeach(): Unit = {
     var i: Long = 0

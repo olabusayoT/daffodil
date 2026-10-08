@@ -176,7 +176,7 @@ class CLIConf(arguments: Array[String], stdout: PrintStream, stderr: PrintStream
       }
     })
 
-  implicit def infosetTypeConverter: ValueConverter[InfosetType.Type] =
+  given infosetTypeConverter: ValueConverter[InfosetType.Type] =
     singleArgConverter[InfosetType.Type]((s: String) => {
       try {
         InfosetType.withName(s.toLowerCase)
@@ -191,7 +191,7 @@ class CLIConf(arguments: Array[String], stdout: PrintStream, stderr: PrintStream
       }
     })
 
-  implicit def implementationConverter: ValueConverter[TDMLImplementation] =
+  given implementationConverter: ValueConverter[TDMLImplementation] =
     singleArgConverter[TDMLImplementation]((s: String) => {
       val optImplementation = TDMLImplementation.optionStringToEnum("implementation", s)
       if (!optImplementation.isDefined) {
@@ -226,10 +226,10 @@ class CLIConf(arguments: Array[String], stdout: PrintStream, stderr: PrintStream
     val argType = ArgType.SINGLE
   }
 
-  implicit def rootNSConverter: ValueConverter[RefQName] =
+  given rootNSConverter: ValueConverter[RefQName] =
     org.rogach.scallop.singleArgConverter[RefQName](qnameConvert _)
 
-  implicit def fileResourceURIConverter: ValueConverter[URISchemaSource] =
+  given fileResourceURIConverter: ValueConverter[URISchemaSource] =
     singleArgConverter[URISchemaSource]((s: String) => {
       fileResourceToURI(s)
     })

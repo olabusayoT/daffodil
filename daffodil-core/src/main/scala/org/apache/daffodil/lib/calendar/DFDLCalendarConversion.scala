@@ -25,23 +25,20 @@ import com.ibm.icu.util.TimeZone
 
 object DFDLCalendarConversion {
 
-  @inline
-  private def pad2(i: Int) = {
+  private inline def pad2(i: Int) = {
     val istr = i.toString
     if (i >= 10) istr
     else "0" + istr
   }
 
-  @inline
-  private def pad3(i: Int) = {
+  private inline def pad3(i: Int) = {
     val istr = i.toString
     if (i >= 100) istr
     else if (i >= 10) "0" + istr
     else "00" + istr
   }
 
-  @inline
-  private def pad4(i: Int) = {
+  private inline def pad4(i: Int) = {
     val istr = i.toString
     if (i >= 1000) istr
     else if (i >= 100) "0" + istr
@@ -72,8 +69,7 @@ object DFDLCalendarConversion {
    *         the remaining characters
    */
   def datePartFromXMLString(string: String, calendar: Calendar): String = {
-    @inline
-    def invalidValue = throw new IllegalArgumentException(
+    inline def invalidValue = throw new IllegalArgumentException(
       "Invalid date string: %s".format(string)
     )
 
@@ -128,8 +124,7 @@ object DFDLCalendarConversion {
    *         the remaining characters
    */
   def timePartFromXMLString(string: String, calendar: Calendar): String = {
-    @inline
-    def invalidValue = throw new IllegalArgumentException(
+    inline def invalidValue = throw new IllegalArgumentException(
       "Invalid time string: %s".format(string)
     )
 
@@ -215,8 +210,7 @@ object DFDLCalendarConversion {
    *         the remaining characters
    */
   def timeZonePartFromXMLString(string: String, calendar: Calendar): String = {
-    @inline
-    def invalidValue = throw new IllegalArgumentException(
+    inline def invalidValue = throw new IllegalArgumentException(
       "Invalid time zone string: %s".format(string)
     )
 
@@ -277,8 +271,7 @@ object DFDLCalendarConversion {
 trait DFDLCalendarConversion {
   val calendarType: String
 
-  @inline
-  final protected def invalidCalendar(string: String): Nothing = {
+  final protected inline def invalidCalendar(string: String): Nothing = {
     throw new IllegalArgumentException(
       "Failed to parse %s from string: %s".format(calendarType, string)
     )

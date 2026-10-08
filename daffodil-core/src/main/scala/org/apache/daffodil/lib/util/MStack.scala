@@ -80,37 +80,37 @@ final class MStackOfMaybe[T <: AnyRef](initialSize: Int = 32) {
 
   def copyFrom(other: MStackOfMaybe[T]) = delegate.copyFrom(other.delegate)
 
-  @inline final def length = delegate.length
+  final inline def length = delegate.length
 
-  @inline final def push(m: Maybe[T]) = {
+  final inline def push(m: Maybe[T]) = {
     if (m.isDefined) delegate.push(m.get)
     else delegate.push(nullT)
   }
 
-  @inline final def pop: Maybe[T] = {
+  final inline def pop: Maybe[T] = {
     val m = delegate.pop
     if (m eq null) Nope
     else One(m)
   }
 
-  @inline final def setTop(m: Maybe[T]) = {
+  final inline def setTop(m: Maybe[T]) = {
     if (m.isDefined) delegate.setTop(m.get)
     else delegate.setTop(nullT)
   }
 
-  @inline final def top: Maybe[T] = {
+  final inline def top: Maybe[T] = {
     val m = delegate.top
     if (m eq null) Nope
     else One(m)
   }
 
-  @inline final def bottom: Maybe[T] = {
+  final inline def bottom: Maybe[T] = {
     val m = delegate.bottom
     if (m eq null) Nope
     else One(m)
   }
 
-  @inline final def isEmpty = delegate.isEmpty
+  final inline def isEmpty = delegate.isEmpty
 
   def clear() = delegate.clear()
   def toListMaybe = delegate.toList.map { (x: AnyRef) =>
@@ -138,19 +138,19 @@ final class MStackOf[T <: AnyRef](initialSize: Int = 32) extends Serializable {
 
   def copyFrom(other: MStackOf[T]) = delegate.copyFrom(other.delegate)
 
-  @inline final def length = delegate.length
+  final inline def length = delegate.length
 
   private val delegate = MStackOfAnyRef(initialSize)
 
-  @inline final def mark = delegate.mark
-  @inline final def reset(m: MStack.Mark) = delegate.reset(m)
+  final inline def mark = delegate.mark
+  final inline def reset(m: MStack.Mark) = delegate.reset(m)
 
-  @inline final def push(t: T) = delegate.push(t)
-  @inline final def pop: T = delegate.pop().asInstanceOf[T]
-  @inline final def setTop(t: T) = delegate.setTop(t)
-  @inline final def top: T = delegate.top.asInstanceOf[T]
-  @inline final def bottom: T = delegate.bottom.asInstanceOf[T]
-  @inline final def isEmpty = delegate.isEmpty
+  final inline def push(t: T) = delegate.push(t)
+  final inline def pop: T = delegate.pop().asInstanceOf[T]
+  final inline def setTop(t: T) = delegate.setTop(t)
+  final inline def top: T = delegate.top.asInstanceOf[T]
+  final inline def bottom: T = delegate.bottom.asInstanceOf[T]
+  final inline def isEmpty = delegate.isEmpty
   def clear() = delegate.clear()
   def toList = delegate.toList
   def maxSizeReached = delegate.maxSizeReached
@@ -240,17 +240,17 @@ protected abstract class MStack[@specialized T] private[util] (
    * mark, so long as you don't pop before push, and don't pop more times than push,
    * it will restore the stack to the contents it had.
    */
-  @inline final def mark = MStack.Mark(index)
+  final inline def mark = MStack.Mark(index)
 
   /**
    *  resets stack top to where it was when mark was called.
    */
-  @inline final def reset(m: MStack.Mark): Unit = {
+  final inline def reset(m: MStack.Mark): Unit = {
     index = m.v
   }
 
   /** The number of elements in the stack */
-  @inline final def length = index
+  final inline def length = index
 
   /**
    * Push an element onto the stack.
@@ -302,7 +302,7 @@ protected abstract class MStack[@specialized T] private[util] (
 
   inline def bottom: T = table(0)
 
-  @inline final def isEmpty: Boolean = index == 0
+  final inline def isEmpty: Boolean = index == 0
 
   def clear() = {
     index = 0

@@ -210,6 +210,7 @@ def buildScalacOptions(scalaVersion: String) = {
   val commonOptions = Seq(
     s"-release:$minSupportedJavaVersion",
     "-feature",
+    "-language:implicitConversions",
     "-deprecation",
     "-unchecked"
   )

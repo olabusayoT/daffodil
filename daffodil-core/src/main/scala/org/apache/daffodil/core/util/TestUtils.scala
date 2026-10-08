@@ -59,7 +59,7 @@ object TestUtils {
   /**
    * Based on JUnitSuite intercept
    */
-  def intercept[T <: AnyRef](body: => Any)(implicit tag: scala.reflect.ClassTag[T]): T = {
+  def intercept[T <: AnyRef](body: => Any)(using tag: scala.reflect.ClassTag[T]): T = {
     val clazz = tag.runtimeClass.asInstanceOf[Class[T]]
     val caught =
       try {

@@ -29,14 +29,14 @@ package org.apache.daffodil.lib.util
  * bits are those of this distinguished NaN value.
  */
 final case class MaybeDouble private (__rep: Long) extends AnyVal {
-  @inline final def value = get
-  @inline final def get: Double =
+  final inline def value = get
+  final inline def get: Double =
     if (isDefined) java.lang.Double.longBitsToDouble(__rep) else noneGet
   // @inline final def getOrElse(alternate: Double): Double = if (isDefined) get else alternate
   private def noneGet = throw new NoSuchElementException("Nope.get")
-  @inline final def isDefined = __rep != MaybeDouble.undefValue
-  @inline final def isEmpty = !isDefined
-  @inline final def toOption: Option[Double] = if (isDefined) Some(get) else None
+  final inline def isDefined = __rep != MaybeDouble.undefValue
+  final inline def isEmpty = !isDefined
+  final inline def toOption: Option[Double] = if (isDefined) Some(get) else None
   override def toString = if (isEmpty) "Nope" else "MaybeDouble(" + get + ")"
   // @inline final def map(f: Double => Double): MaybeDouble = if (isEmpty) MaybeDouble.Nope else MaybeDouble(f(get))
 }
@@ -52,7 +52,7 @@ object MaybeDouble {
     result
   }
 
-  @inline final def apply(v: Double) = new MaybeDouble(java.lang.Double.doubleToRawLongBits(v))
+  final def apply(v: Double) = new MaybeDouble(java.lang.Double.doubleToRawLongBits(v))
 
   val Nope = new MaybeDouble(undefValue)
 }
@@ -62,13 +62,13 @@ object MaybeDouble {
  * can reserve a value to represent Nope.
  */
 final case class MaybeFloat private (__rep: Long) extends AnyVal {
-  @inline final def get: Float =
+  final inline def get: Float =
     if (isDefined) java.lang.Float.intBitsToFloat(__rep.toInt) else noneGet
   // @inline final def getOrElse(alternate: Float): Float = if (isDefined) get else alternate
   private def noneGet = throw new NoSuchElementException("Nope.get")
-  @inline final def isDefined = __rep != MaybeFloat.undefValue
-  @inline final def isEmpty = !isDefined
-  @inline final def toOption: Option[Float] = if (isDefined) Some(get) else None
+  final inline def isDefined = __rep != MaybeFloat.undefValue
+  final inline def isEmpty = !isDefined
+  final inline def toOption: Option[Float] = if (isDefined) Some(get) else None
   override def toString = if (isEmpty) "Nope" else "MaybeFloat(" + get + ")"
 }
 
@@ -76,7 +76,7 @@ object MaybeFloat {
 
   private val undefValue = -1L
 
-  @inline final def apply(v: Float) = new MaybeFloat(
+  final def apply(v: Float) = new MaybeFloat(
     java.lang.Float.floatToRawIntBits(v).toLong
   )
 

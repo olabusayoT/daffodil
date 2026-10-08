@@ -26,7 +26,7 @@ import org.apache.daffodil.lib.exceptions.*
 import org.apache.daffodil.lib.schema.annotation.props.gen.BitOrder
 import org.apache.daffodil.lib.schema.annotation.props.gen.Representation
 import org.apache.daffodil.lib.util.Maybe
-import org.apache.daffodil.lib.util.Maybe.*
+import org.apache.daffodil.lib.util.Maybe.toMaybe
 import org.apache.daffodil.lib.util.MaybeULong
 import org.apache.daffodil.runtime1.processors.parsers.PState
 import org.apache.daffodil.runtime1.processors.unparsers.UState

@@ -33,22 +33,22 @@ import org.apache.daffodil.lib.exceptions.Assert
  *  One(null) = throws an exception
  */
 final class Maybe[+T <: AnyRef](val v: AnyRef) extends AnyVal with Serializable {
-  @inline final def get: T = if (isDefined) value else noneGet
-  @inline final def value: T = v.asInstanceOf[T]
+  final inline def get: T = if (isDefined) value else noneGet
+  final inline def value: T = v.asInstanceOf[T]
   final def noneGet =
     throw new NoSuchElementException("Nope.get") // good place for a breakpoint
 
-  @inline final def isEmpty: Boolean = NopeValue eq v
-  @inline final def isDefined: Boolean = !isEmpty
-  @inline final def nonEmpty = isDefined
-  @inline final def contains[U >: T](elem: U): Boolean = !isEmpty && value == elem
+  final inline def isEmpty: Boolean = NopeValue eq v
+  final inline def isDefined: Boolean = !isEmpty
+  final inline def nonEmpty = isDefined
+  final inline def contains[U >: T](elem: U): Boolean = !isEmpty && value == elem
   //  @inline final def exists(p: T => Boolean): Boolean = !isEmpty && p(get)
   //  @inline final def forall(p: T => Boolean): Boolean = isEmpty || p(get)
   //  @inline final def collect[U <: AnyRef](pf: PartialFunction[T, U]): Maybe[U] = if (!isEmpty && pf.isDefinedAt(get)) One(pf(get)) else Nope
   //  @inline final def iterator: Iterator[T] = if (isEmpty) collection.Iterator.empty else collection.Iterator.single(get)
-  @inline final def toList: List[T] = if (isEmpty) List() else new ::(get, Nil)
-  @inline final def toSeq: Seq[T] = toList
-  @inline final def toArray[U >: T: scala.reflect.ClassTag]: Array[U] =
+  final inline def toList: List[T] = if (isEmpty) List() else new ::(get, Nil)
+  final inline def toSeq: Seq[T] = toList
+  final inline def toArray[U >: T: scala.reflect.ClassTag]: Array[U] =
     if (isEmpty) Array.empty[U] else Array[U](value)
   // @inline final def getOrElse[U >: T](default: U): U = if (isEmpty) default else get
 
@@ -65,7 +65,7 @@ final class Maybe[+T <: AnyRef](val v: AnyRef) extends AnyVal with Serializable 
    * assert (thingy eq null) // back to an object of type T or null if not present.
    * }}}
    */
-  @inline final def orNull: T = if (isEmpty) null.asInstanceOf[T] else value
+  final inline def orNull: T = if (isEmpty) null.asInstanceOf[T] else value
   //  @inline final def filter(p: T => Boolean): Maybe[T] = if (isEmpty || p(get)) this else Nope
   //  @inline final def filterNot(p: T => Boolean): Maybe[T] = if (isEmpty || !p(get)) this else Nope
   //  @inline final def withFilter(f: T => Boolean): Maybe[T] = filter(f)
@@ -77,10 +77,10 @@ final class Maybe[+T <: AnyRef](val v: AnyRef) extends AnyVal with Serializable 
   /**
    * For testing if the function object gets allocated or inlined away.
    */
-  @inline private[util] final def _foreach[U](f: T => U): Unit = if (!isEmpty) f(get)
+  private[util] final inline def _foreach[U](f: T => U): Unit = if (!isEmpty) f(get)
   //  @inline final def fold[U](ifEmpty: => U)(f: T => U): U = if (isEmpty) ifEmpty else f(get)
   //  @inline final def flatten[U <: AnyRef](implicit ev: T <:< Maybe[U]): Maybe[U] = if (isEmpty) Nope else ev(get)
-  @inline final def toOption: scala.Option[T] =
+  final inline def toOption: scala.Option[T] =
     if (isEmpty) scala.None else scala.Some(get)
   override final def toString = if (isEmpty) "Nope" else "One(" + get + ")"
 }
@@ -96,15 +96,13 @@ object NopeValue extends Serializable {
 
 object Maybe {
 
-  import scala.language.implicitConversions
-
   /**
    * implicitly convert Option type to Maybe type.
    *
    * The conversion the other way must be explicit by calling toOption
    */
 
-  implicit def toMaybe[T <: AnyRef](o: Option[T]): Maybe[T] = o match {
+  given toMaybe[T <: AnyRef]: Conversion[Option[T], Maybe[T]] = {
     case None => Nope
     case Some(x) => One(x)
   }
@@ -113,13 +111,13 @@ object Maybe {
    * Maybe(null) returns Nope
    * Maybe(not-null) returns One(not-null)
    */
-  @inline
-  final def apply[T <: AnyRef](value: T) = if (value == null) Nope else new Maybe[T](value)
+  final inline def apply[T <: AnyRef](value: T) =
+    if (value == null) Nope else new Maybe[T](value)
 
-  @inline
-  final def fromMaybeAnyRef[T <: AnyRef](anyref: Maybe[AnyRef]) = Maybe(
-    anyref.v.asInstanceOf[T]
-  )
+  // The cast is on the Maybe, not its contents: this is inline so T is the
+  // caller's concrete type, and casting a Nope's contents to T would throw.
+  final inline def fromMaybeAnyRef[T <: AnyRef](anyref: Maybe[AnyRef]): Maybe[T] =
+    Maybe(anyref.v).asInstanceOf[Maybe[T]]
 
   val Nope = new Maybe[Nothing](NopeValue)
 
@@ -176,7 +174,7 @@ object Maybe {
    */
   object WithNulls {
 
-    @inline final def isDefined[T <: AnyRef](thing: T): Boolean = {
+    final inline def isDefined[T <: AnyRef](thing: T): Boolean = {
       if (thing eq null) false
       else if (thing eq NopeValue)
         Assert.usageError(
@@ -185,7 +183,7 @@ object Maybe {
       else true
     }
 
-    @inline final def get[T <: AnyRef](thing: T): T = {
+    final inline def get[T <: AnyRef](thing: T): T = {
       if (!isDefined(thing))
         throw new NoSuchElementException("get on undefined value: " + thing)
       else thing
@@ -195,7 +193,7 @@ object Maybe {
       if (!isDefined(thing)) None else Some(thing)
     }
 
-    @inline final def toMaybe[T <: AnyRef](thing: AnyRef): Maybe[T] = {
+    final inline def toMaybe[T <: AnyRef](thing: AnyRef): Maybe[T] = {
       if (thing eq null) Nope else new Maybe(thing.asInstanceOf[T])
     }
   }

@@ -71,34 +71,34 @@ sealed trait DataValuePrimitiveType
 final class DataValue[+T <: AnyRef, +X <: AnyRef] private (val v: T)
   extends AnyVal
   with Serializable {
-  @inline def isEmpty = DataValue.NoValue.v eq v
-  @inline def isDefined = !isEmpty
-  @inline def value = v
-  @inline override def toString = if (isEmpty) "NoValue" else "DataValue(" + v.toString + ")"
+  inline def isEmpty = DataValue.NoValue.v eq v
+  inline def isDefined = !isEmpty
+  inline def value = v
+  override def toString = if (isEmpty) "NoValue" else "DataValue(" + v.toString + ")"
 
-  @inline def getAnyRef = v.asInstanceOf[AnyRef]
-  @inline def getBigDecimal = v.asInstanceOf[JBigDecimal]
-  @inline def getCalendar = v.asInstanceOf[DFDLCalendar]
-  @inline def getDate = v.asInstanceOf[DFDLDate]
-  @inline def getTime = v.asInstanceOf[DFDLTime]
-  @inline def getDateTime = v.asInstanceOf[DFDLDateTime]
-  @inline def getByteArray = v.asInstanceOf[Array[Byte]]
-  @inline def getBoolean = v.asInstanceOf[JBoolean]
-  @inline def getNumber = v.asInstanceOf[JNumber]
-  @inline def getByte = v.asInstanceOf[JByte]
-  @inline def getShort = v.asInstanceOf[JShort]
-  @inline def getInt = v.asInstanceOf[JInt]
-  @inline def getLong = v.asInstanceOf[JLong]
-  @inline def getDouble = v.asInstanceOf[JDouble]
-  @inline def getFloat = v.asInstanceOf[JFloat]
-  @inline def getBigInt = v.asInstanceOf[JBigInt]
-  @inline def getString = v.asInstanceOf[JString]
-  @inline def getURI = v.asInstanceOf[URI]
+  inline def getAnyRef = v.asInstanceOf[AnyRef]
+  inline def getBigDecimal = v.asInstanceOf[JBigDecimal]
+  inline def getCalendar = v.asInstanceOf[DFDLCalendar]
+  inline def getDate = v.asInstanceOf[DFDLDate]
+  inline def getTime = v.asInstanceOf[DFDLTime]
+  inline def getDateTime = v.asInstanceOf[DFDLDateTime]
+  inline def getByteArray = v.asInstanceOf[Array[Byte]]
+  inline def getBoolean = v.asInstanceOf[JBoolean]
+  inline def getNumber = v.asInstanceOf[JNumber]
+  inline def getByte = v.asInstanceOf[JByte]
+  inline def getShort = v.asInstanceOf[JShort]
+  inline def getInt = v.asInstanceOf[JInt]
+  inline def getLong = v.asInstanceOf[JLong]
+  inline def getDouble = v.asInstanceOf[JDouble]
+  inline def getFloat = v.asInstanceOf[JFloat]
+  inline def getBigInt = v.asInstanceOf[JBigInt]
+  inline def getString = v.asInstanceOf[JString]
+  inline def getURI = v.asInstanceOf[URI]
 
-  @inline def getNonNullable: DataValue[T, X with NonNullable] = new DataValue(v)
-  @inline def getNullablePrimitive: DataValue.DataValuePrimitiveNullable = new DataValue(v)
+  def getNonNullable: DataValue[T, X with NonNullable] = new DataValue(v)
+  def getNullablePrimitive: DataValue.DataValuePrimitiveNullable = new DataValue(v)
 
-  @inline def getOptionAnyRef = {
+  inline def getOptionAnyRef = {
     if (isEmpty) {
       None
     } else {
@@ -106,7 +106,7 @@ final class DataValue[+T <: AnyRef, +X <: AnyRef] private (val v: T)
     }
   }
 
-  @inline def getMaybe[T <: AnyRef]: Maybe[T] = {
+  inline def getMaybe[T <: AnyRef]: Maybe[T] = {
     if (isEmpty) {
       Nope
     } else {
@@ -156,44 +156,42 @@ object DataValue {
   type DataValueDINode = DataValue[DINode, NonNullable with DataValuePrimitiveType]
   type DataValueUseNilForDefault = DataValue[UseNilForDefaultObj, NonNullable]
 
-  import scala.language.implicitConversions
+  given Conversion[JBigDecimal, DataValueBigDecimal] = v => new DataValue(v)
+  given Conversion[DFDLCalendar, DataValueCalendar] = v => new DataValue(v)
+  given Conversion[DFDLDateTime, DataValueDateTime] = v => new DataValue(v)
+  given Conversion[DFDLDate, DataValueDate] = v => new DataValue(v)
+  given Conversion[DFDLTime, DataValueTime] = v => new DataValue(v)
+  given Conversion[Array[Byte], DataValueByteArray] = v => new DataValue(v)
+  given Conversion[JBoolean, DataValueBool] = v => new DataValue(v)
+  given Conversion[JNumber, DataValueNumber] = v => new DataValue(v)
+  given Conversion[JLong, DataValueLong] = v => new DataValue(v)
+  given Conversion[JDouble, DataValueDouble] = v => new DataValue(v)
+  given Conversion[JBigInt, DataValueBigInt] = v => new DataValue(v)
+  given Conversion[JString, DataValueString] = v => new DataValue(v)
+  given Conversion[URI, DataValueURI] = v => new DataValue(v)
+  given Conversion[JFloat, DataValueFloat] = v => new DataValue(v)
+  given Conversion[JByte, DataValueByte] = v => new DataValue(v)
+  given Conversion[JInt, DataValueInt] = v => new DataValue(v)
+  given Conversion[JShort, DataValueShort] = v => new DataValue(v)
+  given Conversion[DINode, DataValueDINode] = v => new DataValue(v)
 
-  @inline implicit def toDataValue(v: JBigDecimal): DataValueBigDecimal = new DataValue(v)
-  @inline implicit def toDataValue(v: DFDLCalendar): DataValueCalendar = new DataValue(v)
-  @inline implicit def toDataValue(v: DFDLDateTime): DataValueDateTime = new DataValue(v)
-  @inline implicit def toDataValue(v: DFDLDate): DataValueDate = new DataValue(v)
-  @inline implicit def toDataValue(v: DFDLTime): DataValueTime = new DataValue(v)
-  @inline implicit def toDataValue(v: Array[Byte]): DataValueByteArray = new DataValue(v)
-  @inline implicit def toDataValue(v: JBoolean): DataValueBool = new DataValue(v)
-  @inline implicit def toDataValue(v: JNumber): DataValueNumber = new DataValue(v)
-  @inline implicit def toDataValue(v: JLong): DataValueLong = new DataValue(v)
-  @inline implicit def toDataValue(v: JDouble): DataValueDouble = new DataValue(v)
-  @inline implicit def toDataValue(v: JBigInt): DataValueBigInt = new DataValue(v)
-  @inline implicit def toDataValue(v: JString): DataValueString = new DataValue(v)
-  @inline implicit def toDataValue(v: URI): DataValueURI = new DataValue(v)
-  @inline implicit def toDataValue(v: JFloat): DataValueFloat = new DataValue(v)
-  @inline implicit def toDataValue(v: JByte): DataValueByte = new DataValue(v)
-  @inline implicit def toDataValue(v: JInt): DataValueInt = new DataValue(v)
-  @inline implicit def toDataValue(v: JShort): DataValueShort = new DataValue(v)
-  @inline implicit def toDataValue(v: DINode): DataValueDINode = new DataValue(v)
+  given Conversion[Long, DataValueLong] = v => new DataValue(v: JLong)
+  given Conversion[Double, DataValueDouble] = v => new DataValue(v: JDouble)
+  given Conversion[Boolean, DataValueBool] = v => new DataValue(v: JBoolean)
+  given Conversion[Float, DataValueFloat] = v => new DataValue(v: JFloat)
+  given Conversion[Byte, DataValueByte] = v => new DataValue(v: JByte)
+  given Conversion[Int, DataValueInt] = v => new DataValue(v: JInt)
+  given Conversion[Short, DataValueShort] = v => new DataValue(v: JShort)
 
-  @inline implicit def toDataValue(v: Long): DataValueLong = new DataValue(v: JLong)
-  @inline implicit def toDataValue(v: Double): DataValueDouble = new DataValue(v: JDouble)
-  @inline implicit def toDataValue(v: Boolean): DataValueBool = new DataValue(v: JBoolean)
-  @inline implicit def toDataValue(v: Float): DataValueFloat = new DataValue(v: JFloat)
-  @inline implicit def toDataValue(v: Byte): DataValueByte = new DataValue(v: JByte)
-  @inline implicit def toDataValue(v: Int): DataValueInt = new DataValue(v: JInt)
-  @inline implicit def toDataValue(v: Short): DataValueShort = new DataValue(v: JShort)
-
-  @inline def unsafeFromAnyRef(v: AnyRef) = new DataValue(v)
-  @inline def unsafeFromMaybeAnyRef(v: Maybe[AnyRef]) = {
+  def unsafeFromAnyRef(v: AnyRef) = new DataValue(v)
+  def unsafeFromMaybeAnyRef(v: Maybe[AnyRef]) = {
     if (v.isDefined) {
       new DataValue(v.get)
     } else {
       NoValue
     }
   }
-  @inline def unsafeFromOptionAnyRef(v: Option[AnyRef]) = {
+  def unsafeFromOptionAnyRef(v: Option[AnyRef]) = {
     if (v.isDefined) {
       new DataValue(v.get)
     } else {
@@ -212,7 +210,7 @@ object DataValue {
     override def toString = "UseNilForDefault"
   }
 
-  @inline def assertValueIsNotDataValue(v: AnyRef): Unit = {
+  inline def assertValueIsNotDataValue(v: AnyRef): Unit = {
 
     /*
      *

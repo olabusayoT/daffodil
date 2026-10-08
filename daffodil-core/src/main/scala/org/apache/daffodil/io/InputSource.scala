@@ -383,16 +383,14 @@ class BucketingInputSource(
   /**
    * Get the bucket index where bytePos0b is stored
    */
-  @inline
-  final private def getBucketIndex(bytePos0b: Long): Int = {
+  final private inline def getBucketIndex(bytePos0b: Long): Int = {
     ((bytePos0b - headBucketBytePosition0b) >>> bucketSizeExponent).toInt
   }
 
   /**
    * Get the index in a bucket where bytePos0b is stored
    */
-  @inline
-  final private def getByteIndex(bytePos0b: Long): Int = {
+  final private inline def getByteIndex(bytePos0b: Long): Int = {
     ((bytePos0b - headBucketBytePosition0b) & bucketMask).toInt
   }
 

@@ -128,7 +128,7 @@ object ProperlySerializableMap {
 
   type ProperlySerializableMap[K, V] = java.util.Map[K, V]
 
-  implicit class DecoratedWithToProperlySerialableMap[K, V](m: Map[K, V]) {
+  extension [K, V](m: Map[K, V]) {
     def toProperlySerializableMap: ProperlySerializableMap[K, V] = {
       // This LinkedHashMap constructor copies the keys/values from the Scala MapWrapper, so
       // anything using the result of this function will not have any Scala serialization issues

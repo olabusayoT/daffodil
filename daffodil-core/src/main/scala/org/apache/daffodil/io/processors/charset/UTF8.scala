@@ -105,7 +105,7 @@ class BitsCharsetDecoderUTF8 extends BitsCharsetDecoderCreatesSurrogates {
     }
   }
 
-  @inline final def checkContinuationByte(
+  final inline def checkContinuationByte(
     dis: InputSourceDataInputStream,
     byte: Int,
     bitsConsumedSoFar: Int
@@ -121,7 +121,7 @@ class BitsCharsetDecoderUTF8 extends BitsCharsetDecoderCreatesSurrogates {
     }
   }
 
-  @inline final def checkOverlong(
+  final inline def checkOverlong(
     byte1: Int,
     mask1: Int,
     byte2: Int,

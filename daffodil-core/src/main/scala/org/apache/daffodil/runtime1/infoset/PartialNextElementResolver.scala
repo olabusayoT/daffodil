@@ -22,6 +22,7 @@ import org.apache.daffodil.lib.util.Logger
 import org.apache.daffodil.lib.util.MStackOf
 import org.apache.daffodil.lib.util.Maybe
 import org.apache.daffodil.lib.util.Maybe.*
+import org.apache.daffodil.lib.util.Maybe.toMaybe
 import org.apache.daffodil.lib.util.ResettableIterator
 import org.apache.daffodil.lib.xml.NS
 import org.apache.daffodil.lib.xml.NamedQName

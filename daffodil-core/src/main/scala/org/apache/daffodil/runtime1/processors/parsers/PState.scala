@@ -362,8 +362,7 @@ final class PState private (
    * this PoU--if we've already done a deep copy, we don't need to do it again
    * since the PoU copy can't be modified.
    */
-  @inline
-  private def changingVariable(): Unit = {
+  private inline def changingVariable(): Unit = {
     if (!pointsOfUncertainty.isEmpty) {
       val curPoU = pointsOfUncertainty.top
       if (curPoU.variableMap eq this.variableMap) {

@@ -73,8 +73,7 @@ final class MarkState() extends DataStreamCommonState with DataInputStream.Mark 
   var bitLimit0b: MaybeULong = MaybeULong.Nope
   val charIteratorState = new InputSourceDataInputStreamCharIteratorState
 
-  @inline
-  def bytePos0b: Long = bitPos0b >> 3
+  inline def bytePos0b: Long = bitPos0b >> 3
 
   def assignFrom(other: MarkState): Unit = {
     super.assignFrom(other)
@@ -119,10 +118,8 @@ final class InputSourceDataInputStream private (val inputSource: InputSource)
    */
   override def close(): Unit = inputSource.close()
 
-  @inline
   override final def bitPos0b: Long = cst.bitPos0b
 
-  @inline
   override final def bitLimit0b: MaybeULong = cst.bitLimit0b
 
   /**
@@ -869,8 +866,7 @@ class InputSourceDataInputStreamCharIterator(dis: InputSourceDataInputStream)
     finfo = _finfo
   }
 
-  @inline
-  private def checkNeedsRefetch(): Unit = {
+  private inline def checkNeedsRefetch(): Unit = {
     val cis = dis.cst.charIteratorState
     if (cis.bitPositionAtLastFetch0b != dis.bitPos0b) {
       // Something outside of the char iterator  moved the bit position since

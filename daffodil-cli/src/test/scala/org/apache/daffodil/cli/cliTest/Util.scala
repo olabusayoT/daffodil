@@ -568,7 +568,7 @@ object Util {
    *   Array("some", "--arg=the/result/of/root/and/value")
    *
    */
-  implicit class ArgsHelper(val sc: StringContext) extends AnyVal {
+  extension (sc: StringContext) {
     def args(exprs: Any*): Array[String] = {
       val strings = sc.parts.iterator
       val expressions = exprs.iterator

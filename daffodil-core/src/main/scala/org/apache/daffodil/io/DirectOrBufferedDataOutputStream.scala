@@ -76,8 +76,7 @@ private[io] class ByteArrayOrFileOutputStream(
    * Check to see if there is enough room in the ByteArrayOutputStream for the
    * specified length. If there is not, switch to FileOutputStream.
    */
-  @inline
-  private def checkBuffer(lengthInBytes: Long): Unit = {
+  private inline def checkBuffer(lengthInBytes: Long): Unit = {
     if (!isFile && (nBytes + lengthInBytes > maxBufferSizeInBytes)) {
       Logger.log.warn(
         s"Switching to file based output stream. If this is performance critical, you may want to consider re-organizing your schema to avoid this if possible."

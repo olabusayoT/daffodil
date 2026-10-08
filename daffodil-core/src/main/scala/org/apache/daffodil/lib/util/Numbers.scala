@@ -350,8 +350,7 @@ trait Numbers {
     }
   }
 
-  @inline
-  def asAnyRef(n: Any): AnyRef = {
+  inline def asAnyRef(n: Any): AnyRef = {
     n.asInstanceOf[AnyRef]
   }
 

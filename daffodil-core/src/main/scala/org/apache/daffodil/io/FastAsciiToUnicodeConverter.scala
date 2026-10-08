@@ -64,21 +64,18 @@ object FastAsciiToUnicodeConverter {
    * not a legal character code so produce the unicode
    * replacement character.
    */
-  @inline
-  def convertByte(byte: Byte) = {
+  inline def convertByte(byte: Byte) = {
     if (byte < 0) UnicodeReplacementCharacter
     else byte.toChar
   }
 
-  @inline
-  def convertInt(int: Int) = {
+  inline def convertInt(int: Int) = {
     val i = int & 0xff
     if (i > 127) UnicodeReplacementCharacter
     else i.toChar
   }
 
-  @inline
-  def convertLong(bytes: Int): Long = {
+  inline def convertLong(bytes: Int): Long = {
     val int1 = bytes & 0xff
     val int2 = (bytes >> 8) & 0xff
     val int3 = (bytes >> 16) & 0xff

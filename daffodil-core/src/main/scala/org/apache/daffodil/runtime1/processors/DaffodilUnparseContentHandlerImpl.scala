@@ -163,8 +163,7 @@ class DaffodilUnparseContentHandlerImpl(dp: DFDL.DataProcessor, output: DFDL.Out
    * in the batchedInfosetEvents array. This is the current event that the
    * ContentHandler is modifying in preparation to be sent to the SAXInfosetInputter.
    */
-  @inline
-  private def currentEvent = batchedInfosetEvents(currentIndex)
+  private inline def currentEvent = batchedInfosetEvents(currentIndex)
 
   /**
    * This flag is set to true when startPrefixMapping() is handled. When true, we
